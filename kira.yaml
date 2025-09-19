@@ -1,0 +1,23 @@
+vault:
+  path: "/abs/path/to/TestVault"
+  tz: "Europe/Brussels"
+  # mounts: [{name: personal, path: "/.../PersonalVault"}]
+
+adapters:
+  telegram:
+    enabled: true
+    mode: "userbot"              # или "bot"
+    chat_whitelist: []
+  gcal:
+    enabled: true
+    calendars:
+      work: "<gcal_id>"
+      personal: "<gcal_id>"
+
+policies:
+  mode: "Focus"                  # Focus | Travel | Night
+  confirm_external_writes: true  # гейт PR/email/calendar
+
+security:
+  secrets_from_env: true
+  allow_fs_exec: false
