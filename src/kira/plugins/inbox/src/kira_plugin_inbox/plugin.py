@@ -1,17 +1,18 @@
 """Inbox normalization plugin implementation."""
+
 from __future__ import annotations
 
 import json
 import re
 import uuid
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Dict, Iterable, Optional
 
 from kira.plugin_sdk.context import PluginContext
 
-_NORMALIZER: Optional["InboxNormalizer"] = None
+_NORMALIZER: InboxNormalizer | None = None
 
 
 @dataclass
@@ -34,11 +35,11 @@ class InboxNormalizer:
         normalized = re.sub(r"[ \t\u00A0]+", " ", normalized)
         normalized = re.sub(r" ?\n ?", "\n", normalized)
         normalized = re.sub(r"\n{3,}", "\n\n", normalized)
-        return normalized.strip('.,!?;:"\'()[]{}')
+        return normalized.strip(".,!?;:\"'()[]{}")
 
-    def extract_metadata(self, content: str, source: Optional[str] = None) -> Dict[str, object]:
+    def extract_metadata(self, content: str, source: str | None = None) -> dict[str, object]:
         """Extract lightweight metadata heuristics from content."""
-        metadata: Dict[str, object] = {
+        metadata: dict[str, object] = {
             "source": source or "unknown",
             "timestamp": datetime.now(UTC).isoformat(),
             "length": len(content),
@@ -61,7 +62,7 @@ class InboxNormalizer:
 
         return metadata
 
-    def create_normalized_file(self, content: str, metadata: Dict[str, object]) -> Path:
+    def create_normalized_file(self, content: str, metadata: dict[str, object]) -> Path:
         """Write processed markdown with frontmatter."""
         safe_name = metadata.get("timestamp", datetime.now(UTC).isoformat())
         file_name = f"{safe_name}-{uuid.uuid4().hex[:8]}.md"
@@ -82,7 +83,7 @@ class InboxNormalizer:
         output_path.write_text(body, encoding="utf-8")
         return output_path
 
-    def process_message(self, message: str, source: Optional[str] = None) -> Dict[str, object]:
+    def process_message(self, message: str, source: str | None = None) -> dict[str, object]:
         """Normalize and persist a raw message."""
         normalized = self.normalize_text(message)
         metadata = self.extract_metadata(normalized, source)
@@ -93,7 +94,7 @@ class InboxNormalizer:
             "metadata": metadata,
         }
 
-    def process_file(self, file_path: Path) -> Dict[str, object]:
+    def process_file(self, file_path: Path) -> dict[str, object]:
         """Normalize an incoming file by moving it into the processed vault."""
         file_path = Path(file_path)
         content = file_path.read_text(encoding="utf-8")
@@ -117,7 +118,7 @@ def get_normalizer() -> InboxNormalizer:
     return _NORMALIZER
 
 
-def activate(context: PluginContext) -> Dict[str, str]:
+def activate(context: PluginContext) -> dict[str, str]:
     """Activate the inbox plugin by initialising the normalizer."""
     global _NORMALIZER
     _NORMALIZER = InboxNormalizer(context)
@@ -125,7 +126,7 @@ def activate(context: PluginContext) -> Dict[str, str]:
     return {"status": "ok", "plugin": "kira-inbox"}
 
 
-def handle_message_received(context: PluginContext, event_data: Dict[str, object]) -> None:
+def handle_message_received(context: PluginContext, event_data: dict[str, object]) -> None:
     message = str(event_data.get("message", ""))
     source = event_data.get("source")
     normalizer = get_normalizer()
@@ -133,7 +134,7 @@ def handle_message_received(context: PluginContext, event_data: Dict[str, object
     context.logger.debug(f"Normalized message stored at {result['file_path']}")
 
 
-def handle_file_dropped(context: PluginContext, event_data: Dict[str, object]) -> None:
+def handle_file_dropped(context: PluginContext, event_data: dict[str, object]) -> None:
     file_path = Path(str(event_data.get("file_path")))
     normalizer = get_normalizer()
     result = normalizer.process_file(file_path)

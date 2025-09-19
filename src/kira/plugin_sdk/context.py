@@ -1,14 +1,14 @@
 """
 Plugin Context - контекст выполнения плагина
 """
-from pathlib import Path
-from typing import Any, Dict, List, Optional
+
+from typing import Any
 
 
 class PluginContext:
     """Контекст выполнения плагина"""
 
-    def __init__(self, config: Dict[str, Any]):
+    def __init__(self, config: dict[str, Any]):
         self.config = config
         self.events = EventBus()
         self.logger = Logger()
@@ -23,7 +23,7 @@ class EventBus:
     def __init__(self):
         self._subscribers = {}
 
-    def publish(self, event_name: str, data: Dict[str, Any]) -> None:
+    def publish(self, event_name: str, data: dict[str, Any]) -> None:
         """Публикует событие"""
         print(f"📢 Событие: {event_name}")
         if data:
@@ -104,7 +104,7 @@ class KeyValueStore:
 class SecretsManager:
     """Менеджер секретов для плагинов"""
 
-    def get(self, key: str) -> Optional[str]:
+    def get(self, key: str) -> str | None:
         """Получает секрет по ключу"""
         # В реальной реализации здесь будет обращение к хранилищу секретов
         print(f"🔐 Запрошен секрет: {key}")

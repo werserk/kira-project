@@ -1,12 +1,13 @@
 """Ensure plugin entry points are importable and behave consistently."""
+
 from __future__ import annotations
 
 import importlib
 import json
 import sys
+from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Iterator, Tuple
 
 import pytest
 
@@ -17,7 +18,7 @@ from kira.plugin_sdk.context import PluginContext
 PLUGINS_ROOT = Path(__file__).parent.parent.parent / "src" / "kira" / "plugins"
 
 
-def iter_plugin_specs() -> Iterator[Tuple[str, str, Path, str]]:
+def iter_plugin_specs() -> Iterator[tuple[str, str, Path, str]]:
     """Yield (module_name, function_name, src_dir, plugin_name)."""
     for manifest_path in sorted(PLUGINS_ROOT.glob("*/kira-plugin.json")):
         data = json.loads(manifest_path.read_text(encoding="utf-8"))
@@ -43,9 +44,7 @@ PLUGIN_SPECS = list(iter_plugin_specs())
     PLUGIN_SPECS,
     ids=[spec[3] for spec in PLUGIN_SPECS],
 )
-def test_plugin_activate_returns_status(
-    module_name: str, func_name: str, plugin_src: Path, plugin_name: str
-) -> None:
+def test_plugin_activate_returns_status(module_name: str, func_name: str, plugin_src: Path, plugin_name: str) -> None:
     """Each plugin entry point should return a status payload."""
     with prepend_sys_path(plugin_src):
         module = importlib.import_module(module_name)

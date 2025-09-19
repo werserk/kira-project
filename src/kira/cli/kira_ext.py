@@ -3,7 +3,6 @@
 
 import sys
 from pathlib import Path
-from typing import List, Optional
 
 # Добавляем src в путь
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
@@ -262,7 +261,7 @@ def handle_info(name: str, verbose: bool) -> int:
     return 1
 
 
-def main(args: Optional[List[str]] = None) -> int:
+def main(args: list[str] | None = None) -> int:
     if args is None:
         args = sys.argv[1:]
 

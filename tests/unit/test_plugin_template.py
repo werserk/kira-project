@@ -1,4 +1,5 @@
 """Tests for the plugin scaffolding utilities."""
+
 from __future__ import annotations
 
 import json
@@ -77,16 +78,18 @@ def test_cli_create_command(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, cap
     monkeypatch.chdir(tmp_path)
     output_dir = Path("plugins")
 
-    exit_code = main([
-        "create",
-        "Sample Plugin",
-        "--output-dir",
-        str(output_dir),
-        "--permissions",
-        "events.publish",
-        "--capabilities",
-        "notify",
-    ])
+    exit_code = main(
+        [
+            "create",
+            "Sample Plugin",
+            "--output-dir",
+            str(output_dir),
+            "--permissions",
+            "events.publish",
+            "--capabilities",
+            "notify",
+        ]
+    )
 
     captured = capsys.readouterr()
     assert exit_code == 0

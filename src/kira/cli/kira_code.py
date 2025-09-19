@@ -3,7 +3,6 @@
 
 import sys
 from pathlib import Path
-from typing import List, Optional
 
 # Добавляем src в путь
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
@@ -105,7 +104,13 @@ def index_command(rebuild: bool, verbose: bool) -> int:
     show_default=True,
     help="Тип поиска",
 )
-@click.option("--limit", type=int, default=20, show_default=True, help="Максимальное количество результатов")
+@click.option(
+    "--limit",
+    type=int,
+    default=20,
+    show_default=True,
+    help="Максимальное количество результатов",
+)
 @click.option("--verbose", "-v", is_flag=True, help="Подробный вывод")
 def search_command(query: str, search_type: str, limit: int, verbose: bool) -> int:
     """Поиск в коде."""
@@ -191,7 +196,7 @@ def handle_search(
     return 0
 
 
-def main(args: Optional[List[str]] = None) -> int:
+def main(args: list[str] | None = None) -> int:
     if args is None:
         args = sys.argv[1:]
 

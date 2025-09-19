@@ -10,9 +10,9 @@ from .plugin import (
 )
 
 __all__ = [
+    "InboxNormalizer",
     "activate",
     "get_normalizer",
-    "InboxNormalizer",
     "handle_file_dropped",
     "handle_message_received",
     "normalize_command",

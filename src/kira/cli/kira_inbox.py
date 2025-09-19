@@ -3,7 +3,6 @@
 
 import sys
 from pathlib import Path
-from typing import List, Optional
 
 # Добавляем src в путь
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
@@ -45,9 +44,7 @@ def cli(dry_run: bool, verbose: bool, config: str | None) -> int:
 
         if verbose:
             click.echo("🔧 Загружена конфигурация")
-            click.echo(
-                f"   Vault: {loaded_config.get('vault', {}).get('path', 'не указан')}"
-            )
+            click.echo(f"   Vault: {loaded_config.get('vault', {}).get('path', 'не указан')}")
 
         plugin_registry = get_plugin_registry()
         if not plugin_registry.is_plugin_enabled("kira-inbox"):
@@ -97,7 +94,7 @@ def cli(dry_run: bool, verbose: bool, config: str | None) -> int:
         return 1
 
 
-def main(args: Optional[List[str]] = None) -> int:
+def main(args: list[str] | None = None) -> int:
     if args is None:
         args = sys.argv[1:]
 

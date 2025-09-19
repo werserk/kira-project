@@ -1,12 +1,13 @@
 """Utilities for scaffolding built-in plugins and tests."""
+
 from __future__ import annotations
 
 import json
 import re
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from textwrap import dedent
-from typing import Iterable, Sequence
 
 import click
 
@@ -108,7 +109,7 @@ def create_plugin_scaffold(options: PluginTemplateOptions) -> Path:
         "",
         "from .plugin import activate",
         "",
-        "__all__ = [\"activate\"]",
+        '__all__ = ["activate"]',
     ]
     write_file(init_path, "\n".join(init_lines))
 
@@ -246,10 +247,7 @@ def create_command(
             force=force,
         )
         create_plugin_scaffold(options)
-        click.echo(
-            f"✅ Created plugin scaffold for {options.plugin_name} "
-            f"at {options.output_dir / slug}"
-        )
+        click.echo(f"✅ Created plugin scaffold for {options.plugin_name} " f"at {options.output_dir / slug}")
         return 0
     except Exception as exc:  # pragma: no cover - exercised via tests
         click.echo(f"❌ Failed to create plugin scaffold: {exc}")

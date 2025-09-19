@@ -1,11 +1,11 @@
 """
 Схемы валидации для Kira
 """
+
 from pathlib import Path
-from typing import List
 
 
-def validate_vault_schemas(vault_path: str) -> List[str]:
+def validate_vault_schemas(vault_path: str) -> list[str]:
     """
     Валидирует Vault против схем
 
