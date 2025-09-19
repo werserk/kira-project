@@ -1,0 +1,20 @@
+{
+  "name": "kira-calendar",
+  "version": "0.4.2",
+  "displayName": "Calendar Sync",
+  "description": "Sync events & timeboxing",
+  "publisher": "werserk",
+  "engines": { "kira": "^1.0.0" },
+  "permissions": ["calendar.write", "net", "secrets.read"],
+  "entry": "kira_plugin_calendar.plugin:activate",
+  "capabilities": ["pull", "push", "timebox"],
+  "configSchema": {
+    "calendar.default": { "type": "string" },
+    "timebox.length": { "type": "integer", "default": 90 }
+  },
+  "contributes": {
+    "events": ["event.created","task.due_soon"],
+    "commands": ["calendar.pull","calendar.push"]
+  },
+  "sandbox": { "strategy": "subprocess", "timeoutMs": 60000 }
+}
