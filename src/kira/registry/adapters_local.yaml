@@ -1,0 +1,10 @@
+adapters:
+  - name: kira-telegram
+    path: "src/kira/adapters/telegram"
+    enabled: true
+  - name: kira-gcal
+    path: "src/kira/adapters/gcal"
+    enabled: true
+  - name: kira-filesystem
+    path: "src/kira/adapters/filesystem"
+    enabled: true

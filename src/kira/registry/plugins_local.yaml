@@ -1,0 +1,10 @@
+plugins:
+  - name: kira-inbox
+    path: "src/kira/plugins/inbox"
+    enabled: true
+  - name: kira-calendar
+    path: "src/kira/plugins/calendar"
+    enabled: true
+  - name: kira-code
+    path: "src/kira/plugins/code"
+    enabled: true
