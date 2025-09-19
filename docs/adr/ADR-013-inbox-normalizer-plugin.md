@@ -40,6 +40,7 @@ Adopt an Inbox Normalizer plugin that:
 
 5) Sandbox and permissions
    - All Vault writes go through `ctx.vault` (ADR-006); plugin runs in subprocess sandbox with minimal permissions (ADR-004).
+   - Transitional note (MVP): if Host API is not yet available, the plugin records normalization intents (events with proposed frontmatter/body) and writes artifacts only to a temporary workspace. Applying changes to Vault is deferred to the Host.
 
 ## Risks
 

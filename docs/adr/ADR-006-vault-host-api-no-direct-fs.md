@@ -17,6 +17,8 @@ Vault entities must be created/updated consistently and validated. Direct file s
 
 Adopt a Vault Host API as the sole write path. Plugins must not write directly to the Vault file system. All reads/writes go through `core/host.py` exposed to plugins via `ctx.vault` in the SDK.
 
+Transitional note (MVP): until `core/host.py` is implemented, built-in plugins must either (a) no-op on writes or (b) write to a temporary workspace outside the Vault and emit intents (events) for later Host application. Direct writes into Vault paths are prohibited even during MVP.
+
 - Write pipeline (Host API):
   - Validate payload against per-entity JSON Schemas in Vault `.kira/schemas` (ADR-007).
   - Enforce folder contracts (location, naming conventions, required frontmatter fields).

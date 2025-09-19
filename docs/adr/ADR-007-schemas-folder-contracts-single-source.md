@@ -1,7 +1,7 @@
 ---
 type: decision
 id: ADR-007
-title: YAML Schemas & Folder-Contracts as the single source of truth
+title: Schemas & Folder-Contracts as the single source of truth
 date: 2025-09-19
 status: accepted
 owners: [kira-core]
@@ -17,7 +17,7 @@ Without formalized entity schemas and folder contracts, notes drift, links break
 
 Adopt a dual-source model inside the Vault that together forms the single source of truth:
 
-- Schemas: `.kira/schemas/*.yaml|*.json` define entity frontmatter and content constraints (JSON Schema-compatible).
+- Schemas: `.kira/schemas/*.json` define entity frontmatter and content constraints (JSON Schema Draft-07 subset). YAML can be considered later, but MVP is JSON-only to match validators.
 - Folder-Contracts: README files at folder roots describe allowed entity kinds, naming, and layout constraints.
 
 Validation runs in CI and within the Host API (`ctx.vault.write` in ADR-006). Schemas and contracts must be versioned and documented.
@@ -30,7 +30,7 @@ Validation runs in CI and within the Host API (`ctx.vault.write` in ADR-006). Sc
 ## Implementation/Migration
 
 1) Schema format and location
-   - Store schemas under `.kira/schemas/` (YAML or JSON). Use JSON Schema Draft-07 subset consistent with SDK validators.
+   - Store schemas under `.kira/schemas/` as JSON files only (MVP). Use JSON Schema Draft-07 subset consistent with SDK validators.
    - Provide examples and descriptions. Include `$id` and version fields for evolution.
 
 2) Folder-Contracts
