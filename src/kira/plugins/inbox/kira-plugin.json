@@ -1,0 +1,16 @@
+{
+  "name": "kira-inbox",
+  "version": "0.1.0",
+  "displayName": "Inbox Normalizer",
+  "description": "Normalizes incoming messages and files, extracts metadata and creates structured Markdown files",
+  "publisher": "kira",
+  "engines": { "kira": "^1.0.0" },
+  "permissions": [],
+  "entry": "kira_plugin_inbox.plugin:activate",
+  "capabilities": ["normalize"],
+  "contributes": {
+    "events": ["message.received","file.dropped"],
+    "commands": ["inbox.normalize"]
+  },
+  "sandbox": { "strategy": "subprocess", "timeoutMs": 20000 }
+}
