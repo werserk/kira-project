@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
-"""
-CLI модуль для работы с календарем
-"""
-import argparse
+"""CLI модуль для работы с календарем"""
+
 import sys
 from pathlib import Path
 from typing import List, Optional
@@ -10,192 +8,187 @@ from typing import List, Optional
 # Добавляем src в путь
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
+import click
+
 from ..adapters.gcal.adapter import GCalAdapter
 from ..core.config import load_config
 from ..registry import get_adapter_registry
 
-
-def create_parser() -> argparse.ArgumentParser:
-    """Создает парсер аргументов для calendar команды"""
-    parser = argparse.ArgumentParser(
-        prog="kira calendar",
-        description="Работа с календарем (синхронизация)"
-    )
-
-    subparsers = parser.add_subparsers(
-        dest='action',
-        help='Действие с календарем',
-        required=True
-    )
-
-    # Команда pull
-    pull_parser = subparsers.add_parser(
-        'pull',
-        help='Синхронизировать календарь (получить данные)'
-    )
-    pull_parser.add_argument(
-        '--calendar',
-        type=str,
-        help='Конкретный календарь для синхронизации (по умолчанию: все)'
-    )
-    pull_parser.add_argument(
-        '--days',
-        type=int,
-        default=30,
-        help='Количество дней для синхронизации (по умолчанию: 30)'
-    )
-    pull_parser.add_argument(
-        '--verbose', '-v',
-        action='store_true',
-        help='Подробный вывод'
-    )
-
-    # Команда push
-    push_parser = subparsers.add_parser(
-        'push',
-        help='Синхронизировать календарь (отправить данные)'
-    )
-    push_parser.add_argument(
-        '--calendar',
-        type=str,
-        help='Конкретный календарь для синхронизации (по умолчанию: все)'
-    )
-    push_parser.add_argument(
-        '--dry-run',
-        action='store_true',
-        help='Показать что будет отправлено без выполнения'
-    )
-    push_parser.add_argument(
-        '--verbose', '-v',
-        action='store_true',
-        help='Подробный вывод'
-    )
-
-    return parser
+CONTEXT_SETTINGS = {"help_option_names": ["-h", "--help"]}
 
 
-def main(args: Optional[List[str]] = None) -> int:
-    """
-    Главная функция calendar CLI
+@click.group(
+    context_settings=CONTEXT_SETTINGS,
+    help="Работа с календарем (синхронизация)",
+)
+def cli() -> None:
+    """Корневая команда календаря."""
 
-    Args:
-        args: Аргументы командной строки (если None, берется из sys.argv)
 
-    Returns:
-        Код возврата (0 - успех, 1 - ошибка)
-    """
-    if args is None:
-        args = sys.argv[1:]
-
-    parser = create_parser()
-    parsed_args = parser.parse_args(args)
+@cli.command("pull")
+@click.option(
+    "--calendar",
+    type=str,
+    help="Конкретный календарь для синхронизации (по умолчанию: все)",
+)
+@click.option(
+    "--days",
+    type=int,
+    default=30,
+    show_default=True,
+    help="Количество дней для синхронизации",
+)
+@click.option("--verbose", "-v", is_flag=True, help="Подробный вывод")
+def pull_command(calendar: str | None, days: int, verbose: bool) -> int:
+    """Синхронизировать календарь (получить данные)."""
 
     try:
-        # Загружаем конфигурацию
         config = load_config()
 
-        if parsed_args.verbose:
-            print("🔧 Загружена конфигурация")
-            print(f"   Vault: {config.get('vault', {}).get('path', 'не указан')}")
+        if verbose:
+            click.echo("🔧 Загружена конфигурация")
+            click.echo(f"   Vault: {config.get('vault', {}).get('path', 'не указан')}")
 
-        # Проверяем, что gcal адаптер включен
         adapter_registry = get_adapter_registry()
-        if not adapter_registry.is_adapter_enabled('kira-gcal'):
-            print("❌ Адаптер kira-gcal не включен")
+        if not adapter_registry.is_adapter_enabled("kira-gcal"):
+            click.echo("❌ Адаптер kira-gcal не включен")
             return 1
 
-        if parsed_args.verbose:
-            print("✅ Адаптер kira-gcal включен")
+        if verbose:
+            click.echo("✅ Адаптер kira-gcal включен")
 
-        # Создаем адаптер
         adapter = GCalAdapter(config)
-
-        if parsed_args.action == 'pull':
-            return handle_pull(adapter, parsed_args, config)
-        elif parsed_args.action == 'push':
-            return handle_push(adapter, parsed_args, config)
-        else:
-            print(f"❌ Неизвестное действие: {parsed_args.action}")
-            return 1
-
-    except FileNotFoundError as e:
-        print(f"❌ Файл не найден: {e}")
+        return handle_pull(adapter, calendar, days, config, verbose)
+    except FileNotFoundError as exc:
+        click.echo(f"❌ Файл не найден: {exc}")
         return 1
-    except Exception as e:
-        print(f"❌ Ошибка выполнения calendar команды: {e}")
-        if parsed_args.verbose:
+    except Exception as exc:  # pragma: no cover - вывод трейсбека ниже
+        click.echo(f"❌ Ошибка выполнения calendar команды: {exc}")
+        if verbose:
             import traceback
+
             traceback.print_exc()
         return 1
 
 
-def handle_pull(adapter: GCalAdapter, args, config) -> int:
-    """Обработка команды pull"""
-    print(f"📥 Синхронизация календаря (pull) на {args.days} дней...")
-
-    if args.verbose:
-        calendars = config.get('adapters', {}).get('gcal', {}).get('calendars', {})
-        if args.calendar:
-            print(f"   Календарь: {args.calendar}")
-        else:
-            print(f"   Календари: {list(calendars.keys())}")
+@cli.command("push")
+@click.option(
+    "--calendar",
+    type=str,
+    help="Конкретный календарь для синхронизации (по умолчанию: все)",
+)
+@click.option(
+    "--dry-run",
+    is_flag=True,
+    help="Показать что будет отправлено без выполнения",
+)
+@click.option("--verbose", "-v", is_flag=True, help="Подробный вывод")
+def push_command(calendar: str | None, dry_run: bool, verbose: bool) -> int:
+    """Синхронизировать календарь (отправить данные)."""
 
     try:
-        # Выполняем pull
-        result = adapter.pull(
-            calendar_id=args.calendar,
-            days=args.days
-        )
+        config = load_config()
 
-        if args.verbose:
-            print(f"   Получено событий: {result.get('events_count', 0)}")
-            print(f"   Обработано: {result.get('processed_count', 0)}")
+        if verbose:
+            click.echo("🔧 Загружена конфигурация")
+            click.echo(f"   Vault: {config.get('vault', {}).get('path', 'не указан')}")
 
-        print("✅ Синхронизация календаря завершена")
-        return 0
+        adapter_registry = get_adapter_registry()
+        if not adapter_registry.is_adapter_enabled("kira-gcal"):
+            click.echo("❌ Адаптер kira-gcal не включен")
+            return 1
 
-    except Exception as e:
-        print(f"❌ Ошибка синхронизации календаря: {e}")
+        if verbose:
+            click.echo("✅ Адаптер kira-gcal включен")
+
+        adapter = GCalAdapter(config)
+        return handle_push(adapter, calendar, dry_run, config, verbose)
+    except FileNotFoundError as exc:
+        click.echo(f"❌ Файл не найден: {exc}")
+        return 1
+    except Exception as exc:  # pragma: no cover - вывод трейсбека ниже
+        click.echo(f"❌ Ошибка выполнения calendar команды: {exc}")
+        if verbose:
+            import traceback
+
+            traceback.print_exc()
         return 1
 
 
-def handle_push(adapter: GCalAdapter, args, config) -> int:
-    """Обработка команды push"""
-    if args.dry_run:
-        print("🔍 Режим dry-run: показываем что будет отправлено")
-    else:
-        print("📤 Синхронизация календаря (push)...")
+def handle_pull(
+    adapter: GCalAdapter,
+    calendar_id: str | None,
+    days: int,
+    config: dict,
+    verbose: bool,
+) -> int:
+    """Обработка команды pull."""
 
-    if args.verbose:
-        calendars = config.get('adapters', {}).get('gcal', {}).get('calendars', {})
-        if args.calendar:
-            print(f"   Календарь: {args.calendar}")
+    click.echo(f"📥 Синхронизация календаря (pull) на {days} дней...")
+
+    if verbose:
+        calendars = config.get("adapters", {}).get("gcal", {}).get("calendars", {})
+        if calendar_id:
+            click.echo(f"   Календарь: {calendar_id}")
         else:
-            print(f"   Календари: {list(calendars.keys())}")
+            click.echo(f"   Календари: {list(calendars.keys())}")
 
     try:
-        # Выполняем push
-        result = adapter.push(
-            calendar_id=args.calendar,
-            dry_run=args.dry_run
-        )
+        result = adapter.pull(calendar_id=calendar_id, days=days)
 
-        if args.verbose:
-            print(f"   Найдено событий для отправки: {result.get('events_count', 0)}")
-            if not args.dry_run:
-                print(f"   Отправлено: {result.get('sent_count', 0)}")
+        if verbose:
+            click.echo(f"   Получено событий: {result.get('events_count', 0)}")
+            click.echo(f"   Обработано: {result.get('processed_count', 0)}")
 
-        if args.dry_run:
-            print("✅ Dry-run завершен")
-        else:
-            print("✅ Синхронизация календаря завершена")
-
+        click.echo("✅ Синхронизация календаря завершена")
         return 0
-
-    except Exception as e:
-        print(f"❌ Ошибка синхронизации календаря: {e}")
+    except Exception as exc:  # pragma: no cover - зависит от внешнего API
+        click.echo(f"❌ Ошибка синхронизации календаря: {exc}")
         return 1
 
 
-if __name__ == "__main__":
+def handle_push(
+    adapter: GCalAdapter,
+    calendar_id: str | None,
+    dry_run: bool,
+    config: dict,
+    verbose: bool,
+) -> int:
+    """Обработка команды push."""
+
+    click.echo("📤 Синхронизация календаря (push)...")
+
+    if verbose:
+        calendars = config.get("adapters", {}).get("gcal", {}).get("calendars", {})
+        if calendar_id:
+            click.echo(f"   Календарь: {calendar_id}")
+        else:
+            click.echo(f"   Календари: {list(calendars.keys())}")
+        click.echo(f"   Режим dry-run: {'да' if dry_run else 'нет'}")
+
+    try:
+        result = adapter.push(calendar_id=calendar_id, dry_run=dry_run)
+
+        if verbose:
+            click.echo(f"   Отправлено событий: {result.get('events_count', 0)}")
+            click.echo(f"   Обработано: {result.get('processed_count', 0)}")
+
+        click.echo("✅ Синхронизация календаря завершена")
+        return 0
+    except Exception as exc:  # pragma: no cover - зависит от внешнего API
+        click.echo(f"❌ Ошибка синхронизации календаря: {exc}")
+        return 1
+
+
+def main(args: Optional[List[str]] = None) -> int:
+    if args is None:
+        args = sys.argv[1:]
+
+    try:
+        return cli.main(args=list(args), standalone_mode=False)
+    except SystemExit as exc:  # pragma: no cover - click нормализует код выхода
+        return int(exc.code) if exc.code is not None else 0
+
+
+if __name__ == "__main__":  # pragma: no cover - исполняемый модуль
     sys.exit(main())

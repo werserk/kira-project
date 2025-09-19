@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=65", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "kira"
+version = "0.1.0"
+description = "Kira monorepo"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "click>=8.1",
+  "pyyaml>=6.0",
+  "jsonschema>=4.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest",
+]

@@ -318,18 +318,21 @@ class PluginManifestValidator:
         Returns:
             Список ошибок валидации (пустой если валидно)
         """
-        errors = []
+        collected: List[str] = []
 
         try:
-            self.validator.validate(manifest_data)
-        except ValidationError as e:
-            errors.append(f"Ошибка валидации: {e.message}")
-            if e.absolute_path:
-                errors.append(f"Путь: {' -> '.join(str(p) for p in e.absolute_path)}")
-        except Exception as e:
-            errors.append(f"Неожиданная ошибка: {str(e)}")
+            for error in sorted(
+                self.validator.iter_errors(manifest_data),
+                key=lambda err: list(err.absolute_path),
+            ):
+                location = " -> ".join(str(part) for part in error.absolute_path) or "<root>"
+                collected.append(
+                    f"[{error.validator}] {error.message} (path: {location})"
+                )
+        except Exception as exc:
+            collected.append(f"Неожиданная ошибка: {exc}")
 
-        return errors
+        return collected
 
     def validate_manifest_file(self, file_path: str) -> List[str]:
         """

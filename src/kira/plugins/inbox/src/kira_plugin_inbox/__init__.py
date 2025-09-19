@@ -1,4 +1,19 @@
-"""
-Kira Inbox Plugin - нормализация входящих элементов
-"""
-__version__ = "0.1.0"
+"""Inbox plugin package."""
+
+from .plugin import (
+    InboxNormalizer,
+    activate,
+    get_normalizer,
+    handle_file_dropped,
+    handle_message_received,
+    normalize_command,
+)
+
+__all__ = [
+    "activate",
+    "get_normalizer",
+    "InboxNormalizer",
+    "handle_file_dropped",
+    "handle_message_received",
+    "normalize_command",
+]
