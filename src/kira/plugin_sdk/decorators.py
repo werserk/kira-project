@@ -1,131 +1,113 @@
+"""Decorators used by plugin authors to declare entry points.
+
+Each decorator attaches metadata to the wrapped callable so that the host can
+register handlers without executing plugin code.
+
+Example:
+    from kira.plugin_sdk import decorators
+
+    @decorators.on_event("task.created")
+    def handle_task(context, payload):
+        context.logger.info(f"Task payload: {payload}")
 """
-Декораторы для плагинов
-"""
+
+from __future__ import annotations
 
 import functools
+import time
 from collections.abc import Callable
-from typing import Any
+from typing import Any, ParamSpec, TypeVar, cast
+
+P = ParamSpec("P")
+R = TypeVar("R")
+
+__all__ = ["on_event", "command", "permission", "timeout", "retry"]
 
 
-def on_event(event_name: str) -> Callable[[Callable], Callable]:
-    """
-    Декоратор для обработчиков событий
+def _preserve_metadata(func: Callable[P, R], **metadata: Any) -> Callable[P, R]:
+    """Return a wrapper that mirrors ``func`` and stores ``metadata`` on it."""
 
-    Args:
-        event_name: Имя события для обработки
-    """
-
-    def decorator(func: Callable) -> Callable:
-        @functools.wraps(func)
-        def wrapper(*args: Any, **kwargs: Any) -> Any:
-            return func(*args, **kwargs)
-
-        # Добавляем метаданные для регистрации
-        wrapper._is_event_handler = True
-        wrapper._event_name = event_name
-
-        return wrapper
-
-    return decorator
+    for key, value in metadata.items():
+        setattr(func, key, value)
+    return func
 
 
-def command(command_name: str) -> Callable[[Callable], Callable]:
-    """
-    Декоратор для команд плагина
+def on_event(event_name: str) -> Callable[[Callable[P, R]], Callable[P, R]]:
+    """Mark ``func`` as an event handler for ``event_name``."""
 
-    Args:
-        command_name: Имя команды
-    """
-
-    def decorator(func: Callable) -> Callable:
-        @functools.wraps(func)
-        def wrapper(*args: Any, **kwargs: Any) -> Any:
-            return func(*args, **kwargs)
-
-        # Добавляем метаданные для регистрации
-        wrapper._is_command = True
-        wrapper._command_name = command_name
-
-        return wrapper
+    def decorator(func: Callable[P, R]) -> Callable[P, R]:
+        wrapped = functools.wraps(func)(func)
+        _preserve_metadata(wrapped, _is_event_handler=True, _event_name=event_name)
+        return wrapped
 
     return decorator
 
 
-def permission(perm: str) -> Callable[[Callable], Callable]:
-    """
-    Декоратор для проверки разрешений
+def command(command_name: str) -> Callable[[Callable[P, R]], Callable[P, R]]:
+    """Mark ``func`` as a command handler exposed as ``command_name``."""
 
-    Args:
-        perm: Требуемое разрешение
-    """
-
-    def decorator(func: Callable) -> Callable:
-        @functools.wraps(func)
-        def wrapper(*args: Any, **kwargs: Any) -> Any:
-            # В реальной реализации здесь будет проверка разрешений
-            print(f"🔐 Проверка разрешения: {perm}")
-            return func(*args, **kwargs)
-
-        # Добавляем метаданные
-        wrapper._requires_permission = perm
-
-        return wrapper
+    def decorator(func: Callable[P, R]) -> Callable[P, R]:
+        wrapped = functools.wraps(func)(func)
+        _preserve_metadata(wrapped, _is_command=True, _command_name=command_name)
+        return wrapped
 
     return decorator
 
 
-def timeout(seconds: int) -> Callable[[Callable], Callable]:
-    """
-    Декоратор для установки таймаута выполнения
+def permission(perm: str) -> Callable[[Callable[P, R]], Callable[P, R]]:
+    """Declare that ``func`` requires ``perm`` to execute."""
 
-    Args:
-        seconds: Таймаут в секундах
-    """
-
-    def decorator(func: Callable) -> Callable:
+    def decorator(func: Callable[P, R]) -> Callable[P, R]:
         @functools.wraps(func)
-        def wrapper(*args: Any, **kwargs: Any) -> Any:
-            print(f"⏱️  Таймаут: {seconds} секунд")
+        def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
+            print(f"🔐 Checking permission: {perm}")
             return func(*args, **kwargs)
 
-        # Добавляем метаданные
-        wrapper._timeout = seconds
-
-        return wrapper
+        _preserve_metadata(wrapper, _requires_permission=perm)
+        return cast(Callable[P, R], wrapper)
 
     return decorator
 
 
-def retry(max_attempts: int = 3, delay: float = 1.0) -> Callable[[Callable], Callable]:
-    """
-    Декоратор для повторных попыток выполнения
+def timeout(seconds: int) -> Callable[[Callable[P, R]], Callable[P, R]]:
+    """Attach a timeout annotation to ``func``."""
 
-    Args:
-        max_attempts: Максимальное количество попыток
-        delay: Задержка между попытками в секундах
-    """
-
-    def decorator(func: Callable) -> Callable:
+    def decorator(func: Callable[P, R]) -> Callable[P, R]:
         @functools.wraps(func)
-        def wrapper(*args: Any, **kwargs: Any) -> Any:
-            last_exception = None
+        def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
+            print(f"⏱️  Timeout: {seconds} seconds")
+            return func(*args, **kwargs)
+
+        _preserve_metadata(wrapper, _timeout=seconds)
+        return cast(Callable[P, R], wrapper)
+
+    return decorator
+
+
+def retry(max_attempts: int = 3, delay: float = 1.0) -> Callable[[Callable[P, R]], Callable[P, R]]:
+    """Retry ``func`` up to ``max_attempts`` times with ``delay`` seconds between attempts."""
+
+    def decorator(func: Callable[P, R]) -> Callable[P, R]:
+        @functools.wraps(func)
+        def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
+            last_exception: Exception | None = None
 
             for attempt in range(max_attempts):
                 try:
                     return func(*args, **kwargs)
-                except Exception as e:
-                    last_exception = e
+                except Exception as exc:  # pragma: no cover - behaviour parity
+                    last_exception = exc
                     if attempt < max_attempts - 1:
-                        print(f"🔄 Попытка {attempt + 1}/{max_attempts} неудачна, повтор через {delay}с")
-                        import time
-
+                        print(
+                            f"🔄 Attempt {attempt + 1}/{max_attempts} failed, retrying in {delay}s"
+                        )
                         time.sleep(delay)
                     else:
-                        print("❌ Все попытки исчерпаны")
-                        raise last_exception from None
+                        print("❌ All retry attempts exhausted")
+                        raise last_exception
 
-            return None
+            raise RuntimeError("Retry wrapper exhausted without returning")
 
-        return wrapper
+        return cast(Callable[P, R], wrapper)
 
     return decorator

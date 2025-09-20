@@ -1,0 +1,23 @@
+{
+  "name": "kira-minimal-sdk",
+  "version": "1.0.0",
+  "displayName": "Minimal SDK Plugin",
+  "description": "Demonstrates how to build a plugin using only the stable SDK",
+  "publisher": "kira",
+  "engines": { "kira": "^1.0.0" },
+  "permissions": ["events.publish", "events.subscribe"],
+  "entry": "kira_plugin_minimal.plugin:activate",
+  "capabilities": ["notify"],
+  "contributes": {
+    "events": ["task.created"],
+    "commands": ["task.ping"],
+    "adapters": ["telegram"]
+  },
+  "configSchema": {
+    "notifications.enabled": {
+      "type": "boolean",
+      "default": true,
+      "description": "Toggle notification delivery"
+    }
+  }
+}

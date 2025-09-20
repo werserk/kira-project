@@ -296,7 +296,7 @@ class TestManifestFileValidation:
 
         errors = self.validator.validate_manifest_file(str(nonexistent_file))
         assert len(errors) > 0
-        assert any("не найден" in error for error in errors)
+        assert any("not found" in error.lower() for error in errors)
 
 
 if __name__ == "__main__":

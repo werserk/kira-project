@@ -1,14 +1,14 @@
-"""
-JSON Schema для валидации манифеста плагина kira-plugin.json
-"""
+"""Helpers and schema definitions for ``kira-plugin.json`` manifests."""
 
+from __future__ import annotations
+
+import copy
 import json
 from typing import Any
 
-from jsonschema import Draft7Validator
+from jsonschema import Draft7Validator  # type: ignore[import-untyped]
 
-# JSON Schema для валидации kira-plugin.json
-PLUGIN_MANIFEST_SCHEMA = {
+PLUGIN_MANIFEST_SCHEMA: dict[str, Any] = {
     "$schema": "http://json-schema.org/draft-07/schema#",
     "type": "object",
     "required": [
@@ -29,31 +29,31 @@ PLUGIN_MANIFEST_SCHEMA = {
             "pattern": "^[a-z0-9][a-z0-9-]*[a-z0-9]$",
             "minLength": 3,
             "maxLength": 50,
-            "description": "Уникальное имя плагина (kebab-case)",
+            "description": "Unique plugin identifier in kebab-case.",
         },
         "version": {
             "type": "string",
             "pattern": "^\\d+\\.\\d+\\.\\d+(-[a-zA-Z0-9.-]+)?$",
-            "description": "Версия плагина в формате semver",
+            "description": "Semantic version of the plugin.",
         },
         "displayName": {
             "type": "string",
             "minLength": 1,
             "maxLength": 100,
-            "description": "Человекочитаемое название плагина",
+            "description": "Human friendly display name.",
         },
         "description": {
             "type": "string",
             "minLength": 10,
             "maxLength": 500,
-            "description": "Описание функциональности плагина",
+            "description": "Short summary of the plugin capabilities.",
         },
         "publisher": {
             "type": "string",
             "pattern": "^[a-zA-Z0-9][a-zA-Z0-9-]*[a-zA-Z0-9]$",
             "minLength": 2,
             "maxLength": 30,
-            "description": "Имя издателя плагина",
+            "description": "Name of the publishing organisation or author.",
         },
         "engines": {
             "type": "object",
@@ -62,7 +62,7 @@ PLUGIN_MANIFEST_SCHEMA = {
                 "kira": {
                     "type": "string",
                     "pattern": "^\\^?\\d+\\.\\d+\\.\\d+$",
-                    "description": "Требуемая версия ядра Kira",
+                    "description": "Required host engine version expressed as SemVer.",
                 }
             },
             "additionalProperties": False,
@@ -89,12 +89,12 @@ PLUGIN_MANIFEST_SCHEMA = {
                 ],
             },
             "uniqueItems": True,
-            "description": "Список разрешений, требуемых плагином",
+            "description": "Permissions requested by the plugin.",
         },
         "entry": {
             "type": "string",
             "pattern": "^[a-zA-Z0-9_.]+:[a-zA-Z0-9_]+$",
-            "description": "Точка входа в формате module:function",
+            "description": "Entry point in ``module:function`` format.",
         },
         "capabilities": {
             "type": "array",
@@ -113,7 +113,7 @@ PLUGIN_MANIFEST_SCHEMA = {
                 ],
             },
             "uniqueItems": True,
-            "description": "Возможности, предоставляемые плагином",
+            "description": "Capabilities implemented by the plugin.",
         },
         "configSchema": {
             "type": "object",
@@ -133,7 +133,7 @@ PLUGIN_MANIFEST_SCHEMA = {
                                 "object",
                             ],
                         },
-                        "default": {"description": "Значение по умолчанию"},
+                        "default": {"description": "Default value."},
                         "description": {"type": "string", "maxLength": 200},
                         "required": {"type": "boolean"},
                         "enum": {"type": "array", "minItems": 1},
@@ -146,7 +146,7 @@ PLUGIN_MANIFEST_SCHEMA = {
                 }
             },
             "additionalProperties": False,
-            "description": "Схема конфигурации плагина",
+            "description": "Configuration schema understood by the host UI.",
         },
         "contributes": {
             "type": "object",
@@ -155,13 +155,13 @@ PLUGIN_MANIFEST_SCHEMA = {
                     "type": "array",
                     "items": {"type": "string", "pattern": "^[a-zA-Z0-9_.]+$"},
                     "uniqueItems": True,
-                    "description": "События, на которые подписывается плагин",
+                    "description": "Events the plugin subscribes to.",
                 },
                 "commands": {
                     "type": "array",
                     "items": {"type": "string", "pattern": "^[a-zA-Z0-9_.]+$"},
                     "uniqueItems": True,
-                    "description": "Команды, предоставляемые плагином",
+                    "description": "Commands exposed to end-users.",
                 },
                 "adapters": {
                     "type": "array",
@@ -170,11 +170,11 @@ PLUGIN_MANIFEST_SCHEMA = {
                         "enum": ["telegram", "gcal", "filesystem", "email", "webhook"],
                     },
                     "uniqueItems": True,
-                    "description": "Адаптеры, с которыми работает плагин",
+                    "description": "First-party adapters the plugin integrates with.",
                 },
             },
             "additionalProperties": False,
-            "description": "Вклад плагина в систему",
+            "description": "Contribution points used by the plugin.",
         },
         "sandbox": {
             "type": "object",
@@ -183,18 +183,20 @@ PLUGIN_MANIFEST_SCHEMA = {
                     "type": "string",
                     "enum": ["subprocess", "thread", "inline"],
                     "default": "subprocess",
+                    "description": "Sandbox strategy selected by the plugin.",
                 },
                 "timeoutMs": {
                     "type": "integer",
                     "minimum": 1000,
                     "maximum": 300000,
                     "default": 30000,
+                    "description": "Execution timeout in milliseconds.",
                 },
                 "memoryLimit": {
                     "type": "integer",
                     "minimum": 64,
                     "maximum": 1024,
-                    "description": "Лимит памяти в MB",
+                    "description": "Optional memory limit in megabytes.",
                 },
                 "networkAccess": {"type": "boolean", "default": False},
                 "fsAccess": {
@@ -204,10 +206,11 @@ PLUGIN_MANIFEST_SCHEMA = {
                         "write": {"type": "array", "items": {"type": "string"}},
                     },
                     "additionalProperties": False,
+                    "description": "Allowed filesystem paths for sandbox access.",
                 },
             },
             "additionalProperties": False,
-            "description": "Настройки изоляции плагина",
+            "description": "Sandbox configuration requested by the plugin.",
         },
         "dependencies": {
             "type": "object",
@@ -217,19 +220,19 @@ PLUGIN_MANIFEST_SCHEMA = {
                     "pattern": "^[~^]?\\d+\\.\\d+\\.\\d+$",
                 }
             },
-            "description": "Зависимости плагина",
+            "description": "Runtime dependencies required by the plugin.",
         },
         "keywords": {
             "type": "array",
             "items": {"type": "string", "maxLength": 30},
             "maxItems": 10,
             "uniqueItems": True,
-            "description": "Ключевые слова для поиска",
+            "description": "Keywords to improve marketplace search.",
         },
         "homepage": {
             "type": "string",
             "format": "uri",
-            "description": "URL домашней страницы плагина",
+            "description": "Homepage URL for the plugin.",
         },
         "repository": {
             "type": "object",
@@ -239,6 +242,7 @@ PLUGIN_MANIFEST_SCHEMA = {
             },
             "required": ["type", "url"],
             "additionalProperties": False,
+            "description": "Source control repository information.",
         },
         "bugs": {
             "type": "object",
@@ -247,6 +251,7 @@ PLUGIN_MANIFEST_SCHEMA = {
                 "email": {"type": "string", "format": "email"},
             },
             "additionalProperties": False,
+            "description": "Bug tracker or support contact details.",
         },
         "license": {
             "type": "string",
@@ -259,6 +264,7 @@ PLUGIN_MANIFEST_SCHEMA = {
                 "Unlicense",
                 "Proprietary",
             ],
+            "description": "License identifier for the plugin distribution.",
         },
     },
     "additionalProperties": False,
@@ -266,21 +272,21 @@ PLUGIN_MANIFEST_SCHEMA = {
 
 
 class PluginManifestValidator:
-    """Валидатор манифеста плагина"""
+    """Validate plugin manifests against :data:`PLUGIN_MANIFEST_SCHEMA`.
+
+    Example:
+        >>> from kira.plugin_sdk.manifest import PluginManifestValidator
+        >>> validator = PluginManifestValidator()
+        >>> validator.validate_manifest({"name": "demo", "version": "1.0.0"})
+        ['[required] 'displayName' is a required property (path: <root>)']
+    """
 
     def __init__(self) -> None:
         self.validator = Draft7Validator(PLUGIN_MANIFEST_SCHEMA)
 
     def validate_manifest(self, manifest_data: dict[str, Any]) -> list[str]:
-        """
-        Валидирует манифест плагина
+        """Return a list of human readable validation errors."""
 
-        Args:
-            manifest_data: Словарь с данными манифеста
-
-        Returns:
-            Список ошибок валидации (пустой если валидно)
-        """
         collected: list[str] = []
 
         try:
@@ -290,88 +296,44 @@ class PluginManifestValidator:
             ):
                 location = " -> ".join(str(part) for part in error.absolute_path) or "<root>"
                 collected.append(f"[{error.validator}] {error.message} (path: {location})")
-        except Exception as exc:
-            collected.append(f"Неожиданная ошибка: {exc}")
+        except Exception as exc:  # pragma: no cover - defensive path
+            collected.append(f"Unexpected validation error: {exc}")
 
         return collected
 
     def validate_manifest_file(self, file_path: str) -> list[str]:
-        """
-        Валидирует манифест из файла
+        """Load ``file_path`` and validate its manifest contents."""
 
-        Args:
-            file_path: Путь к файлу kira-plugin.json
-
-        Returns:
-            Список ошибок валидации (пустой если валидно)
-        """
         try:
-            with open(file_path, encoding="utf-8") as f:
-                manifest_data = json.load(f)
-            return self.validate_manifest(manifest_data)
+            with open(file_path, encoding="utf-8") as file:
+                manifest_data = json.load(file)
         except FileNotFoundError:
-            return [f"Файл не найден: {file_path}"]
-        except json.JSONDecodeError as e:
-            return [f"Ошибка JSON: {e!s}"]
-        except Exception as e:
-            return [f"Ошибка чтения файла: {e!s}"]
+            return [f"Manifest file not found: {file_path}"]
+        except json.JSONDecodeError as exc:
+            return [f"Invalid JSON: {exc.msg} (line {exc.lineno}, column {exc.colno})"]
+        except Exception as exc:  # pragma: no cover - defensive path
+            return [f"Unable to read manifest: {exc}"]
+
+        return self.validate_manifest(manifest_data)
 
 
 def validate_plugin_manifest(manifest_data: dict[str, Any]) -> bool:
-    """
-    Быстрая проверка валидности манифеста
+    """Return ``True`` when ``manifest_data`` passes schema validation."""
 
-    Args:
-        manifest_data: Словарь с данными манифеста
-
-    Returns:
-        True если манифест валиден, False иначе
-    """
     validator = PluginManifestValidator()
     errors = validator.validate_manifest(manifest_data)
-    return len(errors) == 0
+    return not errors
 
 
 def get_manifest_schema() -> dict[str, Any]:
-    """
-    Возвращает JSON Schema для манифеста плагина
+    """Return a deep copy of :data:`PLUGIN_MANIFEST_SCHEMA`."""
 
-    Returns:
-        Словарь с JSON Schema
-    """
-    return PLUGIN_MANIFEST_SCHEMA.copy()
+    return copy.deepcopy(PLUGIN_MANIFEST_SCHEMA)
 
 
-# Пример использования
-if __name__ == "__main__":
-    # Пример валидного манифеста
-    example_manifest = {
-        "name": "kira-calendar",
-        "version": "0.4.2",
-        "displayName": "Calendar Sync",
-        "description": "Sync events & timeboxing",
-        "publisher": "werserk",
-        "engines": {"kira": "^1.0.0"},
-        "permissions": ["calendar.write", "net", "secrets.read"],
-        "entry": "kira_plugin_calendar.plugin:activate",
-        "capabilities": ["pull", "push", "timebox"],
-        "configSchema": {
-            "calendar.default": {"type": "string"},
-            "timebox.length": {"type": "integer", "default": 90},
-        },
-        "contributes": {
-            "events": ["event.created", "task.due_soon"],
-            "commands": ["calendar.pull", "calendar.push"],
-        },
-        "sandbox": {"strategy": "subprocess", "timeoutMs": 60000},
-    }
-
-    validator = PluginManifestValidator()
-    errors = validator.validate_manifest(example_manifest)
-
-    if errors:
-        print("Ошибки валидации:")
-        for error in errors:
-            print(f"  - {error}")
-    else:
-        print("Манифест валиден!")
+__all__ = [
+    "PLUGIN_MANIFEST_SCHEMA",
+    "PluginManifestValidator",
+    "get_manifest_schema",
+    "validate_plugin_manifest",
+]
