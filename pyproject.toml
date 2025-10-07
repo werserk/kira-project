@@ -11,6 +11,23 @@ python = "^3.11"
 click = "^8.1.0"
 pyyaml = "^6.0"
 jsonschema = "^4.0"
+# Optional adapters (install as needed)
+python-telegram-bot = { version = "^20.0", optional = true }
+google-auth = { version = "^2.0", optional = true }
+google-auth-oauthlib = { version = "^1.0", optional = true }
+google-api-python-client = { version = "^2.0", optional = true }
+# Scheduler
+croniter = { version = "^2.0", optional = true }
+# HTTP client
+httpx = { version = "^0.27.0", optional = true }
+
+[tool.poetry.extras]
+telegram = ["python-telegram-bot", "httpx"]
+gcal = ["google-auth", "google-auth-oauthlib", "google-api-python-client"]
+all = ["python-telegram-bot", "google-auth", "google-auth-oauthlib", "google-api-python-client", "croniter", "httpx"]
+
+[tool.poetry.scripts]
+kira = "kira.cli.__main__:main"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.4.2"
