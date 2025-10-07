@@ -1,0 +1,217 @@
+# Kira Default Configuration
+# Override these settings in kira.yaml or via environment variables
+
+# Vault settings
+vault:
+  path: "vault"  # Path to vault directory
+  inbox_folder: "inbox"
+  processed_folder: "processed"
+  indexes_folder: "@Indexes"
+  templates_folder: "@Templates"
+  archive_folder: "@Archive"
+
+# Core system settings
+core:
+  timezone: "Europe/Brussels"  # Default timezone for timestamps
+  date_format: "%Y-%m-%d"
+  datetime_format: "%Y-%m-%d %H:%M:%S"
+  
+# Sandbox settings
+sandbox:
+  strategy: "subprocess"  # subprocess, thread, inline
+  timeout_ms: 30000  # Default timeout: 30 seconds
+  memory_limit_mb: 512  # Memory limit per plugin
+  max_restarts: 3  # Maximum restart attempts
+  restart_window_seconds: 300  # Window for restart counting (5 minutes)
+  grace_period_seconds: 5.0  # Graceful shutdown period
+  cpu_time_limit_seconds: 40  # CPU time limit
+  env_whitelist:
+    - PATH
+    - HOME
+    - USER
+    - LANG
+    - LC_ALL
+
+# Event bus settings
+event_bus:
+  retry:
+    max_attempts: 3
+    initial_delay: 1.0
+    max_delay: 60.0
+    backoff_multiplier: 2.0
+    jitter: true
+  queue_size: 1000  # Maximum queued events
+  delivery_timeout_seconds: 10.0
+
+# Scheduler settings
+scheduler:
+  tick_interval_seconds: 0.1  # Scheduler loop interval
+  job_timeout_seconds: 300  # Default job timeout (5 minutes)
+  max_concurrent_jobs: 10
+  missed_run_policy: "coalesce"  # coalesce, skip, run_all
+
+# ID generation settings
+ids:
+  max_length: 100  # Maximum ID length (filesystem safety)
+  slug_max_length: 50  # Maximum slug length
+  collision_retry_attempts: 100
+  fallback_id_length: 8  # UUID fallback length
+
+# Graph validation settings
+graph_validation:
+  similarity_threshold: 0.85  # Duplicate detection threshold (0.0-1.0)
+  max_orphans_report: 20  # Maximum orphans in report
+  max_cycles_report: 10  # Maximum cycles in report
+  max_broken_links_report: 30  # Maximum broken links in report
+  max_duplicates_report: 20  # Maximum duplicates in report
+  ignore_folders:
+    - "@Indexes"
+    - "@Templates"
+    - "@Archive"
+  ignore_kinds:
+    - tag
+    - index
+    - template
+
+# Pipeline settings
+pipelines:
+  inbox:
+    max_items_per_run: 100
+    max_retries: 3
+    retry_delay: 1.0
+    retry_backoff: 2.0
+    batch_size: 10
+  
+  sync:
+    interval_seconds: 300  # Sync every 5 minutes
+    max_retries: 3
+    timeout_seconds: 60
+  
+  rollup:
+    daily_hour: 0  # Generate at midnight
+    weekly_day: 1  # Monday
+    retention_days: 90  # Keep rollups for 90 days
+
+# Logging settings
+logging:
+  level: "INFO"  # DEBUG, INFO, WARNING, ERROR
+  path: "logs"
+  rotation:
+    max_bytes: 10485760  # 10 MB
+    backup_count: 5
+  format: "jsonl"  # jsonl, text
+  console_output: true
+  file_output: true
+
+# Plugin settings
+plugins:
+  enabled: []  # List of enabled plugin names
+  disabled: []  # List of disabled plugin names
+  timeout_ms: 30000  # Default plugin timeout
+  auto_reload: false  # Auto-reload plugins on change
+  
+  # Plugin-specific defaults
+  inbox:
+    confidence_threshold: 0.8  # Minimum confidence for auto-processing
+    clarification_timeout_hours: 24.0  # Auto-timeout clarifications
+    max_clarifications: 50  # Maximum pending clarifications
+  
+  calendar:
+    default_calendar_id: "primary"
+    sync_days_past: 7
+    sync_days_future: 30
+    timebox_default_minutes: 25  # Default Pomodoro duration
+    reconcile_interval_hours: 24  # Nightly reconciliation
+  
+  deadlines:
+    warning_days: [7, 3, 1]  # Days before deadline to warn
+    snooze_default_hours: 24
+  
+  code:
+    index_extensions:
+      - .py
+      - .js
+      - .ts
+      - .go
+      - .rs
+    exclude_dirs:
+      - node_modules
+      - __pycache__
+      - .git
+      - venv
+    max_file_size_kb: 1024  # 1 MB
+
+# Adapter settings
+adapters:
+  telegram:
+    mode: "bot"  # bot, userbot
+    update_timeout: 30
+    retry_attempts: 3
+    rate_limit_delay: 1.0
+    whitelist_chats: []  # Empty = all chats allowed
+    max_message_length: 4096
+  
+  gcal:
+    credentials_path: ".credentials/gcal_credentials.json"
+    token_path: ".credentials/gcal_token.json"
+    scopes:
+      - "https://www.googleapis.com/auth/calendar"
+    timeout_seconds: 30
+    max_results: 250  # Max events per request
+
+# Host API settings
+host_api:
+  validation:
+    enabled: true
+    strict_mode: false  # Fail on warnings
+  
+  links:
+    auto_update_backlinks: true
+    check_broken_links: true
+  
+  search:
+    default_limit: 50
+    max_limit: 500
+
+# Security settings
+security:
+  secrets:
+    storage_path: ".secrets/keyring.json"
+    encryption: true  # Encrypt secrets at rest
+  
+  permissions:
+    default_deny: true  # Deny by default, explicit grant required
+    audit_log: true  # Log all permission checks
+  
+  sandbox:
+    network_default: false  # Network disabled by default
+    fs_write_default: false  # FS write disabled by default
+
+# Performance settings
+performance:
+  cache:
+    enabled: true
+    max_size_mb: 100
+    ttl_seconds: 3600  # 1 hour
+  
+  concurrency:
+    max_workers: 4
+    io_workers: 8
+
+# Development settings
+dev:
+  debug: false
+  hot_reload: false
+  profiling: false
+  test_mode: false
+  mock_external_apis: false
+
+# Feature flags
+features:
+  timeboxing: true
+  clarifications: true
+  auto_rollup: true
+  graph_validation: true
+  telemetry: true
+  metrics: true
+

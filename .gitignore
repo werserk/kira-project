@@ -17,5 +17,17 @@ __pycache__
 
 vault/
 
+# Configuration and secrets
+.env
+.env.local
+.env.*.local
+.secrets/
+.credentials/
+kira.yaml  # User config may contain secrets
+
+# Logs
+logs/*.jsonl
+logs/**/*.jsonl
+
 # Temporary/test scripts
 is_everything_ok.sh
