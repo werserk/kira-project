@@ -45,6 +45,7 @@ class Event:
     payload: dict[str, Any] | None = None
     headers: dict[str, Any] = field(default_factory=dict)
     correlation_id: str = field(default_factory=lambda: str(uuid.uuid4()))
+    trace_id: str | None = None  # ADR-015: trace propagation
     timestamp: float = field(default_factory=time.time)
 
     def with_correlation_id(self, correlation_id: str) -> Event:
@@ -54,6 +55,18 @@ class Event:
             payload=self.payload,
             headers=self.headers.copy(),
             correlation_id=correlation_id,
+            trace_id=self.trace_id,
+            timestamp=self.timestamp,
+        )
+
+    def with_trace_id(self, trace_id: str) -> Event:
+        """Create new event with specified trace ID (ADR-015)."""
+        return Event(
+            name=self.name,
+            payload=self.payload,
+            headers=self.headers.copy(),
+            correlation_id=self.correlation_id,
+            trace_id=trace_id,
             timestamp=self.timestamp,
         )
 
