@@ -7,18 +7,22 @@ and receiving briefings through Telegram Bot API.
 from __future__ import annotations
 
 import hashlib
+import hmac
 import json
 import time
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Callable
 
 if TYPE_CHECKING:
     from ...core.events import EventBus
+    from ...core.scheduler import Scheduler
 
 __all__ = [
+    "ConfirmationRequest",
+    "BriefingScheduler",
     "TelegramAdapter",
     "TelegramAdapterConfig",
     "TelegramMessage",
@@ -60,6 +64,37 @@ class TelegramMessage:
 
 
 @dataclass
+class ConfirmationRequest:
+    """Request for user confirmation via inline buttons."""
+
+    request_id: str
+    chat_id: int
+    message: str
+    options: list[dict[str, str]]  # [{"text": "Yes", "callback_data": "confirm_yes"}, ...]
+    command: str  # Plugin command to trigger on selection
+    context: dict[str, Any] = field(default_factory=dict)
+    expires_at: float = field(default_factory=lambda: time.time() + 3600)  # 1 hour TTL
+
+    def is_expired(self) -> bool:
+        """Check if confirmation request has expired."""
+        return time.time() > self.expires_at
+
+    def get_inline_keyboard(self) -> dict[str, Any]:
+        """Generate inline keyboard markup for Telegram.
+
+        Returns
+        -------
+        dict
+            Telegram inline keyboard markup
+        """
+        return {
+            "inline_keyboard": [
+                [{"text": opt["text"], "callback_data": opt["callback_data"]} for opt in self.options]
+            ]
+        }
+
+
+@dataclass
 class TelegramAdapterConfig:
     """Configuration for Telegram adapter."""
 
@@ -72,6 +107,10 @@ class TelegramAdapterConfig:
     retry_delay: float = 2.0
     log_path: Path | None = None
     temp_dir: Path | None = None
+    csrf_secret: str = field(default_factory=lambda: str(uuid.uuid4()))
+    daily_briefing_time: str = "09:00"  # HH:MM format
+    weekly_briefing_day: int = 1  # Monday = 0
+    weekly_briefing_time: str = "09:00"
 
 
 class TelegramAdapter:
@@ -104,6 +143,7 @@ class TelegramAdapter:
         config: TelegramAdapterConfig,
         *,
         event_bus: EventBus | None = None,
+        scheduler: Scheduler | None = None,
         logger: Any = None,
     ) -> None:
         """Initialize Telegram adapter.
@@ -114,20 +154,30 @@ class TelegramAdapter:
             Adapter configuration
         event_bus
             Event bus for publishing events (ADR-005)
+        scheduler
+            Optional scheduler for briefings (ADR-005)
         logger
             Optional structured logger
         """
         self.config = config
         self.event_bus = event_bus
+        self.scheduler = scheduler
         self.logger = logger
         self._running = False
         self._last_update_id: int = 0
         self._processed_updates: set[str] = set()  # Idempotency tracking
         self._api_base_url = f"https://api.telegram.org/bot{config.bot_token}"
+        self._pending_confirmations: dict[str, ConfirmationRequest] = {}
+        self._command_handlers: dict[str, Callable[[dict[str, Any]], None]] = {}
+        self._briefing_generator: Callable[[str], str] | None = None
 
         # Setup temp directory for file downloads
         if config.temp_dir:
             config.temp_dir.mkdir(parents=True, exist_ok=True)
+
+        # Setup scheduled briefings if scheduler provided
+        if self.scheduler:
+            self._setup_briefing_schedules()
 
     def start_polling(self) -> None:
         """Start long polling for updates.
@@ -215,7 +265,116 @@ class TelegramAdapter:
             )
             return None
 
-    def send_daily_briefing(self, chat_id: int, briefing_content: str) -> bool:
+    def register_command_handler(self, command: str, handler: Callable[[dict[str, Any]], None]) -> None:
+        """Register handler for plugin command triggered by confirmation.
+
+        Parameters
+        ----------
+        command
+            Command name (e.g., "inbox.confirm_task")
+        handler
+            Handler function receiving context dict
+        """
+        self._command_handlers[command] = handler
+        self._log_event("command_handler_registered", {"command": command})
+
+    def set_briefing_generator(self, generator: Callable[[str], str]) -> None:
+        """Set briefing content generator function.
+
+        Parameters
+        ----------
+        generator
+            Function that takes briefing type ("daily" or "weekly") and returns formatted content
+        """
+        self._briefing_generator = generator
+
+    def request_confirmation(
+        self,
+        chat_id: int,
+        message: str,
+        options: list[dict[str, str]],
+        command: str,
+        context: dict[str, Any] | None = None,
+    ) -> str:
+        """Request user confirmation via inline buttons.
+
+        Parameters
+        ----------
+        chat_id
+            Target chat ID
+        message
+            Confirmation message
+        options
+            List of options with text and callback_data
+        command
+            Plugin command to execute on selection
+        context
+            Optional context data to pass to command handler
+
+        Returns
+        -------
+        str
+            Request ID for tracking
+
+        Example
+        -------
+        >>> adapter.request_confirmation(
+        ...     chat_id=123456,
+        ...     message="Is this a task?\\n\\n'Fix bug in auth'",
+        ...     options=[
+        ...         {"text": "✅ Yes", "callback_data": "yes"},
+        ...         {"text": "❌ No", "callback_data": "no"}
+        ...     ],
+        ...     command="inbox.confirm_task",
+        ...     context={"entity_id": "task-123", "title": "Fix bug in auth"}
+        ... )
+        'req-abc123'
+        """
+        request_id = f"req-{uuid.uuid4().hex[:12]}"
+        trace_id = str(uuid.uuid4())
+
+        # Create confirmation request
+        confirmation = ConfirmationRequest(
+            request_id=request_id,
+            chat_id=chat_id,
+            message=message,
+            options=options,
+            command=command,
+            context=context or {},
+        )
+
+        # Add CSRF tokens to callback data
+        signed_options = []
+        for opt in options:
+            callback_data = opt["callback_data"]
+            # Sign: request_id:callback_data:signature
+            signature = self._generate_csrf_token(request_id, callback_data)
+            signed_callback = f"{request_id}:{callback_data}:{signature}"
+            signed_options.append({"text": opt["text"], "callback_data": signed_callback})
+
+        confirmation.options = signed_options
+        self._pending_confirmations[request_id] = confirmation
+
+        # Send message with inline keyboard
+        keyboard = confirmation.get_inline_keyboard()
+        response = self.send_message(chat_id, message, reply_markup=keyboard)
+
+        success = response is not None
+
+        self._log_event(
+            "confirmation_requested" if success else "confirmation_request_failed",
+            {
+                "trace_id": trace_id,
+                "request_id": request_id,
+                "chat_id": chat_id,
+                "command": command,
+                "outcome": "success" if success else "failure",
+            },
+        )
+
+        return request_id
+
+    def send_daily_briefing(self, chat_id: int, briefing_content: str | None = None) -> bool:
         """Send daily briefing to chat.
 
         Parameters
@@ -223,7 +382,8 @@ class TelegramAdapter:
         chat_id
             Target chat ID
         briefing_content
-            Briefing content (Markdown formatted)
+            Optional briefing content (Markdown formatted).
+            If not provided, uses briefing_generator.
 
         Returns
         -------
@@ -232,15 +392,34 @@ class TelegramAdapter:
         """
         trace_id = str(uuid.uuid4())
 
+        # Generate content if not provided
+        if briefing_content is None:
+            if self._briefing_generator:
+                try:
+                    briefing_content = self._briefing_generator("daily")
+                except Exception as exc:
+                    self._log_event(
+                        "briefing_generation_failed",
+                        {
+                            "trace_id": trace_id,
+                            "chat_id": chat_id,
+                            "error": str(exc),
+                        },
+                    )
+                    briefing_content = "❌ Failed to generate daily briefing"
+            else:
+                briefing_content = "ℹ️ Daily briefing not configured"
+
         self._log_event(
             "briefing_sending",
             {
                 "trace_id": trace_id,
                 "chat_id": chat_id,
+                "briefing_type": "daily",
             },
         )
 
-        response = self.send_message(chat_id, briefing_content)
+        response = self.send_message(chat_id, f"📅 *Daily Briefing*\n\n{briefing_content}")
 
         success = response is not None
 
@@ -249,6 +428,68 @@ class TelegramAdapter:
             {
                 "trace_id": trace_id,
                 "chat_id": chat_id,
+                "briefing_type": "daily",
+                "outcome": "success" if success else "failure",
+            },
+        )
+
+        return success
+
+    def send_weekly_briefing(self, chat_id: int, briefing_content: str | None = None) -> bool:
+        """Send weekly briefing to chat.
+
+        Parameters
+        ----------
+        chat_id
+            Target chat ID
+        briefing_content
+            Optional briefing content (Markdown formatted).
+            If not provided, uses briefing_generator.
+
+        Returns
+        -------
+        bool
+            True if sent successfully
+        """
+        trace_id = str(uuid.uuid4())
+
+        # Generate content if not provided
+        if briefing_content is None:
+            if self._briefing_generator:
+                try:
+                    briefing_content = self._briefing_generator("weekly")
+                except Exception as exc:
+                    self._log_event(
+                        "briefing_generation_failed",
+                        {
+                            "trace_id": trace_id,
+                            "chat_id": chat_id,
+                            "error": str(exc),
+                        },
+                    )
+                    briefing_content = "❌ Failed to generate weekly briefing"
+            else:
+                briefing_content = "ℹ️ Weekly briefing not configured"
+
+        self._log_event(
+            "briefing_sending",
+            {
+                "trace_id": trace_id,
+                "chat_id": chat_id,
+                "briefing_type": "weekly",
+            },
+        )
+
+        response = self.send_message(chat_id, f"📊 *Weekly Briefing*\n\n{briefing_content}")
+
+        success = response is not None
+
+        self._log_event(
+            "briefing_sent" if success else "briefing_failed",
+            {
+                "trace_id": trace_id,
+                "chat_id": chat_id,
+                "briefing_type": "weekly",
                 "outcome": "success" if success else "failure",
             },
         )
@@ -527,7 +768,7 @@ class TelegramAdapter:
         )
 
     def _handle_callback_query(self, callback_data: dict[str, Any], trace_id: str) -> None:
-        """Handle inline button callback.
+        """Handle inline button callback with CSRF verification.
 
         Parameters
         ----------
@@ -539,6 +780,7 @@ class TelegramAdapter:
         callback_id = callback_data.get("id")
         data = callback_data.get("data", "")
         chat_id = callback_data.get("message", {}).get("chat", {}).get("id")
+        user_id = callback_data.get("from", {}).get("id")
 
         self._log_event(
             "callback_received",
@@ -556,16 +798,112 @@ class TelegramAdapter:
         except Exception:
             pass
 
-        # Publish callback event for plugins to handle
-        if self.event_bus:
-            payload = {
-                "callback_id": callback_id,
-                "data": data,
-                "chat_id": chat_id,
-                "trace_id": trace_id,
-                "timestamp": datetime.now(timezone.utc).isoformat(),
-            }
-            self.event_bus.publish("telegram.callback", payload)
+        # Parse signed callback data: request_id:callback_data:signature
+        parts = data.split(":", 2)
+        if len(parts) == 3:
+            request_id, choice, signature = parts
+
+            # Verify CSRF token
+            if not self._verify_csrf_token(request_id, choice, signature):
+                self._log_event(
+                    "callback_csrf_failed",
+                    {
+                        "trace_id": trace_id,
+                        "request_id": request_id,
+                        "reason": "invalid_signature",
+                    },
+                )
+                self.send_message(chat_id, "❌ Invalid confirmation token. Please try again.")
+                return
+
+            # Get confirmation request
+            confirmation = self._pending_confirmations.get(request_id)
+            if not confirmation:
+                self._log_event(
+                    "callback_confirmation_not_found",
+                    {
+                        "trace_id": trace_id,
+                        "request_id": request_id,
+                    },
+                )
+                self.send_message(chat_id, "❌ Confirmation request not found or expired.")
+                return
+
+            # Check expiration
+            if confirmation.is_expired():
+                self._log_event(
+                    "callback_confirmation_expired",
+                    {
+                        "trace_id": trace_id,
+                        "request_id": request_id,
+                    },
+                )
+                self.send_message(chat_id, "❌ Confirmation request expired. Please try again.")
+                del self._pending_confirmations[request_id]
+                return
+
+            # Execute command handler
+            handler = self._command_handlers.get(confirmation.command)
+            if handler:
+                try:
+                    # Prepare context
+                    context = confirmation.context.copy()
+                    context["choice"] = choice
+                    context["chat_id"] = chat_id
+                    context["user_id"] = user_id
+                    context["trace_id"] = trace_id
+
+                    # Call handler
+                    handler(context)
+
+                    self._log_event(
+                        "callback_command_executed",
+                        {
+                            "trace_id": trace_id,
+                            "request_id": request_id,
+                            "command": confirmation.command,
+                            "choice": choice,
+                        },
+                    )
+
+                    # Send success message
+                    self.send_message(chat_id, f"✅ Confirmed: {choice}")
+
+                except Exception as exc:
+                    self._log_event(
+                        "callback_command_failed",
+                        {
+                            "trace_id": trace_id,
+                            "request_id": request_id,
+                            "command": confirmation.command,
+                            "error": str(exc),
+                        },
+                    )
+                    self.send_message(chat_id, f"❌ Failed to process confirmation: {exc}")
+            else:
+                self._log_event(
+                    "callback_handler_not_found",
+                    {
+                        "trace_id": trace_id,
+                        "request_id": request_id,
+                        "command": confirmation.command,
+                    },
+                )
+
+            # Remove processed confirmation
+            del self._pending_confirmations[request_id]
+
+        else:
+            # Legacy callback without signature - publish generic event
+            if self.event_bus:
+                payload = {
+                    "callback_id": callback_id,
+                    "data": data,
+                    "chat_id": chat_id,
+                    "trace_id": trace_id,
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                }
+                self.event_bus.publish("telegram.callback", payload)
 
     def _api_request(self, method: str, params: dict[str, Any]) -> dict[str, Any] | None:
         """Make Telegram API request.
@@ -590,6 +928,110 @@ class TelegramAdapter:
 
         # For now, return empty response (will be implemented with requests library)
         return {"ok": True, "result": []}
+
+    def _generate_csrf_token(self, request_id: str, callback_data: str) -> str:
+        """Generate CSRF token for callback data.
+
+        Parameters
+        ----------
+        request_id
+            Request ID
+        callback_data
+            Callback data to sign
+
+        Returns
+        -------
+        str
+            HMAC signature (hex)
+        """
+        message = f"{request_id}:{callback_data}"
+        signature = hmac.new(
+            self.config.csrf_secret.encode("utf-8"),
+            message.encode("utf-8"),
+            hashlib.sha256,
+        ).hexdigest()[:16]  # Use first 16 chars to keep callback data short
+        return signature
+
+    def _verify_csrf_token(self, request_id: str, callback_data: str, signature: str) -> bool:
+        """Verify CSRF token.
+
+        Parameters
+        ----------
+        request_id
+            Request ID
+        callback_data
+            Callback data
+        signature
+            Provided signature
+
+        Returns
+        -------
+        bool
+            True if signature is valid
+        """
+        expected = self._generate_csrf_token(request_id, callback_data)
+        return hmac.compare_digest(expected, signature)
+
+    def _setup_briefing_schedules(self) -> None:
+        """Setup scheduled briefings using scheduler."""
+        if not self.scheduler:
+            return
+
+        # Parse daily briefing time
+        try:
+            hour, minute = map(int, self.config.daily_briefing_time.split(":"))
+
+            # Schedule daily briefing for each allowed chat
+            for chat_id in self.config.allowed_chat_ids:
+                self.scheduler.schedule_cron(
+                    f"daily_briefing_{chat_id}",
+                    f"{minute} {hour} * * *",  # Daily at specified time
+                    lambda cid=chat_id: self.send_daily_briefing(cid),
+                    job_id=f"telegram_daily_briefing_{chat_id}",
+                    metadata={"chat_id": chat_id, "type": "daily_briefing"},
+                )
+
+            self._log_event(
+                "daily_briefing_scheduled",
+                {
+                    "time": self.config.daily_briefing_time,
+                    "chat_count": len(self.config.allowed_chat_ids),
+                },
+            )
+        except Exception as exc:
+            self._log_event(
+                "daily_briefing_schedule_failed",
+                {"error": str(exc)},
+            )
+
+        # Parse weekly briefing time
+        try:
+            hour, minute = map(int, self.config.weekly_briefing_time.split(":"))
+            day = self.config.weekly_briefing_day
+
+            # Schedule weekly briefing for each allowed chat
+            for chat_id in self.config.allowed_chat_ids:
+                self.scheduler.schedule_cron(
+                    f"weekly_briefing_{chat_id}",
+                    f"{minute} {hour} * * {day}",  # Weekly on specified day
+                    lambda cid=chat_id: self.send_weekly_briefing(cid),
+                    job_id=f"telegram_weekly_briefing_{chat_id}",
+                    metadata={"chat_id": chat_id, "type": "weekly_briefing"},
+                )
+
+            self._log_event(
+                "weekly_briefing_scheduled",
+                {
+                    "time": self.config.weekly_briefing_time,
+                    "day": day,
+                    "chat_count": len(self.config.allowed_chat_ids),
+                },
+            )
+        except Exception as exc:
+            self._log_event(
+                "weekly_briefing_schedule_failed",
+                {"error": str(exc)},
+            )
 
     def _log_event(self, event_type: str, data: dict[str, Any]) -> None:
         """Emit structured JSONL log entry.
@@ -623,10 +1065,188 @@ class TelegramAdapter:
                 self.logger.info(f"{event_type}: {json.dumps(data)}")
 
 
+class BriefingScheduler:
+    """Helper class for generating briefing content from Vault data.
+
+    This integrates with HostAPI to pull summaries and format them for Telegram.
+    """
+
+    def __init__(self, host_api: Any = None) -> None:
+        """Initialize briefing scheduler.
+
+        Parameters
+        ----------
+        host_api
+            Host API instance for Vault access
+        """
+        self.host_api = host_api
+
+    def generate_daily_briefing(self) -> str:
+        """Generate daily briefing content.
+
+        Returns
+        -------
+        str
+            Formatted briefing content (Markdown)
+        """
+        sections = []
+
+        # Today's summary
+        sections.append("*🌅 Good Morning!*\n")
+        sections.append("Here's what's on your agenda today:")
+
+        # Tasks due today
+        if self.host_api:
+            try:
+                tasks = list(self.host_api.list_entities("task", limit=20))
+                due_today = [t for t in tasks if self._is_due_today(t)]
+
+                if due_today:
+                    sections.append(f"\n📋 *Tasks Due Today ({len(due_today)}):*")
+                    for task in due_today[:5]:
+                        title = task.get_title()
+                        sections.append(f"  • {title}")
+                    if len(due_today) > 5:
+                        sections.append(f"  ... and {len(due_today) - 5} more")
+                else:
+                    sections.append("\n📋 *Tasks:* No tasks due today! 🎉")
+            except Exception:
+                sections.append("\n📋 *Tasks:* Unable to fetch tasks")
+
+            # Events today
+            try:
+                events = list(self.host_api.list_entities("event", limit=10))
+                today_events = [e for e in events if self._is_today(e)]
+
+                if today_events:
+                    sections.append(f"\n📅 *Events Today ({len(today_events)}):*")
+                    for event in today_events[:3]:
+                        title = event.get_title()
+                        sections.append(f"  • {title}")
+                    if len(today_events) > 3:
+                        sections.append(f"  ... and {len(today_events) - 3} more")
+            except Exception:
+                pass
+        else:
+            sections.append("\n_Vault integration not configured_")
+
+        sections.append("\n✨ *Have a productive day!*")
+
+        return "\n".join(sections)
+
+    def generate_weekly_briefing(self) -> str:
+        """Generate weekly briefing content.
+
+        Returns
+        -------
+        str
+            Formatted briefing content (Markdown)
+        """
+        sections = []
+
+        # Week summary
+        sections.append("*📊 Weekly Summary*\n")
+        sections.append("Here's your week at a glance:")
+
+        if self.host_api:
+            try:
+                tasks = list(self.host_api.list_entities("task", limit=50))
+
+                # Completed this week
+                completed = [t for t in tasks if self._completed_this_week(t)]
+                sections.append(f"\n✅ *Completed:* {len(completed)} tasks")
+
+                # In progress
+                in_progress = [t for t in tasks if t.metadata.get("status") == "doing"]
+                sections.append(f"⏳ *In Progress:* {len(in_progress)} tasks")
+
+                # Due this week
+                due_this_week = [t for t in tasks if self._is_due_this_week(t)]
+                if due_this_week:
+                    sections.append(f"\n📋 *Due This Week ({len(due_this_week)}):*")
+                    for task in due_this_week[:5]:
+                        title = task.get_title()
+                        status = task.metadata.get("status", "unknown")
+                        sections.append(f"  • [{status}] {title}")
+                    if len(due_this_week) > 5:
+                        sections.append(f"  ... and {len(due_this_week) - 5} more")
+
+            except Exception:
+                sections.append("\n_Unable to fetch Vault data_")
+        else:
+            sections.append("\n_Vault integration not configured_")
+
+        sections.append("\n🚀 *Keep up the great work!*")
+
+        return "\n".join(sections)
+
+    def _is_due_today(self, entity: Any) -> bool:
+        """Check if entity is due today."""
+        due = entity.metadata.get("due")
+        if not due:
+            return False
+        try:
+            from datetime import date
+            due_date = datetime.fromisoformat(due.replace("Z", "+00:00")).date()
+            return due_date == date.today()
+        except Exception:
+            return False
+
+    def _is_today(self, entity: Any) -> bool:
+        """Check if entity is scheduled for today."""
+        start = entity.metadata.get("start")
+        if not start:
+            return False
+        try:
+            from datetime import date
+            start_date = datetime.fromisoformat(start.replace("Z", "+00:00")).date()
+            return start_date == date.today()
+        except Exception:
+            return False
+
+    def _is_due_this_week(self, entity: Any) -> bool:
+        """Check if entity is due this week."""
+        due = entity.metadata.get("due")
+        if not due:
+            return False
+        try:
+            from datetime import date, timedelta
+            due_date = datetime.fromisoformat(due.replace("Z", "+00:00")).date()
+            today = date.today()
+            week_end = today + timedelta(days=7)
+            return today <= due_date <= week_end
+        except Exception:
+            return False
+
+    def _completed_this_week(self, entity: Any) -> bool:
+        """Check if entity was completed this week."""
+        status = entity.metadata.get("status")
+        if status != "done":
+            return False
+
+        completed_at = entity.metadata.get("completed_at") or entity.updated_at
+        if not completed_at:
+            return False
+
+        try:
+            from datetime import date, timedelta
+            if isinstance(completed_at, str):
+                completed_date = datetime.fromisoformat(completed_at.replace("Z", "+00:00")).date()
+            else:
+                completed_date = completed_at.date()
+
+            today = date.today()
+            week_start = today - timedelta(days=today.weekday())
+            return week_start <= completed_date <= today
+        except Exception:
+            return False
+
+
 def create_telegram_adapter(
     bot_token: str,
     *,
     event_bus: EventBus | None = None,
+    scheduler: Scheduler | None = None,
     logger: Any = None,
     log_path: Path | str | None = None,
     **config_kwargs: Any,
@@ -639,6 +1259,8 @@ def create_telegram_adapter(
         Telegram Bot API token
     event_bus
         Event bus for publishing events
+    scheduler
+        Optional scheduler for automatic briefings
     logger
         Optional logger instance
     log_path
@@ -655,6 +1277,7 @@ def create_telegram_adapter(
         >>> adapter = create_telegram_adapter(
         ...     "YOUR_BOT_TOKEN",
         ...     event_bus=event_bus,
+        ...     scheduler=scheduler,
         ...     allowed_chat_ids=[123456789],
         ...     log_path=Path("logs/adapters/telegram.jsonl")
         ... )
@@ -665,5 +1288,5 @@ def create_telegram_adapter(
 
     config = TelegramAdapterConfig(bot_token=bot_token, **config_kwargs)
 
-    return TelegramAdapter(config, event_bus=event_bus, logger=logger)
+    return TelegramAdapter(config, event_bus=event_bus, scheduler=scheduler, logger=logger)
 

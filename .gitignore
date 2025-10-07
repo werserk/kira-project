@@ -10,14 +10,12 @@
 .coverage.*
 .coverage.xml
 .coverage.json
-.mypy_cache
-.pytest_cache
-.ruff_cache
-.tox
-.coverage
-.coverage.*
-.coverage.xml
-.coverage.json
 __pycache__
+*.pyc
+*.pyo
+*.pyd
 
 vault/
+
+# Temporary/test scripts
+is_everything_ok.sh
