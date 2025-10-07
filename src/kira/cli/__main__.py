@@ -15,6 +15,7 @@ from .kira_ext import cli as ext_cli
 from .kira_inbox import cli as inbox_cli
 from .kira_plugin_template import cli as plugin_cli
 from .kira_rollup import cli as rollup_cli
+from .kira_schedule import cli as schedule_cli
 from .kira_vault import cli as vault_cli
 
 CONTEXT_SETTINGS = {"help_option_names": ["-h", "--help"]}
@@ -23,6 +24,9 @@ EPILOG = """
   kira inbox                    # Запустить inbox-конвейер
   kira calendar pull           # Синхронизировать календарь (pull)
   kira calendar push           # Синхронизировать календарь (push)
+  kira schedule view --today   # Показать расписание на сегодня
+  kira schedule conflicts      # Найти конфликты в расписании
+  kira schedule quick "Meeting tomorrow at 14:00"  # Быстро создать событие
   kira rollup daily            # Создать дневной rollup
   kira rollup weekly           # Создать недельный rollup
   kira vault init             # Инициализировать Vault
@@ -79,6 +83,7 @@ def validate_vault() -> int:
 # Подключаем подкоманды
 cli.add_command(inbox_cli, "inbox")
 cli.add_command(calendar_cli, "calendar")
+cli.add_command(schedule_cli, "schedule")
 cli.add_command(rollup_cli, "rollup")
 cli.add_command(code_cli, "code")
 cli.add_command(ext_cli, "ext")
