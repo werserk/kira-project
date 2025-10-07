@@ -1,187 +1,233 @@
-# Kira Plugin SDK
+# Kira Plugin SDK Documentation
 
-The Kira Plugin SDK provides a stable, well-documented interface for plugin authors to interact with the Kira engine. This document serves as the primary reference for plugin development.
+## Overview
+
+The Kira Plugin SDK (`kira.plugin_sdk`) is the stable, public API for building plugins. It provides typed, documented facades to core capabilities while maintaining strict compatibility guarantees.
+
+**Version:** 1.0.0  
+**Status:** Stable  
+**Related ADRs:** ADR-002, ADR-003, ADR-004
+
+## Installation
+
+Plugins are co-located in the monorepo under `src/kira/plugins/` or can be external packages. The SDK is automatically available when developing plugins.
 
 ## Quick Start
 
+### Minimal Plugin Example
+
 ```python
-from kira.plugin_sdk import context, decorators, types
+# src/kira_plugin_hello/plugin.py
+from kira.plugin_sdk import context, decorators
 
-@decorators.command("hello")
-def hello_command(ctx: types.PluginContext, args: types.CommandArguments) -> str:
-    """A simple hello command."""
-    ctx.logger.info("Hello from plugin!")
-    return "Hello, World!"
-
-@decorators.on_event("task.created")
-def on_task_created(ctx: types.PluginContext, payload: types.EventPayload) -> None:
-    """Handle task creation events."""
-    if payload and "title" in payload:
-        ctx.logger.info(f"New task: {payload['title']}")
-
-def activate() -> dict[str, str]:
+@decorators.on_event("system.ready")
+def on_ready(ctx: context.PluginContext, event):
+    """Handle system ready event."""
+    ctx.logger.info("Hello from plugin!", event_name=event.name)
+    
+def activate(ctx: context.PluginContext):
     """Plugin activation entry point."""
-    return {"name": "hello-plugin", "version": "1.0.0"}
+    ctx.logger.info("Hello plugin activated")
+    return {"status": "active"}
 ```
 
-## Core Modules
+### Plugin Manifest
 
-### Context (`kira.plugin_sdk.context`)
+Every plugin requires a `kira-plugin.json` manifest:
 
-The context module provides runtime execution context and facades for plugin authors.
+```json
+{
+  "name": "kira-hello",
+  "version": "1.0.0",
+  "displayName": "Hello Plugin",
+  "description": "Example hello world plugin",
+  "publisher": "kira-core",
+  "engines": {
+    "kira": "^1.0.0"
+  },
+  "entry": "kira_plugin_hello.plugin:activate",
+  "permissions": [
+    "events.subscribe",
+    "events.publish"
+  ],
+  "capabilities": ["pull"],
+  "contributes": {
+    "events": ["hello.sent"],
+    "commands": []
+  },
+  "sandbox": {
+    "strategy": "subprocess",
+    "timeoutMs": 30000
+  }
+}
+```
+
+## SDK Modules
+
+### 1. `kira.plugin_sdk.context`
+
+Provides the execution context and facades for plugin operations.
 
 #### PluginContext
 
-The main context object passed to all plugin entry points:
+Main context object passed to plugin functions.
 
 ```python
 from kira.plugin_sdk.context import PluginContext
 
-def my_handler(ctx: PluginContext) -> None:
-    # Access configuration
-    feature_flag = ctx.config.get("feature", False)
-
-    # Use logger
-    ctx.logger.info("Processing request")
-
-    # Store data
-    ctx.kv.set("last_run", "2024-01-01")
-
-    # Schedule tasks
-    ctx.scheduler.schedule_once(60, lambda: ctx.logger.info("Delayed task"))
-
-    # Publish events
-    ctx.events.publish("plugin.completed", {"status": "success"})
+def my_handler(ctx: PluginContext):
+    # Access logger
+    ctx.logger.info("Processing", entity_id="task-123")
+    
+    # Access event bus
+    ctx.events.publish("custom.event", {"data": "value"})
+    
+    # Access scheduler
+    job_id = ctx.scheduler.schedule_interval(
+        "my-job",
+        60,  # Every 60 seconds
+        lambda: print("Job executed")
+    )
+    
+    # Access key-value store
+    ctx.kv.set("my-key", {"value": 42})
+    value = ctx.kv.get("my-key")
+    
+    # Access secrets (requires permission)
+    api_key = ctx.secrets.get("api_key")
 ```
 
-#### Available Facades
+**Available Properties:**
+- `logger: Logger` - Structured logging with trace IDs
+- `events: EventBus` - Publish/subscribe to events
+- `scheduler: Scheduler` - Schedule periodic or one-time tasks
+- `kv: KeyValueStore` - Persistent key-value storage
+- `secrets: SecretsManager` - Secure secrets management
+- `config: dict` - Plugin configuration from manifest
 
-- **Logger**: Structured logging with `info()`, `warning()`, `error()`, `debug()`
-- **EventBus**: Publish/subscribe to events with `publish()` and `subscribe()`
-- **Scheduler**: Schedule one-time or recurring tasks
-- **KeyValueStore**: Persistent key-value storage with `get()`, `set()`, `delete()`
-- **SecretsManager**: Secure secret management with `get()`, `set()`, `delete()`
+### 2. `kira.plugin_sdk.decorators`
 
-### Decorators (`kira.plugin_sdk.decorators`)
+Declarative decorators for plugin functions.
 
-Decorators for defining plugin behavior:
+#### @on_event
+
+Subscribe to events by name.
 
 ```python
-from kira.plugin_sdk.decorators import command, on_event, permission, timeout, retry
+from kira.plugin_sdk import decorators
 
-@command("process_data")
-@permission("fs.read")
-@timeout(30)
-@retry(max_attempts=3, delay=1.0)
-def process_data(ctx: PluginContext, args: CommandArguments) -> dict:
-    """Process data with retry logic and timeout."""
-    # Implementation here
-    pass
-
-@on_event("user.login")
-def handle_user_login(ctx: PluginContext, payload: EventPayload) -> None:
-    """Handle user login events."""
-    # Implementation here
-    pass
+@decorators.on_event("message.received")
+def handle_message(ctx, event):
+    """Handle incoming messages."""
+    ctx.logger.info(f"Received: {event.payload.get('text')}")
+    
+@decorators.on_event("task.enter_doing")
+def on_task_start(ctx, event):
+    """Handle task state transition."""
+    task_id = event.payload["task_id"]
+    ctx.logger.info(f"Task started: {task_id}")
 ```
 
-#### Available Decorators
+#### @command
 
-- `@command(name)`: Register a command handler
-- `@on_event(event_name)`: Register an event handler
-- `@permission(perm)`: Require specific permissions
-- `@timeout(seconds)`: Set execution timeout
-- `@retry(max_attempts, delay)`: Add retry logic
+Register CLI command.
 
-### Types (`kira.plugin_sdk.types`)
+```python
+@decorators.command("hello")
+def hello_command(ctx, **kwargs):
+    """Say hello via CLI."""
+    name = kwargs.get("name", "World")
+    ctx.logger.info(f"Hello, {name}!")
+    return f"Hello, {name}!"
+```
 
-Type definitions and protocols for plugin authors:
+#### @permission
+
+Require specific permission.
+
+```python
+@decorators.permission("net")
+@decorators.permission("secrets.read")
+def fetch_data(ctx):
+    """Fetch data from external API."""
+    api_key = ctx.secrets.get("api_key")
+    # ... make network request
+```
+
+#### @timeout
+
+Set operation timeout.
+
+```python
+@decorators.timeout(seconds=10)
+def slow_operation(ctx):
+    """Operation with 10s timeout."""
+    # ... do work
+```
+
+#### @retry
+
+Configure retry behavior.
+
+```python
+@decorators.retry(max_attempts=3, delay=1.0)
+def flaky_operation(ctx):
+    """Operation with retry logic."""
+    # ... may fail and retry
+```
+
+### 3. `kira.plugin_sdk.types`
+
+Type definitions and protocols.
 
 ```python
 from kira.plugin_sdk.types import (
     EventPayload,
     CommandArguments,
-    PluginState,
     EventHandler,
     CommandHandler,
     RPCRequest,
     RPCResponse,
 )
 
-# Type aliases
-Payload: EventPayload = {"user_id": "123", "action": "login"}
-Args: CommandArguments = {"input_file": "data.csv"}
-
-# Protocol implementations
-def my_event_handler(ctx: PluginContext, payload: EventPayload) -> None:
-    """Event handler implementation."""
+# Type-safe event handler
+def my_handler(ctx: PluginContext, event: EventPayload) -> None:
     pass
 
-def my_command_handler(ctx: PluginContext, args: CommandArguments) -> str:
-    """Command handler implementation."""
-    return "success"
+# Type-safe command handler
+def my_command(ctx: PluginContext, args: CommandArguments) -> str:
+    return "result"
 ```
 
-### Permissions (`kira.plugin_sdk.permissions`)
+### 4. `kira.plugin_sdk.permissions`
 
-Permission constants and helpers:
+Permission constants and helpers.
 
 ```python
-from kira.plugin_sdk.permissions import (
-    PermissionName,
-    ALL_PERMISSIONS,
-    describe,
-    requires,
-    ensure_permissions,
-)
+from kira.plugin_sdk import permissions
 
-# Check if permission is granted
-if requires("calendar.read", granted_permissions):
-    ctx.logger.info("Calendar access granted")
+# Permission constants
+permissions.PermissionName.NET
+permissions.PermissionName.FS_READ
+permissions.PermissionName.FS_WRITE
+permissions.PermissionName.SECRETS_READ
+permissions.PermissionName.EVENTS_PUBLISH
+permissions.PermissionName.SCHEDULER_CREATE
+
+# Get all available permissions
+all_perms = permissions.ALL_PERMISSIONS
 
 # Get permission description
-desc = describe("vault.write")
-# Returns: "Write secrets to the secure vault."
+desc = permissions.describe("net")
+# Returns: "Network access for HTTP/HTTPS requests"
 
-# Find missing permissions
-missing = ensure_permissions(
-    required=["fs.read", "net"],
-    granted=["fs.read"]
-)
-# Returns: {"net"}
+# Check if permissions are granted
+permissions.ensure_permissions(ctx, ["net", "secrets.read"])
 ```
 
-#### Available Permissions
+### 5. `kira.plugin_sdk.manifest`
 
-- `calendar.read`, `calendar.write`: Calendar access
-- `vault.read`, `vault.write`: Vault access
-- `fs.read`, `fs.write`: Filesystem access
-- `net`: Network access
-- `secrets.read`, `secrets.write`: Secrets management
-- `events.publish`, `events.subscribe`: Event system
-- `scheduler.create`, `scheduler.cancel`: Task scheduling
-- `sandbox.execute`: Sandbox execution
-
-### RPC (`kira.plugin_sdk.rpc`)
-
-RPC client for host communication:
-
-```python
-from kira.plugin_sdk.rpc import HostRPCClient, RPCError
-
-# Create RPC client (transport provided by host)
-client = HostRPCClient(transport=host_transport)
-
-try:
-    result = client.call("host.get_config", {"key": "database_url"})
-    ctx.logger.info(f"Config: {result}")
-except RPCError as e:
-    ctx.logger.error(f"RPC failed: {e}")
-```
-
-### Manifest (`kira.plugin_sdk.manifest`)
-
-Manifest validation and schema access:
+Manifest validation and schema access.
 
 ```python
 from kira.plugin_sdk.manifest import (
@@ -192,148 +238,317 @@ from kira.plugin_sdk.manifest import (
 
 # Validate manifest
 validator = PluginManifestValidator()
-is_valid = validator.validate_manifest_file("kira-plugin.json")
+result = validator.validate_manifest({
+    "name": "my-plugin",
+    "version": "1.0.0",
+    # ... rest of manifest
+})
 
-# Get schema for tooling
+if not result.is_valid:
+    print("Validation errors:", result.errors)
+
+# Get JSON Schema
 schema = get_manifest_schema()
 ```
 
-## Plugin Development
+### 6. `kira.plugin_sdk.rpc`
 
-### Plugin Structure
-
-```
-my-plugin/
-├── kira-plugin.json          # Plugin manifest
-└── src/
-    └── my_plugin/
-        ├── __init__.py
-        └── plugin.py
-```
-
-### Plugin Manifest
-
-```json
-{
-  "name": "my-plugin",
-  "version": "1.0.0",
-  "description": "A sample Kira plugin",
-  "engines": {
-    "kira": ">=1.0.0"
-  },
-  "permissions": [
-    "fs.read",
-    "events.publish"
-  ],
-  "commands": [
-    "process"
-  ],
-  "events": [
-    "file.uploaded"
-  ]
-}
-```
-
-### Plugin Entry Point
+RPC client for Host API interactions.
 
 ```python
-from kira.plugin_sdk import context, decorators, types
+from kira.plugin_sdk.rpc import HostRPCClient, RPCError
 
-@decorators.command("process")
-def process_command(ctx: types.PluginContext, args: types.CommandArguments) -> str:
-    """Process uploaded files."""
-    ctx.logger.info("Processing files...")
-    return "Processing complete"
+try:
+    client = HostRPCClient(transport)
+    response = client.call("vault.create_entity", {
+        "entity_type": "task",
+        "data": {"title": "New Task"}
+    })
+except RPCError as e:
+    ctx.logger.error(f"RPC failed: {e}")
+```
 
-@decorators.on_event("file.uploaded")
-def on_file_uploaded(ctx: types.PluginContext, payload: types.EventPayload) -> None:
-    """Handle file upload events."""
-    if payload and "filename" in payload:
-        ctx.logger.info(f"File uploaded: {payload['filename']}")
+## Common Patterns
 
-def activate() -> dict[str, str]:
-    """Plugin activation entry point."""
-    return {
-        "name": "my-plugin",
-        "version": "1.0.0",
-        "description": "A sample Kira plugin"
-    }
+### Event-Driven Plugin
+
+```python
+from kira.plugin_sdk import context, decorators
+
+@decorators.on_event("message.received")
+def normalize_message(ctx: context.PluginContext, event):
+    """Normalize incoming messages into entities."""
+    text = event.payload.get("text", "")
+    
+    # Extract task from text
+    if text.startswith("TODO:"):
+        task_title = text[5:].strip()
+        
+        # Emit normalized event
+        ctx.events.publish("inbox.normalized", {
+            "entity_type": "task",
+            "title": task_title,
+            "source": "telegram",
+            "original_event": event.correlation_id
+        })
+        
+        ctx.logger.info(
+            "Normalized message to task",
+            entity_type="task",
+            correlation_id=event.correlation_id
+        )
+
+def activate(ctx: context.PluginContext):
+    ctx.logger.info("Normalizer plugin activated")
+    return {"status": "active", "handlers": ["message.received"]}
+```
+
+### Scheduled Plugin
+
+```python
+from kira.plugin_sdk import context, decorators
+
+def activate(ctx: context.PluginContext):
+    """Activate plugin with scheduled jobs."""
+    
+    # Schedule sync every 5 minutes
+    ctx.scheduler.schedule_interval(
+        "calendar-sync",
+        300,  # 5 minutes
+        lambda: sync_calendar(ctx),
+        job_id="calendar-sync-job"
+    )
+    
+    # Schedule daily rollup at midnight
+    ctx.scheduler.schedule_cron(
+        "daily-rollup",
+        "0 0 * * *",  # Every day at midnight
+        lambda: generate_rollup(ctx),
+        job_id="daily-rollup-job"
+    )
+    
+    ctx.logger.info("Calendar plugin activated with scheduled jobs")
+    return {"status": "active"}
+
+def sync_calendar(ctx: context.PluginContext):
+    """Sync calendar events."""
+    ctx.logger.info("Starting calendar sync")
+    # ... sync logic
+    ctx.events.publish("calendar.synced", {"count": 10})
+```
+
+### Vault Integration
+
+```python
+from kira.plugin_sdk import context
+
+def process_task(ctx: context.PluginContext, task_data: dict):
+    """Create task in Vault via Host API."""
+    
+    # NOTE: In MVP, emit intent event instead of direct write
+    # Future: ctx.vault.create_entity(...)
+    
+    ctx.events.publish("vault.create_intent", {
+        "entity_type": "task",
+        "data": {
+            "title": task_data["title"],
+            "due": task_data.get("due"),
+            "priority": task_data.get("priority", "medium")
+        }
+    })
+    
+    ctx.logger.info(
+        "Emitted vault create intent",
+        entity_type="task",
+        title=task_data["title"]
+    )
 ```
 
 ## Best Practices
 
-### Import Guidelines
+### 1. Error Handling
 
-✅ **Do:**
-```python
-from kira.plugin_sdk import context, decorators, types
-from kira.plugin_sdk.decorators import command, on_event
-```
-
-❌ **Don't:**
-```python
-from kira.core import *  # Forbidden!
-import kira.core.events  # Forbidden!
-```
-
-### Error Handling
+Always handle exceptions and log errors:
 
 ```python
-from kira.plugin_sdk.rpc import RPCError
-
-def safe_operation(ctx: PluginContext) -> None:
+@decorators.on_event("risky.operation")
+def handle_risky(ctx, event):
     try:
-        result = ctx.rpc.call("risky_operation")
-        ctx.logger.info(f"Success: {result}")
-    except RPCError as e:
-        ctx.logger.error(f"RPC failed: {e}")
-        # Handle gracefully
+        # ... operation that may fail
+        result = process_data(event.payload)
+        ctx.events.publish("operation.success", {"result": result})
+    except ValueError as e:
+        ctx.logger.error(f"Validation failed: {e}", error=str(e))
     except Exception as e:
-        ctx.logger.error(f"Unexpected error: {e}")
-        raise
+        ctx.logger.error(f"Unexpected error: {e}", error=str(e), trace_id=event.trace_id)
 ```
 
-### Async Support
+### 2. Structured Logging
+
+Use structured fields for better observability:
 
 ```python
-import asyncio
-from kira.plugin_sdk.types import EventHandler
-
-async def async_handler(ctx: PluginContext, payload: EventPayload) -> None:
-    """Async event handler."""
-    await asyncio.sleep(1)  # Simulate async work
-    ctx.logger.info("Async operation completed")
-
-# Register async handler
-ctx.events.subscribe("async.event", async_handler)
+ctx.logger.info(
+    "Processing entity",
+    entity_id="task-123",
+    entity_type="task",
+    operation="normalize",
+    trace_id=event.trace_id,
+    latency_ms=42.5,
+    outcome="success"
+)
 ```
 
-## Compatibility
+### 3. Idempotency
 
-The SDK follows semantic versioning:
+Use stable job IDs for idempotent scheduling:
 
-- **Major version changes**: Breaking changes requiring plugin updates
-- **Minor version changes**: New features, backward compatible
-- **Patch version changes**: Bug fixes, backward compatible
+```python
+# Good: stable ID, idempotent
+ctx.scheduler.schedule_interval(
+    "my-sync",
+    60,
+    sync_function,
+    job_id="my-sync-job"  # Same ID = update existing job
+)
 
-Plugins declare required engine version in their manifest:
+# Bad: new ID every time
+ctx.scheduler.schedule_interval(
+    "my-sync",
+    60,
+    sync_function
+    # No job_id = creates new job every activation
+)
+```
 
-```json
+### 4. Permission Requests
+
+Request minimal permissions needed:
+
+```python
+# Manifest
 {
-  "engines": {
-    "kira": ">=1.0.0,<2.0.0"
-  }
+  "permissions": [
+    "events.subscribe",
+    "events.publish",
+    "scheduler.create"
+    // Don't request "net" if not needed
+  ]
 }
 ```
 
+### 5. Testing
+
+Write tests for your plugin:
+
+```python
+# tests/test_my_plugin.py
+from kira.plugin_sdk.context import PluginContext
+from kira_plugin_myplugin.plugin import activate, handle_event
+
+def test_activation():
+    """Test plugin activation."""
+    ctx = PluginContext(config={})
+    result = activate(ctx)
+    assert result["status"] == "active"
+
+def test_event_handling():
+    """Test event handler."""
+    ctx = PluginContext(config={})
+    event = Event(name="test.event", payload={"data": "value"})
+    handle_event(ctx, event)
+    # Assert expected behavior
+```
+
+## Compatibility Guarantees
+
+The SDK follows Semantic Versioning:
+
+- **Major version** (1.x.x → 2.0.0): Breaking changes
+- **Minor version** (1.0.x → 1.1.0): New features, backward compatible
+- **Patch version** (1.0.0 → 1.0.1): Bug fixes, backward compatible
+
+### Deprecation Policy
+
+1. Feature marked as deprecated with `DeprecationWarning`
+2. Alternative provided in deprecation message
+3. Feature kept for ≥2 minor versions
+4. Removed only in next major version
+
+Example:
+```python
+# Deprecated in 1.2.0, removed in 2.0.0
+@deprecated(since="1.2.0", alternative="new_method")
+def old_method(ctx):
+    pass
+```
+
+## Debugging
+
+### Enable Verbose Logging
+
+Set log level in plugin:
+
+```python
+import logging
+
+def activate(ctx):
+    ctx.logger.logger.setLevel(logging.DEBUG)
+    ctx.logger.debug("Debug mode enabled")
+```
+
+### Trace Requests
+
+Use trace IDs to follow requests:
+
+```python
+trace_id = ctx.logger.span("my_operation")
+ctx.logger.info("Step 1", trace_id=trace_id)
+# ... more steps
+ctx.logger.info("Step 2", trace_id=trace_id)
+```
+
+### Inspect Events
+
+Subscribe to all events for debugging:
+
+```python
+@decorators.on_event("*")
+def debug_all_events(ctx, event):
+    ctx.logger.debug(f"Event: {event.name}", payload=event.payload)
+```
+
+## FAQ
+
+**Q: Can plugins import from `kira.core`?**  
+A: No. Plugins must only import from `kira.plugin_sdk`. This ensures compatibility.
+
+**Q: Can plugins import other plugins?**  
+A: No. Plugins communicate via events, not direct imports.
+
+**Q: How do I store persistent data?**  
+A: Use `ctx.kv` for simple key-value storage or emit vault intents for entity creation.
+
+**Q: Can I use external libraries?**  
+A: Yes, but declare them in your plugin's dependencies.
+
+**Q: How do I handle secrets?**  
+A: Request `secrets.read`/`secrets.write` permissions and use `ctx.secrets`.
+
+**Q: What if my operation takes a long time?**  
+A: Use `@timeout` decorator or handle in background with scheduler.
+
 ## Examples
 
-See the `examples/` directory for complete plugin examples demonstrating SDK usage patterns.
+See `examples/minimal-sdk-plugin/` for a complete example plugin.
 
 ## Support
 
-For questions and support:
+- **Documentation:** `docs/`
+- **Issues:** GitHub Issues
+- **ADRs:** `docs/adr/ADR-002-stable-plugin-sdk.md`
 
-- Check the [Architecture Decision Records](../adr/) for design rationale
-- Review existing plugins in `src/kira/plugins/`
-- Run tests with `poetry run pytest tests/unit/test_sdk_surface.py`
+---
+
+**Last Updated:** 2025-10-07  
+**SDK Version:** 1.0.0

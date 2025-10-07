@@ -1,0 +1,81 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kira.dev/schemas/event.json",
+  "title": "Event Entity",
+  "description": "Schema for calendar event entities in Kira Vault",
+  "type": "object",
+  "required": [
+    "id",
+    "title",
+    "start",
+    "created",
+    "updated"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^event-\\d{8}-\\d{4}-.+$",
+      "description": "Unique event identifier"
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200,
+      "description": "Event title"
+    },
+    "start": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Event start time (ISO 8601)"
+    },
+    "end": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Event end time (ISO 8601)"
+    },
+    "all_day": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether this is an all-day event"
+    },
+    "location": {
+      "type": "string",
+      "description": "Event location"
+    },
+    "attendees": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Attendee email addresses"
+    },
+    "gcal_event_id": {
+      "type": "string",
+      "description": "Google Calendar event ID"
+    },
+    "gcal_calendar_id": {
+      "type": "string",
+      "description": "Google Calendar calendar ID"
+    },
+    "tags": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "created": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "updated": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "source": {
+      "type": "string",
+      "enum": ["gcal", "manual", "timebox"],
+      "description": "Source of event creation"
+    }
+  }
+}
+
