@@ -15,17 +15,19 @@ Example:
 from __future__ import annotations
 
 from collections import defaultdict
-from collections.abc import Callable, Mapping
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from .types import EventHandler, EventPayload
+if TYPE_CHECKING:
+    from collections.abc import Callable, Mapping
+
+    from .types import EventHandler, EventPayload
 
 __all__ = [
-    "PluginContext",
     "EventBus",
-    "Logger",
-    "Scheduler",
     "KeyValueStore",
+    "Logger",
+    "PluginContext",
+    "Scheduler",
     "SecretsManager",
 ]
 
@@ -214,7 +216,7 @@ class PluginContext:
     def with_overrides(
         self,
         **overrides: Any,
-    ) -> "PluginContext":
+    ) -> PluginContext:
         """Return a shallow copy of the context replacing provided attributes."""
 
         return PluginContext(

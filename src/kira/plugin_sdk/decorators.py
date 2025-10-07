@@ -15,13 +15,15 @@ from __future__ import annotations
 
 import functools
 import time
-from collections.abc import Callable
-from typing import Any, ParamSpec, TypeVar, cast
+from typing import TYPE_CHECKING, Any, ParamSpec, TypeVar, cast
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 P = ParamSpec("P")
 R = TypeVar("R")
 
-__all__ = ["on_event", "command", "permission", "timeout", "retry"]
+__all__ = ["command", "on_event", "permission", "retry", "timeout"]
 
 
 def _preserve_metadata(func: Callable[P, R], **metadata: Any) -> Callable[P, R]:
@@ -64,7 +66,7 @@ def permission(perm: str) -> Callable[[Callable[P, R]], Callable[P, R]]:
             return func(*args, **kwargs)
 
         _preserve_metadata(wrapper, _requires_permission=perm)
-        return cast(Callable[P, R], wrapper)
+        return cast("Callable[P, R]", wrapper)
 
     return decorator
 
@@ -79,7 +81,7 @@ def timeout(seconds: int) -> Callable[[Callable[P, R]], Callable[P, R]]:
             return func(*args, **kwargs)
 
         _preserve_metadata(wrapper, _timeout=seconds)
-        return cast(Callable[P, R], wrapper)
+        return cast("Callable[P, R]", wrapper)
 
     return decorator
 
@@ -104,10 +106,10 @@ def retry(max_attempts: int = 3, delay: float = 1.0) -> Callable[[Callable[P, R]
                         time.sleep(delay)
                     else:
                         print("❌ All retry attempts exhausted")
-                        raise last_exception
+                        raise last_exception from None
 
             raise RuntimeError("Retry wrapper exhausted without returning")
 
-        return cast(Callable[P, R], wrapper)
+        return cast("Callable[P, R]", wrapper)
 
     return decorator

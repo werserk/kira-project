@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
-from typing import Iterable, Literal, Sequence
+from typing import TYPE_CHECKING, Literal
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable, Sequence
 
 PermissionName = Literal[
     "calendar.read",

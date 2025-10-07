@@ -9,7 +9,7 @@ from pathlib import Path
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
-from kira.plugin_sdk import context, decorators, manifest
+from kira.plugin_sdk import context, decorators, manifest, permissions, rpc, types
 
 
 class TestSDKSurfaceStability:
@@ -23,6 +23,9 @@ class TestSDKSurfaceStability:
             "context",
             "decorators",
             "manifest",
+            "permissions",
+            "rpc",
+            "types",
         }
 
         actual_modules = {name for name in dir(sdk) if not name.startswith("_")}
@@ -71,6 +74,51 @@ class TestSDKSurfaceStability:
         assert expected_exports.issubset(
             actual_exports
         ), f"Missing manifest exports: {expected_exports - actual_exports}"
+
+    def test_permissions_module_has_expected_exports(self) -> None:
+        """Test that permissions module exports expected functions and constants."""
+        expected_exports = {
+            "PermissionName",
+            "ALL_PERMISSIONS",
+            "describe",
+            "requires",
+            "ensure_permissions",
+        }
+
+        actual_exports = {name for name in dir(permissions) if not name.startswith("_")}
+        assert expected_exports.issubset(
+            actual_exports
+        ), f"Missing permissions exports: {expected_exports - actual_exports}"
+
+    def test_rpc_module_has_expected_exports(self) -> None:
+        """Test that rpc module exports expected classes."""
+        expected_exports = {
+            "RPCError",
+            "HostRPCClient",
+            "Transport",
+        }
+
+        actual_exports = {name for name in dir(rpc) if not name.startswith("_")}
+        assert expected_exports.issubset(
+            actual_exports
+        ), f"Missing rpc exports: {expected_exports - actual_exports}"
+
+    def test_types_module_has_expected_exports(self) -> None:
+        """Test that types module exports expected types and protocols."""
+        expected_exports = {
+            "EventPayload",
+            "CommandArguments",
+            "PluginState",
+            "EventHandler",
+            "CommandHandler",
+            "RPCRequest",
+            "RPCResponse",
+        }
+
+        actual_exports = {name for name in dir(types) if not name.startswith("_")}
+        assert expected_exports.issubset(
+            actual_exports
+        ), f"Missing types exports: {expected_exports - actual_exports}"
 
     def test_plugin_context_signature_stability(self) -> None:
         """Test that PluginContext has stable signature."""
@@ -121,7 +169,7 @@ class TestSDKSurfaceStability:
 
     def test_sdk_modules_have_docstrings(self) -> None:
         """Test that all SDK modules have docstrings."""
-        modules = [context, decorators, manifest]
+        modules = [context, decorators, manifest, permissions, rpc, types]
 
         for module in modules:
             assert module.__doc__ is not None, f"Module {module.__name__} missing docstring"

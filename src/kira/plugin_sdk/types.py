@@ -43,7 +43,7 @@ class EventHandler(Protocol[PayloadT]):
 
     def __call__(
         self,
-        context: "PluginContext",
+        context: PluginContext,
         payload: PayloadT,
     ) -> Awaitable[None] | None:
         """Execute the handler with the provided context and payload."""
@@ -54,7 +54,7 @@ class CommandHandler(Protocol[PayloadT, ReturnT]):
 
     def __call__(
         self,
-        context: "PluginContext",
+        context: PluginContext,
         arguments: PayloadT,
     ) -> Awaitable[ReturnT] | ReturnT:
         """Execute the command and optionally return a value."""
