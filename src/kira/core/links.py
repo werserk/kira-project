@@ -365,6 +365,55 @@ class LinkGraph:
 
         return broken
 
+    def find_cycles(self, link_type: str = LinkType.DEPENDS_ON) -> list[list[str]]:
+        """Find cycles in directed graph for specific link type (ADR-016).
+
+        Parameters
+        ----------
+        link_type
+            Link type to check for cycles (default: depends_on)
+
+        Returns
+        -------
+        list[list[str]]
+            List of cycles, each cycle is a list of entity IDs
+        """
+        cycles = []
+        visited = set()
+        rec_stack = set()
+        path = []
+
+        def dfs(node: str) -> bool:
+            """DFS to detect cycles."""
+            visited.add(node)
+            rec_stack.add(node)
+            path.append(node)
+
+            # Check all dependencies
+            for link in self.get_outgoing_links(node, link_type):
+                target = link.target_id
+
+                if target not in visited:
+                    if dfs(target):
+                        return True
+                elif target in rec_stack:
+                    # Found cycle - extract cycle from path
+                    cycle_start = path.index(target)
+                    cycle = path[cycle_start:] + [target]
+                    cycles.append(cycle)
+                    return True
+
+            path.pop()
+            rec_stack.remove(node)
+            return False
+
+        # Check all nodes
+        for entity_id in self._entities:
+            if entity_id not in visited:
+                dfs(entity_id)
+
+        return cycles
+
     def get_stats(self) -> dict[str, Any]:
         """Get link graph statistics.
 
