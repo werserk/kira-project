@@ -1,0 +1,129 @@
+# Task FSM Ontology (ADR-014)
+# Defines states, transitions, and invariants for task lifecycle
+
+version: "1.0"
+entity_type: task
+
+states:
+  todo:
+    description: "Task is planned but not started"
+    allowed_transitions:
+      - doing
+      - blocked
+      - done
+    
+  doing:
+    description: "Task is actively being worked on"
+    allowed_transitions:
+      - review
+      - blocked
+      - done
+    invariants:
+      - "Must have active timebox OR blocked_reason"
+    
+  review:
+    description: "Task is awaiting review/approval"
+    allowed_transitions:
+      - done
+      - doing
+      - blocked
+    optional_fields:
+      - reviewer
+      - review_email_draft_id
+    
+  done:
+    description: "Task is completed"
+    allowed_transitions:
+      - doing  # Can reopen
+    required_fields:
+      - completed_at
+    
+  blocked:
+    description: "Task is blocked and cannot proceed"
+    allowed_transitions:
+      - todo
+      - doing
+    required_fields:
+      - blocked_reason
+    optional_fields:
+      - blocked_by_task_id
+
+transitions:
+  enter_doing:
+    description: "Task enters active work state"
+    hooks:
+      - name: create_timebox
+        plugin: kira-calendar
+        action: schedule_timebox
+        parameters:
+          - time_hint
+          - duration_estimate
+    events:
+      - task.enter_doing
+    
+  enter_review:
+    description: "Task enters review state"
+    hooks:
+      - name: draft_review_email
+        plugin: kira-mailer
+        action: create_draft
+        parameters:
+          - reviewer
+          - task_summary
+    events:
+      - task.enter_review
+    
+  enter_done:
+    description: "Task is marked complete"
+    hooks:
+      - name: update_rollup
+        plugin: kira-rollup
+        action: add_completed_task
+      - name: close_timebox
+        plugin: kira-calendar
+        action: complete_timebox
+    events:
+      - task.enter_done
+    
+  enter_blocked:
+    description: "Task becomes blocked"
+    hooks:
+      - name: notify_blocked
+        plugin: kira-telegram
+        action: send_notification
+        parameters:
+          - blocked_reason
+    events:
+      - task.enter_blocked
+
+validation:
+  # Timeboxing coverage requirement (ADR-014)
+  doing_timebox_coverage: 0.90
+  
+  # Required fields by state
+  field_requirements:
+    blocked:
+      - blocked_reason
+    done:
+      - completed_at
+    review:
+      - entered_review_at
+
+# Metadata fields added automatically
+metadata_fields:
+  entered_todo_at: timestamp
+  entered_doing_at: timestamp
+  entered_review_at: timestamp
+  entered_done_at: timestamp
+  entered_blocked_at: timestamp
+  last_transition_at: timestamp
+  transition_count: integer
+  time_in_doing: duration  # seconds
+
+# Reporting fields
+reporting:
+  weekly_rollup_includes:
+    - done
+  blocked_requires_reason: true
+  doing_requires_timebox: true
+
