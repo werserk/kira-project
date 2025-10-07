@@ -48,7 +48,36 @@ __all__ = [
     "Scheduler",
     "SchedulerProtocol",
     "SecretsManager",
+    "VaultProtocol",
 ]
+
+
+class VaultProtocol(Protocol):
+    """Protocol for Vault API implementations.
+
+    This protocol is satisfied by the Host API from kira.core.host,
+    ensuring plugins can access Vault operations through ctx.vault.
+    """
+
+    def create_entity(self, entity_type: str, data: dict[str, Any], *, content: str = "") -> Any:
+        """Create new entity in Vault."""
+        ...
+
+    def read_entity(self, entity_id: str) -> Any:
+        """Read entity by ID."""
+        ...
+
+    def update_entity(self, entity_id: str, updates: dict[str, Any], *, content: str | None = None) -> Any:
+        """Update existing entity."""
+        ...
+
+    def delete_entity(self, entity_id: str) -> None:
+        """Delete entity from Vault."""
+        ...
+
+    def list_entities(self, entity_type: str | None = None, *, limit: int | None = None) -> Any:
+        """List entities in Vault."""
+        ...
 
 
 class EventBusProtocol(Protocol):
@@ -263,6 +292,7 @@ class PluginContext:
         scheduler: SchedulerProtocol | Scheduler | None = None,
         kv: KeyValueStore | None = None,
         secrets: SecretsManager | None = None,
+        vault: VaultProtocol | None = None,
     ) -> None:
         self.config: Mapping[str, Any] = config or {}
         self.events: EventBusProtocol = events if events is not None else EventBus()
@@ -270,6 +300,7 @@ class PluginContext:
         self.scheduler: SchedulerProtocol = scheduler if scheduler is not None else Scheduler()
         self.kv = kv or KeyValueStore()
         self.secrets = secrets or SecretsManager()
+        self.vault: VaultProtocol | None = vault  # None means no Vault access
 
     def with_overrides(
         self,
@@ -284,4 +315,5 @@ class PluginContext:
             scheduler=overrides.get("scheduler", self.scheduler),
             kv=overrides.get("kv", self.kv),
             secrets=overrides.get("secrets", self.secrets),
+            vault=overrides.get("vault", self.vault),
         )

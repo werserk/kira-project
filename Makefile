@@ -1,7 +1,7 @@
 # Makefile для Kira
 # Упрощенные команды для работы с CLI
 
-.PHONY: inbox calendar-pull calendar-push rollup-daily rollup-weekly validate ext-list help
+.PHONY: inbox calendar-pull calendar-push rollup-daily rollup-weekly validate ext-list vault-init vault-validate vault-info help
 
 # Показать справку
 help:
@@ -11,6 +11,9 @@ help:
 	@echo "  calendar-push      - Синхронизировать календарь (push)"
 	@echo "  rollup-daily       - Создать дневной rollup"
 	@echo "  rollup-weekly      - Создать недельный rollup"
+	@echo "  vault-init         - Инициализировать Vault"
+	@echo "  vault-validate     - Валидировать Vault структуру"
+	@echo "  vault-info         - Показать информацию о Vault"
 	@echo "  validate           - Валидация Vault против схем"
 	@echo "  ext-list           - Показать список расширений"
 	@echo "  help               - Показать эту справку"
@@ -69,6 +72,25 @@ code-index:
 
 code-search:
 	./kira code search "$(QUERY)" --verbose
+
+# Vault команды
+vault-init:
+	./kira vault init --verbose
+
+vault-validate:
+	./kira vault validate --verbose
+
+vault-info:
+	./kira vault info --verbose
+
+vault-schemas:
+	./kira vault schemas --list --verbose
+
+vault-new-task:
+	./kira vault new --type task --title "$(TITLE)" --verbose
+
+vault-new-note:
+	./kira vault new --type note --title "$(TITLE)" --verbose
 
 # Ext команды
 ext-list:
@@ -147,3 +169,10 @@ examples:
 	@echo "6. Работа с кодом:"
 	@echo "   make code-analyze"
 	@echo "   make code-search QUERY='function_name'"
+	@echo ""
+	@echo "7. Управление Vault:"
+	@echo "   make vault-init"
+	@echo "   make vault-validate"
+	@echo "   make vault-info"
+	@echo "   make vault-new-task TITLE='My Task'"
+	@echo "   make vault-new-note TITLE='My Note'"

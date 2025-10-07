@@ -19,3 +19,5 @@
 .coverage.xml
 .coverage.json
 __pycache__
+
+vault/

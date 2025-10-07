@@ -15,6 +15,7 @@ from .kira_ext import cli as ext_cli
 from .kira_inbox import cli as inbox_cli
 from .kira_plugin_template import cli as plugin_cli
 from .kira_rollup import cli as rollup_cli
+from .kira_vault import cli as vault_cli
 
 CONTEXT_SETTINGS = {"help_option_names": ["-h", "--help"]}
 EPILOG = """
@@ -24,6 +25,8 @@ EPILOG = """
   kira calendar push           # Синхронизировать календарь (push)
   kira rollup daily            # Создать дневной rollup
   kira rollup weekly           # Создать недельный rollup
+  kira vault init             # Инициализировать Vault
+  kira vault new --type task --title "My Task"  # Создать entity
   kira ext list               # Показать список расширений
   kira ext install <name>     # Установить расширение
   kira ext enable <name>      # Включить расширение
@@ -80,6 +83,7 @@ cli.add_command(rollup_cli, "rollup")
 cli.add_command(code_cli, "code")
 cli.add_command(ext_cli, "ext")
 cli.add_command(plugin_cli, "plugin")
+cli.add_command(vault_cli, "vault")
 
 
 def main(args: list[str] | None = None) -> int:
