@@ -4,18 +4,35 @@ The concrete host injects instances of these helpers. The default in-memory
 implementations are intentionally simple so that contract tests can exercise
 expected behaviour without requiring the real infrastructure.
 
+Note: The host can inject real EventBus and Scheduler implementations from
+kira.core.events and kira.core.scheduler to replace the mock implementations.
+
 Example:
     from kira.plugin_sdk.context import PluginContext
 
     context = PluginContext(config={"feature": "beta"})
     context.logger.info("Plugin activated")
     context.kv.set("seen", True)
+
+Example with real implementations:
+    from kira.core.events import create_event_bus
+    from kira.core.scheduler import create_scheduler
+    from kira.plugin_sdk.context import PluginContext
+
+    real_bus = create_event_bus()
+    real_scheduler = create_scheduler()
+
+    context = PluginContext(
+        config={"feature": "beta"},
+        events=real_bus,
+        scheduler=real_scheduler
+    )
 """
 
 from __future__ import annotations
 
 from collections import defaultdict
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Protocol
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Mapping
@@ -24,12 +41,50 @@ if TYPE_CHECKING:
 
 __all__ = [
     "EventBus",
+    "EventBusProtocol",
     "KeyValueStore",
     "Logger",
     "PluginContext",
     "Scheduler",
+    "SchedulerProtocol",
     "SecretsManager",
 ]
+
+
+class EventBusProtocol(Protocol):
+    """Protocol for event bus implementations.
+
+    This protocol is satisfied by both the mock EventBus below and the
+    real EventBus from kira.core.events, ensuring compatibility.
+    """
+
+    def publish(self, event_name: str, data: EventPayload = None) -> Any:
+        """Publish event to subscribers."""
+        ...
+
+    def subscribe(self, event_name: str, handler: EventHandler[EventPayload]) -> Any:
+        """Subscribe handler to event."""
+        ...
+
+
+class SchedulerProtocol(Protocol):
+    """Protocol for scheduler implementations.
+
+    This protocol is satisfied by both the mock Scheduler below and the
+    real Scheduler from kira.core.scheduler, ensuring compatibility.
+    """
+
+    def schedule_once(self, delay_seconds: int, task: Callable[[], None]) -> str:
+        """Schedule task to run once after delay."""
+        ...
+
+    def schedule_recurring(self, interval_seconds: int, task: Callable[[], None]) -> str:
+        """Schedule recurring task."""
+        ...
+
+    def cancel(self, task_id: str) -> bool:
+        """Cancel scheduled task."""
+        ...
 
 
 class EventBus:
@@ -194,22 +249,25 @@ class PluginContext:
     The context is the primary object handed to plugin entry points. It
     provides access to the event bus, logger, scheduler, key/value store and
     secrets manager.
+
+    The host can inject real implementations from kira.core to replace the
+    default mock implementations used for testing.
     """
 
     def __init__(
         self,
         config: Mapping[str, Any] | None = None,
         *,
-        events: EventBus | None = None,
+        events: EventBusProtocol | EventBus | None = None,
         logger: Logger | None = None,
-        scheduler: Scheduler | None = None,
+        scheduler: SchedulerProtocol | Scheduler | None = None,
         kv: KeyValueStore | None = None,
         secrets: SecretsManager | None = None,
     ) -> None:
         self.config: Mapping[str, Any] = config or {}
-        self.events = events or EventBus()
+        self.events: EventBusProtocol = events if events is not None else EventBus()
         self.logger = logger or Logger()
-        self.scheduler = scheduler or Scheduler()
+        self.scheduler: SchedulerProtocol = scheduler if scheduler is not None else Scheduler()
         self.kv = kv or KeyValueStore()
         self.secrets = secrets or SecretsManager()
 
