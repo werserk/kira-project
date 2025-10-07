@@ -63,7 +63,45 @@ class InboxNormalizer:
         return metadata
 
     def create_normalized_file(self, content: str, metadata: dict[str, object]) -> Path:
-        """Write processed markdown with frontmatter."""
+        """Write processed markdown with frontmatter.
+
+        Uses Host API (ctx.vault) to create entities instead of direct filesystem writes,
+        following ADR-006. Falls back to direct write if vault is not available (development).
+        """
+        # Try to use Host API first (ADR-006)
+        if self.context.vault is not None:
+            try:
+                # Extract title from content or metadata
+                title_match = re.match(r"^#\s+(.+)$", content.split("\n")[0])
+                title = title_match.group(1) if title_match else "Inbox item"
+
+                # Prepare entity data
+                entity_data = {
+                    "title": title,
+                    "source": metadata.get("source", "unknown"),
+                    "type": metadata.get("type", "text"),
+                    "priority": metadata.get("priority", "medium"),
+                    "status": "inbox",
+                }
+
+                # Add tags if present
+                if "tags" in metadata:
+                    entity_data["tags"] = metadata["tags"]
+
+                # Create entity via Host API
+                entity = self.context.vault.create_entity(
+                    entity_type="note",
+                    data=entity_data,
+                    content=content,
+                )
+
+                self.context.logger.info(f"Created entity via Host API: {entity.id}")
+                return entity.path if entity.path else self.processed_path / f"{entity.id}.md"
+
+            except Exception as exc:
+                self.context.logger.warning(f"Host API unavailable, falling back to direct write: {exc}")
+
+        # Fallback: direct filesystem write (for development/testing without full Host API)
         safe_name = metadata.get("timestamp", datetime.now(UTC).isoformat())
         file_name = f"{safe_name}-{uuid.uuid4().hex[:8]}.md"
         output_path = self.processed_path / file_name
@@ -81,6 +119,7 @@ class InboxNormalizer:
         ]
         body = "\n".join(body_lines)
         output_path.write_text(body, encoding="utf-8")
+        self.context.logger.debug(f"Created file directly: {output_path}")
         return output_path
 
     def process_message(self, message: str, source: str | None = None) -> dict[str, object]:

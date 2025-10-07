@@ -33,7 +33,9 @@ from .time import (
                                load_timezone_from_config,
                                set_default_timezone,
 )
+from .vault_facade import VaultFacade, create_vault_facade
 from .vault_init import VaultInitError, get_vault_info, init_vault, verify_vault_structure
+from .vault_rpc_handlers import VaultRPCHandlers, register_vault_rpc_handlers
 
 __all__ = [
     # Config
@@ -83,6 +85,12 @@ __all__ = [
     "get_default_timezone",
     "load_timezone_from_config",
     "set_default_timezone",
+    # Vault Facade (ADR-006)
+    "VaultFacade",
+    "create_vault_facade",
+    # Vault RPC Handlers (ADR-006)
+    "VaultRPCHandlers",
+    "register_vault_rpc_handlers",
     # Vault Init (ADR-007)
     "VaultInitError",
     "get_vault_info",
