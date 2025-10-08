@@ -18,7 +18,8 @@ from kira.cli.kira_rollup import main as rollup_main
 def test_inbox():
     """Тест inbox команды"""
     print("=== Тест inbox ===")
-    return inbox_main(["--verbose"])
+    result = inbox_main(["--verbose"])
+    assert result is not None
 
 
 def test_calendar():
@@ -28,7 +29,8 @@ def test_calendar():
     result1 = calendar_main(["pull", "--verbose"])
     print("Calendar push:")
     result2 = calendar_main(["push", "--dry-run", "--verbose"])
-    return result1 or result2
+    assert result1 is not None
+    assert result2 is not None
 
 
 def test_rollup():
@@ -38,7 +40,8 @@ def test_rollup():
     result1 = rollup_main(["daily", "--verbose"])
     print("Weekly rollup:")
     result2 = rollup_main(["weekly", "--verbose"])
-    return result1 or result2
+    assert result1 is not None
+    assert result2 is not None
 
 
 def test_code():
@@ -48,7 +51,8 @@ def test_code():
     result1 = code_main(["analyze", "--verbose"])
     print("Code search:")
     result2 = code_main(["search", "function", "--verbose"])
-    return result1 or result2
+    assert result1 is not None
+    assert result2 is not None
 
 
 def test_ext():
@@ -58,7 +62,8 @@ def test_ext():
     result1 = ext_main(["list", "--verbose"])
     print("Ext info:")
     result2 = ext_main(["info", "kira-inbox", "--verbose"])
-    return result1 or result2
+    assert result1 is not None
+    assert result2 is not None
 
 
 def main():
