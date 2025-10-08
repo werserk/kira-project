@@ -153,14 +153,21 @@ class SchemaCache:
             return
 
         try:
-            for schema_file in self.schemas_dir.glob("*.json"):
-                entity_type = schema_file.stem
+            schema_files = list(self.schemas_dir.glob("*.json"))
+            
+            if not schema_files:
+                # Directory exists but is empty, load defaults
+                self._load_default_schemas()
+            else:
+                # Load schemas from files
+                for schema_file in schema_files:
+                    entity_type = schema_file.stem
 
-                with open(schema_file, encoding="utf-8") as f:
-                    schema_data = json.load(f)
+                    with open(schema_file, encoding="utf-8") as f:
+                        schema_data = json.load(f)
 
-                schema = EntitySchema(entity_type, schema_data)
-                self._schemas[entity_type] = schema
+                    schema = EntitySchema(entity_type, schema_data)
+                    self._schemas[entity_type] = schema
 
             self._loaded = True
 

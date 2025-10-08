@@ -500,39 +500,50 @@ class HostAPI:
         count = 0
         skipped = 0
 
-        # Search in processed directory
-        for md_file in (self.vault_path / "processed").glob("*.md"):
-            # Extract entity ID from filename (simplified)
-            try:
-                # Read the file to get the actual ID
-                document = read_markdown(md_file)
-                entity_id = document.get_metadata("id")
+        # Determine which folders to search
+        if entity_type:
+            # Search specific folder for this entity type
+            folders = [self._get_folder_for_entity_type(entity_type)]
+        else:
+            # Search all known folders
+            folders = ["tasks", "notes", "events", "projects", "contacts", "meetings", "processed"]
 
-                if not entity_id or not is_valid_entity_id(entity_id):
-                    continue
+        for folder_name in folders:
+            folder_path = self.vault_path / folder_name
+            if not folder_path.exists():
+                continue
 
-                # Filter by entity type
-                if entity_type:
-                    parsed_id = parse_entity_id(entity_id)
-                    if parsed_id.entity_type != entity_type:
+            for md_file in folder_path.glob("*.md"):
+                try:
+                    # Read the file to get the actual ID
+                    document = read_markdown(md_file)
+                    entity_id = document.get_metadata("id")
+
+                    if not entity_id or not is_valid_entity_id(entity_id):
                         continue
 
-                # Handle pagination
-                if skipped < offset:
-                    skipped += 1
+                    # Filter by entity type if specified
+                    if entity_type:
+                        parsed_id = parse_entity_id(entity_id)
+                        if parsed_id.entity_type != entity_type:
+                            continue
+
+                    # Handle pagination
+                    if skipped < offset:
+                        skipped += 1
+                        continue
+
+                    # Create entity
+                    entity = Entity.from_markdown(entity_id, document, md_file)
+                    yield entity
+
+                    count += 1
+                    if limit and count >= limit:
+                        return
+
+                except Exception:
+                    # Skip malformed files
                     continue
-
-                # Create entity
-                entity = Entity.from_markdown(entity_id, document, md_file)
-                yield entity
-
-                count += 1
-                if limit and count >= limit:
-                    break
-
-            except Exception:
-                # Skip malformed files
-                continue
 
     def upsert_entity(self, entity_type: str, data: dict[str, Any], *, content: str = "") -> Entity:
         """Create or update entity.
