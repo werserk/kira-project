@@ -1,7 +1,12 @@
-"""Task Finite State Machine (ADR-014).
+"""Task Finite State Machine (ADR-014, Phase 1 Point 4).
 
-Implements task state management with explicit transitions and hooks
-for timeboxing, review, and completion workflows.
+Implements task state management with explicit transitions, hooks,
+and guarded transitions for business invariants.
+
+Phase 1, Point 4 Guards:
+- todo → doing: requires assignee OR start_ts
+- doing → done: sets done_ts and freezes estimate
+- done → doing: requires reopen_reason
 """
 
 from __future__ import annotations
@@ -21,8 +26,19 @@ __all__ = [
     "TaskTransition",
     "TaskFSM",
     "FSMValidationError",
+    "FSMGuardError",
     "create_task_fsm",
 ]
+
+
+class FSMGuardError(Exception):
+    """Raised when FSM guard validation fails (Phase 1, Point 4).
+    
+    Guards enforce business invariants on transitions.
+    Invalid transitions do NOT write to Vault.
+    """
+
+    pass
 
 
 class TaskState(str, Enum):
@@ -164,9 +180,13 @@ class TaskFSM:
         *,
         reason: str | None = None,
         metadata: dict[str, Any] | None = None,
+        task_data: dict[str, Any] | None = None,
         force: bool = False,
-    ) -> TaskTransition:
-        """Transition task to new state.
+    ) -> tuple[TaskTransition, dict[str, Any]]:
+        """Transition task to new state with guard validation.
+
+        Phase 1, Point 4: Guards enforce business invariants.
+        Invalid transitions raise errors and do NOT write to Vault.
 
         Parameters
         ----------
@@ -175,21 +195,25 @@ class TaskFSM:
         to_state
             Target state
         reason
-            Optional reason for transition (required for BLOCKED)
+            Optional reason for transition (required for BLOCKED and reopening)
         metadata
             Additional metadata for transition
+        task_data
+            Task metadata (required for guard validation)
         force
             Force transition even if invalid (use with caution)
 
         Returns
         -------
-        TaskTransition
-            Transition record
+        tuple[TaskTransition, dict[str, Any]]
+            Transition record and updated task data (with guard modifications)
 
         Raises
         ------
         FSMValidationError
             If transition is invalid and not forced
+        FSMGuardError
+            If transition guard fails (Phase 1, Point 4)
         """
         current_state = self.get_state(task_id)
 
@@ -204,6 +228,17 @@ class TaskFSM:
         if to_state == TaskState.BLOCKED and not reason:
             raise FSMValidationError(
                 f"Transition to BLOCKED requires a reason for task {task_id}"
+            )
+
+        # Phase 1, Point 4: Execute transition guards
+        updated_task_data = (task_data or {}).copy()
+        if not force:
+            updated_task_data = self._execute_guards(
+                task_id=task_id,
+                from_state=current_state,
+                to_state=to_state,
+                reason=reason,
+                task_data=updated_task_data,
             )
 
         # Create transition record
@@ -242,7 +277,108 @@ class TaskFSM:
         # Execute hooks
         self._execute_hooks(task_id, to_state, transition)
 
-        return transition
+        return transition, updated_task_data
+
+    def _execute_guards(
+        self,
+        task_id: str,
+        from_state: TaskState,
+        to_state: TaskState,
+        reason: str | None,
+        task_data: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Execute transition guards (Phase 1, Point 4).
+        
+        Guards enforce business invariants:
+        - todo → doing: requires assignee OR start_ts
+        - doing → done: sets done_ts and freezes estimate
+        - done → doing: requires reopen_reason
+        
+        Parameters
+        ----------
+        task_id
+            Task identifier
+        from_state
+            Current state
+        to_state
+            Target state
+        reason
+            Transition reason
+        task_data
+            Task metadata
+            
+        Returns
+        -------
+        dict[str, Any]
+            Updated task data (guards may modify it)
+            
+        Raises
+        ------
+        FSMGuardError
+            If guard validation fails
+        """
+        updated_data = task_data.copy()
+        
+        # Guard: todo → doing requires assignee OR start_ts
+        if from_state == TaskState.TODO and to_state == TaskState.DOING:
+            has_assignee = bool(updated_data.get("assignee"))
+            has_start_ts = bool(updated_data.get("start_ts"))
+            
+            if not has_assignee and not has_start_ts:
+                raise FSMGuardError(
+                    f"Transition todo → doing for task {task_id} requires "
+                    f"either 'assignee' or 'start_ts' to be set"
+                )
+        
+        # Guard: doing → done sets done_ts and freezes estimate
+        if from_state == TaskState.DOING and to_state == TaskState.DONE:
+            # Set done_ts if not already set
+            if not updated_data.get("done_ts"):
+                from .time import get_current_utc, format_utc_iso8601
+                updated_data["done_ts"] = format_utc_iso8601(get_current_utc())
+            
+            # Freeze estimate (mark as immutable)
+            if "estimate" in updated_data:
+                # Add flag indicating estimate is frozen
+                updated_data["estimate_frozen"] = True
+            
+            if self.logger:
+                self.logger.info(
+                    f"Task {task_id}: Set done_ts and froze estimate on doing → done",
+                    extra={
+                        "task_id": task_id,
+                        "done_ts": updated_data.get("done_ts"),
+                        "estimate_frozen": updated_data.get("estimate_frozen"),
+                    },
+                )
+        
+        # Guard: done → doing requires reopen_reason
+        if from_state == TaskState.DONE and to_state == TaskState.DOING:
+            reopen_reason = reason or updated_data.get("reopen_reason")
+            
+            if not reopen_reason:
+                raise FSMGuardError(
+                    f"Transition done → doing for task {task_id} requires "
+                    f"'reopen_reason' to be provided"
+                )
+            
+            # Store reopen reason in task data
+            updated_data["reopen_reason"] = reopen_reason
+            
+            # Clear done_ts when reopening
+            if "done_ts" in updated_data:
+                updated_data["done_ts"] = None
+            
+            if self.logger:
+                self.logger.info(
+                    f"Task {task_id}: Reopened with reason: {reopen_reason}",
+                    extra={
+                        "task_id": task_id,
+                        "reopen_reason": reopen_reason,
+                    },
+                )
+        
+        return updated_data
 
     def _emit_transition_event(self, task_id: str, transition: TaskTransition) -> None:
         """Emit event for state transition.
