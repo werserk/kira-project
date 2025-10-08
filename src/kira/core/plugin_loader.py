@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, Any
 
 from packaging import version
 
-from ..plugin_sdk.context import PluginContext
+from ..plugin_sdk.context import PluginContext, VaultProtocol
 from ..plugin_sdk.manifest import PluginManifestValidator
 from .policy import Policy
 from .sandbox import Sandbox
@@ -38,6 +38,7 @@ class PluginLoader:
         context: PluginContext | None = None,
         sandbox: Sandbox | None = None,
         vault_path: Path | None = None,
+        vault: VaultProtocol | None = None,
         use_sandbox: bool = True,
     ) -> None:
         """Initialize the plugin loader.
@@ -53,10 +54,17 @@ class PluginLoader:
         vault_path
             Path to vault (for policy enforcement). If None, policy checks
             won't enforce vault path restrictions.
+        vault
+            Vault API (VaultFacade wrapping Host API) to inject into plugin context.
+            If None, plugins won't have vault access.
         use_sandbox
             Whether to use sandbox for subprocess strategy plugins.
         """
-        self.context = context or PluginContext()
+        # Create context with vault access if provided
+        if context is None:
+            context = PluginContext(vault=vault) if vault else PluginContext()
+        
+        self.context = context
         self.manifest_validator = PluginManifestValidator()
         self.vault_path = vault_path
         self.use_sandbox = use_sandbox

@@ -19,6 +19,8 @@ if TYPE_CHECKING:
 
     from kira.plugin_sdk.context import PluginContext
 
+from .clarification_queue import ClarificationQueue
+
 __all__ = ["InboxNormalizer", "activate", "get_normalizer"]
 
 _NORMALIZER: InboxNormalizer | None = None
@@ -32,18 +34,6 @@ class EntityClassification:
     confidence: float  # 0.0 to 1.0
     extracted_fields: dict[str, Any] = field(default_factory=dict)
     reasoning: str = ""
-
-
-@dataclass
-class ClarificationRequest:
-    """Pending clarification for uncertain extraction."""
-
-    request_id: str
-    content: str
-    classification: EntityClassification
-    suggested_fields: dict[str, Any]
-    alternatives: list[EntityClassification] = field(default_factory=list)
-    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
 
 @dataclass
@@ -70,10 +60,9 @@ class InboxNormalizer:
         self.inbox_path.mkdir(parents=True, exist_ok=True)
         self.processed_path.mkdir(parents=True, exist_ok=True)
 
-        # Clarification queue
-        self._clarifications: dict[str, ClarificationRequest] = {}
+        # Clarification queue with proper persistence
         self._clarifications_path = vault_root / ".kira" / "clarifications.json"
-        self._load_clarifications()
+        self._clarification_queue = ClarificationQueue(storage_path=self._clarifications_path)
 
         # Setup event handlers
         self._setup_event_handlers()
@@ -367,70 +356,73 @@ class InboxNormalizer:
         dict
             Clarification request details
         """
-        request_id = f"clarify-{uuid.uuid4().hex[:12]}"
-
-        # Create classification
-        classification = EntityClassification(
-            entity_type=metadata.get("entity_type", "note"),
-            confidence=metadata.get("confidence", 0.0),
-            extracted_fields=metadata.get("extracted_fields", {}),
-        )
+        entity_type = metadata.get("entity_type", "note")
+        confidence = metadata.get("confidence", 0.0)
 
         # Generate alternatives (other possible entity types)
         alternatives = []
         content_lower = content.lower()
 
         if "встреча" in content_lower or "созвон" in content_lower:
-            alternatives.append(EntityClassification(entity_type="meeting", confidence=0.6, extracted_fields={}))
+            alternatives.append({"type": "meeting", "confidence": 0.6})
         if "задача" in content_lower or "нужно" in content_lower:
-            alternatives.append(EntityClassification(entity_type="task", confidence=0.5, extracted_fields={}))
+            alternatives.append({"type": "task", "confidence": 0.5})
 
-        # Create request
-        request = ClarificationRequest(
-            request_id=request_id,
-            content=content,
-            classification=classification,
-            suggested_fields=metadata,
+        # Include content in metadata for persistence
+        extracted_data = metadata.copy()
+        extracted_data["content"] = content
+
+        # Add to queue with proper serialization
+        item = self._clarification_queue.add(
+            source_event_id=metadata.get("event_id", f"evt-{uuid.uuid4().hex[:8]}"),
+            extracted_type=entity_type,
+            extracted_data=extracted_data,
+            confidence=confidence,
             alternatives=alternatives[:2],  # Max 2 alternatives
         )
 
-        self._clarifications[request_id] = request
-        self._save_clarifications()
-
         # Request confirmation via Telegram (if available)
-        self._request_telegram_confirmation(request)
+        self._request_telegram_confirmation(item)
 
-        self.context.logger.info(f"Queued for clarification: {request_id}")
+        self.context.logger.info(f"Queued for clarification: {item.clarification_id}")
 
         return {
             "success": False,
             "requires_clarification": True,
-            "request_id": request_id,
-            "confidence": classification.confidence,
+            "request_id": item.clarification_id,
+            "confidence": confidence,
         }
 
-    def _request_telegram_confirmation(self, request: ClarificationRequest) -> None:
+    def _request_telegram_confirmation(self, item: Any) -> None:
         """Request inline confirmation via Telegram.
 
         Parameters
         ----------
-        request
-            Clarification request
+        item
+            ClarificationItem from queue
         """
+        # Extract content from extracted_data
+        content = item.extracted_data.get("content", "")
+        if not content:
+            # Try to reconstruct from metadata
+            title = item.extracted_data.get("title", "Unknown item")
+            content = f"{title}"
+
         # Build confirmation message
         message = "📥 *Inbox Normalization*\n\n"
-        message += f"Content: {request.content[:100]}...\n\n"
-        message += f"Detected as: *{request.classification.entity_type}*\n"
-        message += f"Confidence: {request.classification.confidence:.0%}\n\n"
+        message += f"Content: {content[:100]}...\n\n"
+        message += f"Detected as: *{item.extracted_type}*\n"
+        message += f"Confidence: {item.confidence:.0%}\n\n"
         message += "Is this correct?"
 
         # Build options
         options = [
-            {"text": f"✅ Yes ({request.classification.entity_type})", "callback_data": "confirm"},
+            {"text": f"✅ Yes ({item.extracted_type})", "callback_data": "confirm"},
         ]
 
-        for alt in request.alternatives[:2]:
-            options.append({"text": f"🔄 {alt.entity_type.capitalize()}", "callback_data": f"alt_{alt.entity_type}"})
+        for alt in item.suggested_alternatives[:2]:
+            alt_type = alt.get("type", "unknown")
+            options.append({"text": f"🔄 {alt_type.capitalize()}", "callback_data": f"alt_{alt_type}"})
 
         options.append({"text": "❌ Skip", "callback_data": "skip"})
 
@@ -438,14 +430,14 @@ class InboxNormalizer:
         self.context.events.publish(
             "telegram.confirmation_request",
             {
-                "request_id": request.request_id,
+                "request_id": item.clarification_id,
                 "message": message,
                 "options": options,
                 "command": "inbox.confirm",
                 "context": {
-                    "content": request.content,
-                    "classification": request.classification.entity_type,
-                    "metadata": request.suggested_fields,
+                    "content": content,
+                    "classification": item.extracted_type,
+                    "metadata": item.extracted_data,
                 },
             },
         )
@@ -462,34 +454,47 @@ class InboxNormalizer:
         request_id = payload.get("request_id")
         choice = payload.get("choice")
 
-        if not request_id or request_id not in self._clarifications:
+        if not request_id:
             return
 
-        request = self._clarifications[request_id]
+        # Get pending items
+        pending_items = self._clarification_queue.get_pending()
+        item = next((i for i in pending_items if i.clarification_id == request_id), None)
+
+        if not item:
+            self.context.logger.warning(f"Clarification item not found: {request_id}")
+            return
+
+        # Extract content from item
+        content = item.extracted_data.get("content", item.extracted_data.get("title", ""))
 
         if choice == "confirm":
             # User confirmed - create entity with original classification
-            metadata = request.suggested_fields.copy()
+            metadata = item.extracted_data.copy()
+            metadata["entity_type"] = item.extracted_type
             metadata["confidence"] = 1.0  # User confirmed
-            result = self.create_entity(request.content, metadata)
+            result = self.create_entity(content, metadata)
+            
+            # Update item status
+            self._clarification_queue.confirm(request_id, {"confirmed": True})
             self.context.logger.info(f"Clarification confirmed: {request_id} -> {result}")
 
         elif choice.startswith("alt_"):
             # User selected alternative type
             alt_type = choice.split("_", 1)[1]
-            metadata = request.suggested_fields.copy()
+            metadata = item.extracted_data.copy()
             metadata["entity_type"] = alt_type
             metadata["confidence"] = 1.0
-            result = self.create_entity(request.content, metadata)
+            result = self.create_entity(content, metadata)
+            
+            # Update item status with alternative
+            self._clarification_queue.confirm(request_id, {"confirmed": True, "alternative": alt_type})
             self.context.logger.info(f"Clarification alternative selected: {request_id} -> {alt_type}")
 
         elif choice == "skip":
-            # User skipped - log and move on
+            # User skipped - mark as rejected
+            self._clarification_queue.confirm(request_id, {"confirmed": False})
             self.context.logger.info(f"Clarification skipped: {request_id}")
-
-        # Remove from queue
-        del self._clarifications[request_id]
-        self._save_clarifications()
 
     def _create_file_fallback(self, content: str, metadata: dict[str, Any]) -> dict[str, Any]:
         """Fallback: create markdown file directly.
@@ -625,29 +630,25 @@ class InboxNormalizer:
         except Exception as exc:
             self.context.logger.error(f"Failed to handle file.dropped: {exc}")
 
-    def _load_clarifications(self) -> None:
-        """Load clarification queue from storage."""
-        try:
-            if self._clarifications_path.exists():
-                with open(self._clarifications_path) as f:
-                    data = json.load(f)
-                    # Reconstruct clarification objects (simplified)
-                    self._clarifications = {}
-                    self.context.logger.info(f"Loaded {len(data)} clarification requests")
-        except Exception as exc:
-            self.context.logger.warning(f"Failed to load clarifications: {exc}")
-            self._clarifications = {}
+    def get_pending_clarifications(self) -> list[Any]:
+        """Get pending clarification items.
 
-    def _save_clarifications(self) -> None:
-        """Save clarification queue to storage."""
-        try:
-            self._clarifications_path.parent.mkdir(parents=True, exist_ok=True)
-            # Simplified serialization (just IDs for now)
-            data = {req_id: {"content": req.content[:100]} for req_id, req in self._clarifications.items()}
-            with open(self._clarifications_path, "w") as f:
-                json.dump(data, f, indent=2)
-        except Exception as exc:
-            self.context.logger.error(f"Failed to save clarifications: {exc}")
+        Returns
+        -------
+        list
+            List of pending clarification items
+        """
+        return self._clarification_queue.get_pending()
+
+    def get_clarification_statistics(self) -> dict[str, Any]:
+        """Get clarification queue statistics.
+
+        Returns
+        -------
+        dict
+            Statistics about the clarification queue
+        """
+        return self._clarification_queue.get_statistics()
 
 
 def get_normalizer() -> InboxNormalizer:
