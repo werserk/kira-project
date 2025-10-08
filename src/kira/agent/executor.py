@@ -10,7 +10,9 @@ from typing import Any
 
 from ..adapters.llm import LLMAdapter, Message, Tool
 from .config import AgentConfig
+from .memory import ConversationMemory
 from .prompts import get_system_prompt
+from .rag import RAGStore
 from .tools import ToolRegistry, ToolResult
 
 __all__ = [
@@ -70,6 +72,9 @@ class AgentExecutor:
         llm_adapter: LLMAdapter,
         tool_registry: ToolRegistry,
         config: AgentConfig,
+        *,
+        rag_store: RAGStore | None = None,
+        memory: ConversationMemory | None = None,
     ) -> None:
         """Initialize executor.
 
@@ -81,10 +86,16 @@ class AgentExecutor:
             Tool registry
         config
             Agent configuration
+        rag_store
+            Optional RAG store for context enhancement
+        memory
+            Optional conversation memory
         """
         self.llm_adapter = llm_adapter
         self.tool_registry = tool_registry
         self.config = config
+        self.rag_store = rag_store
+        self.memory = memory or ConversationMemory()
 
     def _parse_plan(self, llm_response: str) -> ExecutionPlan:
         """Parse LLM response into execution plan.
@@ -125,13 +136,15 @@ class AgentExecutor:
             plan_description=data.get("plan", []),
         )
 
-    def plan(self, user_request: str) -> ExecutionPlan:
+    def plan(self, user_request: str, *, trace_id: str | None = None) -> ExecutionPlan:
         """Generate execution plan from user request.
 
         Parameters
         ----------
         user_request
             Natural language request
+        trace_id
+            Optional trace ID for memory context
 
         Returns
         -------
@@ -139,15 +152,31 @@ class AgentExecutor:
             Generated execution plan
         """
         tools_desc = self.tool_registry.get_tools_description()
+
+        # Enhance with RAG context if available
+        context_snippets = []
+        if self.rag_store:
+            results = self.rag_store.search(user_request, top_k=3)
+            for result in results:
+                context_snippets.append(f"- {result.document.content[:200]}")
+
+        rag_context = "\n".join(context_snippets) if context_snippets else ""
+        if rag_context:
+            tools_desc += f"\n\nRelevant context:\n{rag_context}"
+
         system_prompt = get_system_prompt(
             max_tool_calls=self.config.max_tool_calls,
             tools_description=tools_desc,
         )
 
-        messages = [
-            Message(role="system", content=system_prompt),
-            Message(role="user", content=user_request),
-        ]
+        messages = [Message(role="system", content=system_prompt)]
+
+        # Add conversation history if available
+        if trace_id and self.memory.has_context(trace_id):
+            context_messages = self.memory.get_context_messages(trace_id)
+            messages.extend(context_messages)
+
+        messages.append(Message(role="user", content=user_request))
 
         response = self.llm_adapter.chat(
             messages,
@@ -229,24 +258,34 @@ class AgentExecutor:
             trace_id=trace_id,
         )
 
-    def chat_and_execute(self, user_request: str) -> ExecutionResult:
+    def chat_and_execute(self, user_request: str, *, trace_id: str | None = None) -> ExecutionResult:
         """Full workflow: plan → execute.
 
         Parameters
         ----------
         user_request
             Natural language request
+        trace_id
+            Optional trace ID for memory context
 
         Returns
         -------
         ExecutionResult
             Execution result
         """
-        trace_id = str(uuid.uuid4())
+        if trace_id is None:
+            trace_id = str(uuid.uuid4())
 
         try:
-            plan = self.plan(user_request)
-            return self.execute_plan(plan, trace_id=trace_id)
+            plan = self.plan(user_request, trace_id=trace_id)
+            result = self.execute_plan(plan, trace_id=trace_id)
+
+            # Store in memory if successful
+            if result.status == "ok" and result.results:
+                assistant_message = f"Executed {len(result.results)} steps successfully"
+                self.memory.add_turn(trace_id, user_request, assistant_message)
+
+            return result
         except Exception as e:
             return ExecutionResult(
                 status="error",

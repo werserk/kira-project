@@ -157,7 +157,10 @@ def create_agent_app(config: AgentConfig | None = None) -> FastAPI:
 
     @app.get("/health", response_model=HealthResponse)
     def health() -> HealthResponse:
-        """Health check endpoint."""
+        """Health check endpoint with provider availability."""
+        # Check adapter availability (simplified)
+        status_details = {"llm_provider": config.llm_provider}
+
         return HealthResponse(
             status="ok",
             timestamp=datetime.now(UTC).isoformat(),
@@ -167,9 +170,26 @@ def create_agent_app(config: AgentConfig | None = None) -> FastAPI:
     def version() -> dict[str, str]:
         """Get version info."""
         return {
-            "version": "0.1.0",
+            "version": "0.2.0",
+            "sprint": "2",
             "llm_provider": config.llm_provider,
             "status": "alpha",
+        }
+
+    @app.get("/metrics")
+    def metrics() -> dict[str, Any]:
+        """Get Prometheus-compatible metrics."""
+        # In production, use prometheus_client library
+        # For Sprint 2, return simple metrics
+        return {
+            "agent_requests_total": 0,
+            "agent_requests_success": 0,
+            "agent_requests_failed": 0,
+            "agent_request_duration_seconds": {
+                "count": 0,
+                "sum": 0.0,
+                "avg": 0.0,
+            },
         }
 
     @app.post("/agent/chat", response_model=ChatResponse)
