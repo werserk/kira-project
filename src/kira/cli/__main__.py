@@ -9,6 +9,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
 import click
 
+from .kira_agent import agent as agent_cli
 from .kira_backup import cli as backup_cli
 from .kira_calendar import cli as calendar_cli
 from .kira_code import cli as code_cli
@@ -26,7 +27,9 @@ from .kira_rollup import cli as rollup_cli
 from .kira_schedule import cli as schedule_cli
 from .kira_search import cli as search_cli
 from .kira_stats import cli as stats_cli
+from .kira_sync import cli as sync_cli
 from .kira_task import cli as task_cli
+from .kira_telegram import cli as telegram_cli
 from .kira_today import cli as today_cli
 from .kira_vault import cli as vault_cli
 
@@ -101,6 +104,7 @@ def validate_vault() -> int:
 
 
 # Подключаем подкоманды
+cli.add_command(agent_cli, "agent")
 cli.add_command(today_cli, "today")
 cli.add_command(task_cli, "task")
 cli.add_command(note_cli, "note")
@@ -109,6 +113,8 @@ cli.add_command(search_cli, "search")
 cli.add_command(inbox_cli, "inbox")
 cli.add_command(calendar_cli, "calendar")
 cli.add_command(schedule_cli, "schedule")
+cli.add_command(sync_cli, "sync")
+cli.add_command(telegram_cli, "telegram")
 cli.add_command(rollup_cli, "rollup")
 cli.add_command(review_cli, "review")
 cli.add_command(stats_cli, "stats")

@@ -165,6 +165,75 @@ class LLMRouter:
             )
         return adapter
 
+    def generate(
+        self,
+        prompt: str,
+        *,
+        model: str | None = None,
+        temperature: float = 0.7,
+        max_tokens: int = 1000,
+        timeout: float = 30.0,
+    ) -> LLMResponse:
+        """Generate text completion from prompt.
+
+        Routes to default provider.
+
+        Parameters
+        ----------
+        prompt
+            Input prompt
+        model
+            Optional model override
+        temperature
+            Sampling temperature
+        max_tokens
+            Maximum tokens
+        timeout
+            Request timeout
+
+        Returns
+        -------
+        LLMResponse
+            Generated response
+
+        Raises
+        ------
+        LLMErrorEnhanced
+            If request fails
+        """
+        provider = self.config.default_provider
+
+        try:
+            adapter = self._get_adapter(provider)
+            return self._execute_with_retry(
+                adapter,
+                "generate",
+                provider,
+                prompt,
+                model=model,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                timeout=timeout,
+            )
+
+        except LLMErrorEnhanced as e:
+            # Try Ollama fallback if enabled and error is retryable
+            if self.config.enable_ollama_fallback and e.retryable:
+                ollama = self.adapters.get("ollama")
+                if ollama:
+                    try:
+                        return ollama.generate(
+                            prompt,
+                            model=model,
+                            temperature=temperature,
+                            max_tokens=max_tokens,
+                            timeout=timeout,
+                        )
+                    except Exception:
+                        # Re-raise original error if fallback also fails
+                        pass
+            raise
+
     def _calculate_backoff(self, attempt: int) -> float:
         """Calculate exponential backoff delay."""
         delay = self.config.initial_backoff * (self.config.backoff_multiplier ** (attempt - 1))

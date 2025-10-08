@@ -12,7 +12,7 @@ from __future__ import annotations
 import json
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 try:
     from fastapi import FastAPI, HTTPException
@@ -22,11 +22,23 @@ except ImportError:
         "FastAPI dependencies not installed. Install with: poetry install --extras agent"
     ) from None
 
-from ..adapters.llm import OpenAIAdapter, OpenRouterAdapter
+from ..adapters.llm import (
+    AnthropicAdapter,
+    LLMAdapter,
+    LLMRouter,
+    OllamaAdapter,
+    OpenAIAdapter,
+    OpenRouterAdapter,
+    RouterConfig,
+    TaskType,
+)
 from ..core.host import create_host_api
 from .config import AgentConfig
 from .executor import AgentExecutor, ExecutionPlan, ExecutionStep
 from .kira_tools import RollupDailyTool, TaskCreateTool, TaskGetTool, TaskListTool, TaskUpdateTool
+from .memory import ConversationMemory
+from .rag import RAGStore
+from .telegram_gateway import create_telegram_router
 from .tools import ToolRegistry
 
 __all__ = ["create_agent_app", "AuditLogger"]
@@ -116,21 +128,54 @@ def create_agent_app(config: AgentConfig | None = None) -> FastAPI:
         version="0.1.0",
     )
 
-    # Initialize LLM adapter
-    if config.llm_provider == "openai":
-        if not config.openai_api_key:
-            raise ValueError("OPENAI_API_KEY not configured")
-        llm_adapter = OpenAIAdapter(
+    # Initialize LLM adapters for router
+    anthropic_adapter = None
+    if config.anthropic_api_key:
+        anthropic_adapter = AnthropicAdapter(
+            api_key=config.anthropic_api_key,
+            default_model=config.anthropic_default_model,
+        )
+
+    openai_adapter = None
+    if config.openai_api_key:
+        openai_adapter = OpenAIAdapter(
             api_key=config.openai_api_key,
             default_model=config.openai_default_model,
         )
-    else:  # openrouter
-        if not config.openrouter_api_key:
-            raise ValueError("OPENROUTER_API_KEY not configured")
-        llm_adapter = OpenRouterAdapter(
+
+    openrouter_adapter = None
+    if config.openrouter_api_key:
+        openrouter_adapter = OpenRouterAdapter(
             api_key=config.openrouter_api_key,
             default_model=config.openrouter_default_model,
         )
+
+    ollama_adapter = None
+    if config.enable_ollama_fallback:
+        try:
+            ollama_adapter = OllamaAdapter(
+                base_url=config.ollama_base_url,
+                default_model=config.ollama_default_model,
+            )
+        except Exception:
+            # Ollama not available, continue without it
+            pass
+
+    # Initialize LLM Router with multi-provider support
+    router_config = RouterConfig(
+        planning_provider=config.planning_provider,
+        structuring_provider=config.structuring_provider,
+        default_provider=config.default_provider,
+        enable_ollama_fallback=config.enable_ollama_fallback,
+    )
+
+    llm_adapter = LLMRouter(
+        router_config,
+        anthropic_adapter=anthropic_adapter,
+        openai_adapter=openai_adapter,
+        openrouter_adapter=openrouter_adapter,
+        ollama_adapter=ollama_adapter,
+    )
 
     # Initialize tool registry
     tool_registry = ToolRegistry()
@@ -148,12 +193,33 @@ def create_agent_app(config: AgentConfig | None = None) -> FastAPI:
     tool_registry.register(TaskListTool(host_api=host_api))
     tool_registry.register(RollupDailyTool(vault_path=config.vault_path))
 
-    # Initialize executor
-    executor = AgentExecutor(llm_adapter, tool_registry, config)
+    # Initialize RAG store for context enhancement
+    rag_store = None
+    if config.enable_rag:
+        rag_index_path = Path(config.rag_index_path or ".rag/index.json")
+        rag_store = RAGStore(rag_index_path)
+
+    # Initialize conversation memory
+    memory = ConversationMemory(max_exchanges=config.memory_max_exchanges)
+
+    # Initialize executor with RAG and Memory
+    # Note: LLMRouter implements LLMAdapter protocol with additional features
+    executor = AgentExecutor(
+        cast(LLMAdapter, llm_adapter),
+        tool_registry,
+        config,
+        rag_store=rag_store,
+        memory=memory,
+    )
 
     # Initialize audit logger
     audit_dir = Path("artifacts/audit")
     audit_logger = AuditLogger(audit_dir)
+
+    # Integrate Telegram Gateway if enabled
+    if config.enable_telegram_webhook and config.telegram_bot_token:
+        telegram_router = create_telegram_router(executor, config.telegram_bot_token)
+        app.include_router(telegram_router)
 
     @app.get("/health", response_model=HealthResponse)
     def health() -> HealthResponse:
