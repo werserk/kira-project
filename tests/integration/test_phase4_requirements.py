@@ -51,15 +51,14 @@ class TestPhase4Point15VaultMigrator:
             vault_path = Path(tmpdir)
 
             # Create file with non-UTC timestamp
+            # Write raw markdown to avoid YAML auto-normalization
             file_path = vault_path / "test.md"
-            doc = MarkdownDocument(
-                frontmatter={
-                    "title": "Test",
-                    "created": "2025-10-08",  # Date only
-                },
-                content="Content",
-            )
-            write_markdown(file_path, doc)
+            raw_content = """---
+title: Test
+created: 2025-10-08
+---
+Content"""
+            file_path.write_text(raw_content, encoding="utf-8")
 
             # Migrate
             stats, results = migrate_vault(vault_path, dry_run=False)
@@ -106,7 +105,7 @@ class TestPhase4Point15VaultMigrator:
                 write_markdown(file_path, doc)
 
             # Migrate
-            stats, results = migrate_vault(vault_path, dry_run=False)
+            _stats, results = migrate_vault(vault_path, dry_run=False)
 
             # All files should pass validation (round-trip test)
             for result in results:
@@ -137,7 +136,7 @@ class TestPhase4Point16MigrationDryRun:
             original_mtime = file_path.stat().st_mtime
 
             # Run dry-run migration
-            stats, results = migrate_vault(vault_path, dry_run=True)
+            _stats, results = migrate_vault(vault_path, dry_run=True)
 
             # File should not be modified
             assert file_path.stat().st_mtime == original_mtime
@@ -196,7 +195,7 @@ class TestPhase4Point16MigrationDryRun:
                 write_markdown(file_path, doc)
 
             # Run dry-run migration
-            stats, results = migrate_vault(vault_path, dry_run=True)
+            stats, _results = migrate_vault(vault_path, dry_run=True)
 
             # Count critical errors (files that failed)
             critical_errors = stats.failed
@@ -357,4 +356,3 @@ class TestPhase4EndToEnd:
 
 # Mark slow tests
 pytestmark = pytest.mark.integration
-

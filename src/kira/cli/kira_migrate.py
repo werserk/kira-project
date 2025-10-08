@@ -149,7 +149,7 @@ def run_command(
             click.echo(json.dumps(output_data, indent=2))
         else:
             # Human-readable output
-            click.echo(f"📊 Migration Summary:")
+            click.echo("📊 Migration Summary:")
             click.echo(f"   Total files: {stats.total_files}")
             click.echo(f"   ✅ Successful: {stats.successful}")
             click.echo(f"   ⏭️  Skipped (no changes): {stats.skipped}")
@@ -201,7 +201,7 @@ def run_command(
                         for error in val_error["errors"]:
                             click.echo(f"      - {error}")
                 return 2  # Validation error
-            elif not output_json:
+            if not output_json:
                 click.echo("✅ All migrated files validated successfully (DoD: round-trip passed)")
 
         # Dry-run validation report (Phase 4, Point 16)
@@ -365,4 +365,3 @@ def main(args: list[str] | None = None) -> int:
 
 if __name__ == "__main__":
     sys.exit(main())
-
