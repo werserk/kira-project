@@ -7,9 +7,6 @@ Usage:
 
 import click
 
-from ..agent.config import AgentConfig
-from ..agent.service import create_agent_app
-
 
 @click.group()
 def agent() -> None:
@@ -24,8 +21,11 @@ def start(host: str | None, port: int | None) -> None:
     """Start agent HTTP service."""
     try:
         import uvicorn
+
+        from ..agent.config import AgentConfig
+        from ..agent.service import create_agent_app
     except ImportError:
-        click.echo("Error: uvicorn not installed. Install with: poetry install --extras agent", err=True)
+        click.echo("Error: Agent dependencies not installed. Install with: poetry install --extras agent", err=True)
         return
 
     config = AgentConfig.from_env()

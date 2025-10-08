@@ -6,6 +6,7 @@
 .ruff_cache
 .mypy_cache
 .tox
+.rag
 .coverage
 .coverage.*
 .coverage.xml
