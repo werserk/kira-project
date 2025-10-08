@@ -319,9 +319,7 @@ class TestScheduler:
         """Test job metadata."""
         scheduler = Scheduler()
 
-        job_id = scheduler.schedule_interval(
-            "test", 60, lambda: None, metadata={"priority": "high", "owner": "admin"}
-        )
+        job_id = scheduler.schedule_interval("test", 60, lambda: None, metadata={"priority": "high", "owner": "admin"})
 
         job = scheduler.get_job(job_id)
         assert job.metadata["priority"] == "high"
@@ -334,4 +332,3 @@ class TestSchedulerFactory:
         scheduler = create_scheduler()
 
         assert isinstance(scheduler, Scheduler)
-

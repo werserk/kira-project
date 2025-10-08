@@ -48,18 +48,11 @@ class ValidationReport:
 
     def has_issues(self) -> bool:
         """Check if report has any issues."""
-        return bool(
-            self.orphans or self.cycles or self.broken_links or self.duplicates
-        )
+        return bool(self.orphans or self.cycles or self.broken_links or self.duplicates)
 
     def issue_count(self) -> int:
         """Count total issues."""
-        return (
-            len(self.orphans)
-            + len(self.cycles)
-            + len(self.broken_links)
-            + len(self.duplicates)
-        )
+        return len(self.orphans) + len(self.cycles) + len(self.broken_links) + len(self.duplicates)
 
 
 class GraphValidator:
@@ -322,16 +315,16 @@ def normalize_title(title: str) -> str:
     normalized = title.lower()
 
     # Remove punctuation
-    normalized = re.sub(r'[^\w\s-]', '', normalized)
+    normalized = re.sub(r"[^\w\s-]", "", normalized)
 
     # Remove extra whitespace
-    normalized = ' '.join(normalized.split())
+    normalized = " ".join(normalized.split())
 
     # Remove common words
-    stop_words = {'a', 'an', 'the', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for'}
+    stop_words = {"a", "an", "the", "and", "or", "but", "in", "on", "at", "to", "for"}
     words = normalized.split()
     words = [w for w in words if w not in stop_words]
-    normalized = ' '.join(words)
+    normalized = " ".join(words)
 
     return normalized.strip()
 
@@ -388,4 +381,3 @@ def find_duplicates(
                     )
 
     return duplicates
-

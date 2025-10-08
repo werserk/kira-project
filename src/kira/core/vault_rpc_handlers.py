@@ -199,9 +199,7 @@ class VaultRPCHandlers:
         limit = params.get("limit")
         offset = params.get("offset", 0)
 
-        entities = list(
-            self.host_api.list_entities(entity_type, limit=limit, offset=offset)
-        )
+        entities = list(self.host_api.list_entities(entity_type, limit=limit, offset=offset))
 
         return {
             "entities": [
@@ -319,13 +317,15 @@ class VaultRPCHandlers:
             content_lower = entity.content.lower()
 
             if query_lower in title or query_lower in content_lower:
-                results.append({
-                    "id": entity.id,
-                    "entity_type": entity.entity_type,
-                    "metadata": entity.metadata,
-                    "content": entity.content,
-                    "path": str(entity.path) if entity.path else None,
-                })
+                results.append(
+                    {
+                        "id": entity.id,
+                        "entity_type": entity.entity_type,
+                        "metadata": entity.metadata,
+                        "content": entity.content,
+                        "path": str(entity.path) if entity.path else None,
+                    }
+                )
 
             if len(results) >= limit:
                 break
@@ -368,4 +368,3 @@ def register_vault_rpc_handlers(host_api: HostAPI) -> dict[str, Any]:
         "vault.get_links": vault_rpc.handle_vault_get_links,
         "vault.search": vault_rpc.handle_vault_search,
     }
-

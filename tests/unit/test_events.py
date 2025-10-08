@@ -283,4 +283,3 @@ class TestEventBusFactory:
         bus = create_event_bus()
 
         assert isinstance(bus, EventBus)
-

@@ -354,4 +354,3 @@ def get_events_by_category(category: str) -> list[EventDefinition]:
         List of events in category
     """
     return [event for event in CANONICAL_EVENTS.values() if event.category == category]
-

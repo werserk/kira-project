@@ -43,9 +43,7 @@ def cli() -> None:
 @click.option("--tag", type=str, help="Фильтр по тегу")
 @click.option("--limit", type=int, default=50, help="Максимальное количество задач")
 @click.option("--verbose", "-v", is_flag=True, help="Подробный вывод")
-def list_command(
-    status: str, due: str, tag: str | None, limit: int, verbose: bool
-) -> int:
+def list_command(status: str, due: str, tag: str | None, limit: int, verbose: bool) -> int:
     """Показать список задач."""
     try:
         config = load_config()
@@ -82,6 +80,7 @@ def list_command(
         click.echo(f"❌ Ошибка: {exc}")
         if verbose:
             import traceback
+
             traceback.print_exc()
         return 1
 
@@ -107,6 +106,7 @@ def show_command(task_id: str, verbose: bool) -> int:
         click.echo(f"❌ Ошибка: {exc}")
         if verbose:
             import traceback
+
             traceback.print_exc()
         return 1
 
@@ -117,9 +117,7 @@ def show_command(task_id: str, verbose: bool) -> int:
 @click.option("--tag", multiple=True, help="Теги (можно указать несколько)")
 @click.option("--priority", type=click.Choice(["low", "medium", "high"]), default="medium")
 @click.option("--verbose", "-v", is_flag=True, help="Подробный вывод")
-def add_command(
-    title: str, due: str | None, tag: tuple[str, ...], priority: str, verbose: bool
-) -> int:
+def add_command(title: str, due: str | None, tag: tuple[str, ...], priority: str, verbose: bool) -> int:
     """Быстро создать задачу."""
     try:
         config = load_config()
@@ -136,7 +134,7 @@ def add_command(
 
         # Создание задачи
         host_api = create_host_api(vault_path)
-        
+
         entity_data = {
             "title": title,
             "status": "todo",
@@ -165,6 +163,7 @@ def add_command(
         click.echo(f"❌ Ошибка создания задачи: {exc}")
         if verbose:
             import traceback
+
             traceback.print_exc()
         return 1
 
@@ -202,7 +201,7 @@ def block_command(task_id: str, reason: str | None, verbose: bool) -> int:
 
         # Обновить статус
         update_task_metadata(task_path, {"status": "blocked"})
-        
+
         # Добавить причину в контент, если указана
         if reason:
             with open(task_path, "r+", encoding="utf-8") as f:
@@ -211,11 +210,11 @@ def block_command(task_id: str, reason: str | None, verbose: bool) -> int:
                 if len(parts) >= 3:
                     frontmatter = parts[1]
                     body = parts[2]
-                    
+
                     # Добавить блок с причиной блокировки
                     block_note = f"\n\n## 🚫 Заблокировано\n\n{reason}\n\n*Заблокировано: {datetime.now().strftime('%Y-%m-%d %H:%M')}*\n"
                     new_content = f"---{frontmatter}---{body.rstrip()}{block_note}"
-                    
+
                     f.seek(0)
                     f.write(new_content)
                     f.truncate()
@@ -230,6 +229,7 @@ def block_command(task_id: str, reason: str | None, verbose: bool) -> int:
         click.echo(f"❌ Ошибка: {exc}")
         if verbose:
             import traceback
+
             traceback.print_exc()
         return 1
 
@@ -265,6 +265,7 @@ def delete_command(task_id: str, force: bool, verbose: bool) -> int:
         click.echo(f"❌ Ошибка удаления: {exc}")
         if verbose:
             import traceback
+
             traceback.print_exc()
         return 1
 
@@ -302,6 +303,7 @@ def edit_command(task_id: str, verbose: bool) -> int:
         click.echo(f"❌ Ошибка: {exc}")
         if verbose:
             import traceback
+
             traceback.print_exc()
         return 1
 
@@ -364,7 +366,7 @@ def archive_command(task_id: str | None, done: bool, older_than: int | None, for
                         continue
 
                     metadata = yaml.safe_load(parts[1])
-                    
+
                     # Проверить условия архивации
                     should_archive = False
 
@@ -423,11 +425,13 @@ def archive_command(task_id: str | None, done: bool, older_than: int | None, for
         click.echo(f"❌ Ошибка архивации: {exc}")
         if verbose:
             import traceback
+
             traceback.print_exc()
         return 1
 
 
 # Helper functions
+
 
 def load_tasks(tasks_dir: Path) -> list[dict]:
     """Загрузить все задачи."""
@@ -478,37 +482,28 @@ def filter_tasks(tasks: list[dict], status: str, due: str, tag: str | None) -> l
         today = now.date()
 
         if due == "today":
-            filtered = [
-                t for t in filtered
-                if t.get("due") and parse_date(t["due"]).date() == today
-            ]
+            filtered = [t for t in filtered if t.get("due") and parse_date(t["due"]).date() == today]
         elif due == "tomorrow":
             tomorrow = (now.replace(hour=0, minute=0, second=0, microsecond=0)).date()
             from datetime import timedelta
+
             tomorrow = today + timedelta(days=1)
-            filtered = [
-                t for t in filtered
-                if t.get("due") and parse_date(t["due"]).date() == tomorrow
-            ]
+            filtered = [t for t in filtered if t.get("due") and parse_date(t["due"]).date() == tomorrow]
         elif due == "week":
             from datetime import timedelta
+
             week_end = today + timedelta(days=7)
-            filtered = [
-                t for t in filtered
-                if t.get("due") and today <= parse_date(t["due"]).date() <= week_end
-            ]
+            filtered = [t for t in filtered if t.get("due") and today <= parse_date(t["due"]).date() <= week_end]
         elif due == "overdue":
             filtered = [
-                t for t in filtered
+                t
+                for t in filtered
                 if t.get("due") and parse_date(t["due"]).date() < today and t.get("status") != "done"
             ]
 
     # Фильтр по тегу
     if tag:
-        filtered = [
-            t for t in filtered
-            if tag in t.get("tags", [])
-        ]
+        filtered = [t for t in filtered if tag in t.get("tags", [])]
 
     return filtered
 
@@ -626,10 +621,13 @@ def change_task_status(task_id: str, new_status: str, verbose: bool) -> int:
             return 1
 
         # Обновить статус
-        update_task_metadata(task_path, {
-            "status": new_status,
-            "updated": datetime.now(timezone.utc).isoformat(),
-        })
+        update_task_metadata(
+            task_path,
+            {
+                "status": new_status,
+                "updated": datetime.now(timezone.utc).isoformat(),
+            },
+        )
 
         status_msgs = {
             "doing": "🔄 Задача в работе",
@@ -645,29 +643,31 @@ def change_task_status(task_id: str, new_status: str, verbose: bool) -> int:
         click.echo(f"❌ Ошибка: {exc}")
         if verbose:
             import traceback
+
             traceback.print_exc()
         return 1
 
 
 def update_task_metadata(task_path: Path, updates: dict) -> None:
     """Обновить метаданные задачи (Phase 0, Point 2: Single Writer).
-    
+
     Uses HostAPI to route all mutations through vault.py.
     No direct file writes allowed.
     """
     # Extract entity ID from file
     from ..core.md_io import read_markdown
+
     doc = read_markdown(task_path)
     entity_id = doc.get_metadata("id")
-    
+
     if not entity_id:
         raise ValueError("Task file missing 'id' field")
-    
+
     # Use HostAPI for single writer pattern (Phase 0, Point 2)
     config = load_config()
     vault_path = Path(config.get("vault", {}).get("path", "vault"))
     host_api = create_host_api(vault_path)
-    
+
     # Update through single writer
     host_api.update_entity(entity_id, updates)
 
@@ -711,4 +711,3 @@ def main(args: list[str] | None = None) -> int:
 
 if __name__ == "__main__":
     sys.exit(main())
-

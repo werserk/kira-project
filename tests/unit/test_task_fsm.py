@@ -97,7 +97,7 @@ class TestTaskFSM:
 
     def test_transition_todo_to_doing(self):
         """Test transitioning from TODO to DOING."""
-        transition = self.fsm.transition("task-123", TaskState.DOING)
+        transition, _ = self.fsm.transition("task-123", TaskState.DOING)
 
         assert transition.from_state == TaskState.TODO
         assert transition.to_state == TaskState.DOING
@@ -111,7 +111,7 @@ class TestTaskFSM:
     def test_transition_with_force_allows_invalid(self):
         """Test force flag allows invalid transitions."""
         # TODO -> REVIEW is invalid, but force=True allows it
-        transition = self.fsm.transition("task-123", TaskState.REVIEW, force=True)
+        transition, _ = self.fsm.transition("task-123", TaskState.REVIEW, force=True)
 
         assert transition.from_state == TaskState.TODO
         assert transition.to_state == TaskState.REVIEW
@@ -124,9 +124,7 @@ class TestTaskFSM:
 
     def test_transition_to_blocked_with_reason(self):
         """Test transitioning to BLOCKED with reason."""
-        transition = self.fsm.transition(
-            "task-123", TaskState.BLOCKED, reason="Waiting for API access"
-        )
+        transition, _ = self.fsm.transition("task-123", TaskState.BLOCKED, reason="Waiting for API access")
 
         assert transition.to_state == TaskState.BLOCKED
         assert transition.reason == "Waiting for API access"
@@ -171,9 +169,7 @@ class TestTaskFSM:
         """Test transition with metadata."""
         metadata = {"user_id": "user-123", "time_hint": 60}
 
-        transition = self.fsm.transition(
-            "task-123", TaskState.DOING, metadata=metadata
-        )
+        transition, _ = self.fsm.transition("task-123", TaskState.DOING, metadata=metadata)
 
         assert transition.metadata == metadata
 
@@ -186,6 +182,7 @@ class TestTaskFSM:
         """Test getting tasks in a specific state."""
         self.fsm.transition("task-1", TaskState.DOING)
         self.fsm.transition("task-2", TaskState.DOING)
+        self.fsm.transition("task-3", TaskState.DOING)
         self.fsm.transition("task-3", TaskState.REVIEW)
 
         doing_tasks = self.fsm.get_tasks_in_state(TaskState.DOING)
@@ -202,13 +199,14 @@ class TestTaskFSM:
         """Test getting FSM statistics."""
         self.fsm.transition("task-1", TaskState.DOING)
         self.fsm.transition("task-2", TaskState.DOING)
+        self.fsm.transition("task-3", TaskState.DOING)
         self.fsm.transition("task-3", TaskState.REVIEW)
         self.fsm.transition("task-1", TaskState.DONE)
 
         stats = self.fsm.get_statistics()
 
         assert stats["total_tasks"] == 3
-        assert stats["total_transitions"] == 4
+        assert stats["total_transitions"] == 5  # task-1: TODO→DOING→DONE, task-2: TODO→DOING, task-3: TODO→DOING→REVIEW
         assert stats["by_state"]["doing"] == 1
         assert stats["by_state"]["review"] == 1
         assert stats["by_state"]["done"] == 1
@@ -291,7 +289,7 @@ class TestTaskFSMHooks:
         self.fsm.register_hook(TaskState.DOING, failing_hook)
 
         # Transition should succeed despite hook failure
-        transition = self.fsm.transition("task-123", TaskState.DOING)
+        transition, _ = self.fsm.transition("task-123", TaskState.DOING)
 
         assert transition.to_state == TaskState.DOING
         assert self.fsm.get_state("task-123") == TaskState.DOING
@@ -325,9 +323,7 @@ class TestTaskFSMHooks:
             )
 
         self.fsm.register_hook(TaskState.DOING, create_timebox_hook)
-        self.fsm.transition(
-            "task-123", TaskState.DOING, metadata={"time_hint": 90}
-        )
+        self.fsm.transition("task-123", TaskState.DOING, metadata={"time_hint": 90})
 
         assert len(timebox_created) == 1
         assert timebox_created[0]["task_id"] == "task-123"
@@ -402,9 +398,7 @@ class TestTaskFSMWorkflows:
         self.fsm.transition(task_id, TaskState.DOING)
 
         # Get blocked
-        self.fsm.transition(
-            task_id, TaskState.BLOCKED, reason="Waiting for dependency"
-        )
+        self.fsm.transition(task_id, TaskState.BLOCKED, reason="Waiting for dependency")
         assert self.fsm.get_state(task_id) == TaskState.BLOCKED
 
         # Unblock and continue
@@ -426,8 +420,8 @@ class TestTaskFSMWorkflows:
         self.fsm.transition(task_id, TaskState.DONE)
         assert self.fsm.get_state(task_id) == TaskState.DONE
 
-        # Reopen
-        self.fsm.transition(task_id, TaskState.DOING)
+        # Reopen with reason
+        self.fsm.transition(task_id, TaskState.DOING, reason="Found issue that needs fixing")
         assert self.fsm.get_state(task_id) == TaskState.DOING
 
     def test_skip_review_workflow(self):
@@ -523,4 +517,3 @@ class TestTimeboxingCoverage:
 
         # Should meet 90% coverage requirement
         assert coverage >= 0.90
-

@@ -38,7 +38,7 @@ SyncSource = Literal["kira", "gcal", "telegram", "other"]
 @dataclass
 class SyncContract:
     """Sync contract for tracking synchronization state.
-    
+
     Attributes
     ----------
     source : SyncSource
@@ -52,16 +52,16 @@ class SyncContract:
     etag : str | None
         Optional ETag from remote system (for optimistic locking)
     """
-    
+
     source: SyncSource
     version: int
     remote_id: str | None = None
     last_write_ts: str | None = None
     etag: str | None = None
-    
+
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for storage in x-kira metadata.
-        
+
         Returns
         -------
         dict[str, Any]
@@ -71,27 +71,27 @@ class SyncContract:
             "source": self.source,
             "version": self.version,
         }
-        
+
         if self.remote_id is not None:
             result["remote_id"] = self.remote_id
-        
+
         if self.last_write_ts is not None:
             result["last_write_ts"] = self.last_write_ts
-        
+
         if self.etag is not None:
             result["etag"] = self.etag
-        
+
         return result
-    
+
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> SyncContract:
         """Create contract from dictionary.
-        
+
         Parameters
         ----------
         data
             Dictionary with contract fields
-            
+
         Returns
         -------
         SyncContract
@@ -108,12 +108,12 @@ class SyncContract:
 
 def get_sync_contract(metadata: dict[str, Any]) -> SyncContract | None:
     """Extract sync contract from entity metadata.
-    
+
     Parameters
     ----------
     metadata
         Entity metadata dictionary
-        
+
     Returns
     -------
     SyncContract | None
@@ -122,11 +122,11 @@ def get_sync_contract(metadata: dict[str, Any]) -> SyncContract | None:
     x_kira = metadata.get("x-kira", {})
     if not x_kira:
         return None
-    
+
     # Check if sync contract fields present
     if "source" not in x_kira and "version" not in x_kira:
         return None
-    
+
     return SyncContract.from_dict(x_kira)
 
 
@@ -138,9 +138,9 @@ def update_sync_contract(
     etag: str | None = None,
 ) -> dict[str, Any]:
     """Update sync contract in metadata (Phase 4, Point 14).
-    
+
     Increments version and updates last_write_ts automatically.
-    
+
     Parameters
     ----------
     metadata
@@ -151,7 +151,7 @@ def update_sync_contract(
         Optional remote system ID
     etag
         Optional ETag from remote system
-        
+
     Returns
     -------
     dict[str, Any]
@@ -159,18 +159,18 @@ def update_sync_contract(
     """
     # Get current contract or create new one
     current_contract = get_sync_contract(metadata)
-    
+
     if current_contract is None:
         # Create new contract
         new_version = 1
     else:
         # Increment version
         new_version = current_contract.version + 1
-    
+
     # Get current timestamp
     now_utc = get_current_utc()
     last_write_ts = format_utc_iso8601(now_utc)
-    
+
     # Build new contract
     new_contract = SyncContract(
         source=source,
@@ -179,11 +179,11 @@ def update_sync_contract(
         last_write_ts=last_write_ts,
         etag=etag,
     )
-    
+
     # Update metadata
     updated_metadata = metadata.copy()
     updated_metadata["x-kira"] = new_contract.to_dict()
-    
+
     return updated_metadata
 
 
@@ -193,16 +193,16 @@ def create_kira_sync_contract(
     remote_id: str | None = None,
 ) -> dict[str, Any]:
     """Create or update sync contract for Kira-originated write (Phase 4, Point 14).
-    
+
     Sets source="kira" and increments version.
-    
+
     Parameters
     ----------
     metadata
         Entity metadata
     remote_id
         Optional remote system ID (if entity is synced)
-        
+
     Returns
     -------
     dict[str, Any]
@@ -219,9 +219,9 @@ def create_remote_sync_contract(
     etag: str | None = None,
 ) -> dict[str, Any]:
     """Create or update sync contract for remote-originated import (Phase 4, Point 14).
-    
+
     Sets source to remote system (e.g., "gcal") and increments version.
-    
+
     Parameters
     ----------
     metadata
@@ -232,7 +232,7 @@ def create_remote_sync_contract(
         Remote system ID
     etag
         Optional ETag from remote system
-        
+
     Returns
     -------
     dict[str, Any]
@@ -248,12 +248,12 @@ def create_remote_sync_contract(
 
 def is_kira_origin(metadata: dict[str, Any]) -> bool:
     """Check if last write originated from Kira.
-    
+
     Parameters
     ----------
     metadata
         Entity metadata
-        
+
     Returns
     -------
     bool
@@ -265,14 +265,14 @@ def is_kira_origin(metadata: dict[str, Any]) -> bool:
 
 def is_remote_origin(metadata: dict[str, Any], source: SyncSource) -> bool:
     """Check if last write originated from specific remote source.
-    
+
     Parameters
     ----------
     metadata
         Entity metadata
     source
         Remote source to check
-        
+
     Returns
     -------
     bool
@@ -284,12 +284,12 @@ def is_remote_origin(metadata: dict[str, Any], source: SyncSource) -> bool:
 
 def get_sync_version(metadata: dict[str, Any]) -> int:
     """Get current sync version from metadata.
-    
+
     Parameters
     ----------
     metadata
         Entity metadata
-        
+
     Returns
     -------
     int
@@ -297,4 +297,3 @@ def get_sync_version(metadata: dict[str, Any]) -> int:
     """
     contract = get_sync_contract(metadata)
     return contract.version if contract else 0
-

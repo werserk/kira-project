@@ -31,7 +31,7 @@ __all__ = [
 @dataclass
 class SandboxConfig:
     """Configuration for plugin sandbox.
-    
+
     Attributes
     ----------
     max_cpu_seconds : float
@@ -45,13 +45,13 @@ class SandboxConfig:
     allowed_capabilities : list[str]
         List of allowed capabilities
     """
-    
+
     max_cpu_seconds: float = 30.0
     max_memory_mb: int = 256
     max_wall_time_seconds: float = 60.0
     allow_network: bool = False
     allowed_capabilities: list[str] = None
-    
+
     def __post_init__(self):
         if self.allowed_capabilities is None:
             self.allowed_capabilities = ["vault.read", "vault.save"]
@@ -59,11 +59,11 @@ class SandboxConfig:
 
 class PluginCapability:
     """Plugin capabilities (Phase 5, Point 16).
-    
+
     Defines what operations a plugin can perform.
     Instead of raw FS access, plugins use capability API.
     """
-    
+
     VAULT_READ = "vault.read"
     VAULT_SAVE = "vault.save"
     VAULT_LIST = "vault.list"
@@ -74,13 +74,14 @@ class PluginCapability:
 
 class SandboxViolation(Exception):
     """Raised when plugin violates sandbox constraints."""
+
     pass
 
 
 @dataclass
 class PluginResult:
     """Result of plugin execution.
-    
+
     Attributes
     ----------
     success : bool
@@ -92,7 +93,7 @@ class PluginResult:
     duration_seconds : float
         Execution duration
     """
-    
+
     success: bool
     output: Any = None
     error: str | None = None
@@ -101,23 +102,23 @@ class PluginResult:
 
 class PluginSandbox:
     """Sandbox for secure plugin execution (Phase 5, Point 16).
-    
+
     Runs plugins as subprocesses with:
     - Resource limits (CPU, memory, time)
     - No network access by default
     - Capability-based API instead of raw FS access
     """
-    
+
     def __init__(self, config: SandboxConfig | None = None) -> None:
         """Initialize plugin sandbox.
-        
+
         Parameters
         ----------
         config
             Sandbox configuration
         """
         self.config = config or SandboxConfig()
-    
+
     def execute(
         self,
         plugin_path: Path,
@@ -127,10 +128,10 @@ class PluginSandbox:
         capabilities: list[str] | None = None,
     ) -> PluginResult:
         """Execute plugin in sandbox (Phase 5, Point 16).
-        
+
         DoD: Plugins without explicit capability cannot access
         arbitrary files or the network.
-        
+
         Parameters
         ----------
         plugin_path
@@ -141,7 +142,7 @@ class PluginSandbox:
             Environment variables
         capabilities
             Requested capabilities
-            
+
         Returns
         -------
         PluginResult
@@ -152,7 +153,7 @@ class PluginSandbox:
                 success=False,
                 error=f"Plugin not found: {plugin_path}",
             )
-        
+
         # Validate capabilities
         requested_caps = capabilities or []
         for cap in requested_caps:
@@ -161,26 +162,26 @@ class PluginSandbox:
                     success=False,
                     error=f"Capability not allowed: {cap}",
                 )
-        
+
         # Check network capability
         if PluginCapability.NETWORK not in requested_caps:
             if self.config.allow_network:
                 # Network allowed globally but not requested
                 pass
             # else: Network denied (default)
-        
+
         # Prepare environment
         plugin_env = os.environ.copy()
         if env:
             plugin_env.update(env)
-        
+
         # Add capability flags to environment
         plugin_env["KIRA_CAPABILITIES"] = ",".join(requested_caps)
         plugin_env["KIRA_SANDBOXED"] = "1"
-        
+
         # Execute in subprocess with limits
         start_time = time.time()
-        
+
         try:
             # Set resource limits (applied to subprocess)
             def set_limits():
@@ -189,17 +190,17 @@ class PluginSandbox:
                     resource.RLIMIT_CPU,
                     (int(self.config.max_cpu_seconds), int(self.config.max_cpu_seconds)),
                 )
-                
+
                 # Memory limit
                 max_memory_bytes = self.config.max_memory_mb * 1024 * 1024
                 resource.setrlimit(
                     resource.RLIMIT_AS,
                     (max_memory_bytes, max_memory_bytes),
                 )
-            
+
             # Run plugin
             cmd = [sys.executable, str(plugin_path)] + (args or [])
-            
+
             result = subprocess.run(
                 cmd,
                 env=plugin_env,
@@ -208,9 +209,9 @@ class PluginSandbox:
                 timeout=self.config.max_wall_time_seconds,
                 preexec_fn=set_limits,  # Apply resource limits
             )
-            
+
             duration = time.time() - start_time
-            
+
             if result.returncode == 0:
                 return PluginResult(
                     success=True,
@@ -223,7 +224,7 @@ class PluginSandbox:
                     error=result.stderr or f"Exit code {result.returncode}",
                     duration_seconds=duration,
                 )
-        
+
         except subprocess.TimeoutExpired:
             duration = time.time() - start_time
             return PluginResult(
@@ -231,7 +232,7 @@ class PluginSandbox:
                 error=f"Plugin exceeded time limit ({self.config.max_wall_time_seconds}s)",
                 duration_seconds=duration,
             )
-        
+
         except Exception as exc:
             duration = time.time() - start_time
             return PluginResult(
@@ -239,15 +240,15 @@ class PluginSandbox:
                 error=f"Plugin execution failed: {exc}",
                 duration_seconds=duration,
             )
-    
+
     def has_capability(self, capability: str) -> bool:
         """Check if capability is allowed.
-        
+
         Parameters
         ----------
         capability
             Capability to check
-            
+
         Returns
         -------
         bool
@@ -263,7 +264,7 @@ def create_sandbox(
     allow_network: bool = False,
 ) -> PluginSandbox:
     """Create plugin sandbox with specified limits.
-    
+
     Parameters
     ----------
     max_cpu_seconds
@@ -272,7 +273,7 @@ def create_sandbox(
         Memory limit in MB
     allow_network
         Allow network access
-        
+
     Returns
     -------
     PluginSandbox
@@ -284,4 +285,3 @@ def create_sandbox(
         allow_network=allow_network,
     )
     return PluginSandbox(config)
-

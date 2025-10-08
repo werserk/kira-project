@@ -96,6 +96,7 @@ def create_command(name: str | None, destination: str | None, verbose: bool) -> 
         click.echo(f"❌ Ошибка создания бэкапа: {exc}")
         if verbose:
             import traceback
+
             traceback.print_exc()
         return 1
 
@@ -140,7 +141,7 @@ def list_command(destination: str | None, verbose: bool) -> int:
             name = backup["name"]
             created = backup["created"]
             size_mb = backup["size_mb"]
-            
+
             # Форматировать дату
             try:
                 dt = datetime.fromisoformat(created.replace("Z", "+00:00"))
@@ -151,10 +152,10 @@ def list_command(destination: str | None, verbose: bool) -> int:
             click.echo(f"  📦 {name}")
             click.echo(f"     Создан: {date_str}")
             click.echo(f"     Размер: {size_mb:.2f} MB")
-            
+
             if verbose:
                 click.echo(f"     Путь: {backup['path']}")
-            
+
             click.echo()
 
         return 0
@@ -163,6 +164,7 @@ def list_command(destination: str | None, verbose: bool) -> int:
         click.echo(f"❌ Ошибка: {exc}")
         if verbose:
             import traceback
+
             traceback.print_exc()
         return 1
 
@@ -207,7 +209,7 @@ def restore_command(backup_name: str, destination: str | None, force: bool, verb
             # Создать временный бэкап текущего Vault
             temp_backup_name = f"vault-before-restore-{datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')}"
             temp_backup_path = backup_root / temp_backup_name
-            
+
             click.echo(f"💾 Создание временного бэкапа текущего Vault: {temp_backup_name}")
             shutil.copytree(vault_path, temp_backup_path, symlinks=False)
 
@@ -230,6 +232,7 @@ def restore_command(backup_name: str, destination: str | None, force: bool, verb
         click.echo(f"❌ Ошибка восстановления: {exc}")
         if verbose:
             import traceback
+
             traceback.print_exc()
         return 1
 
@@ -273,11 +276,13 @@ def delete_command(backup_name: str, destination: str | None, force: bool, verbo
         click.echo(f"❌ Ошибка удаления: {exc}")
         if verbose:
             import traceback
+
             traceback.print_exc()
         return 1
 
 
 # Helper functions
+
 
 def get_backup_info(backup_path: Path) -> dict:
     """Получить информацию о бэкапе."""
@@ -323,4 +328,3 @@ def main(args: list[str] | None = None) -> int:
 
 if __name__ == "__main__":
     sys.exit(main())
-

@@ -66,6 +66,7 @@ def cli(period: str, verbose: bool) -> int:
         click.echo(f"❌ Ошибка: {exc}")
         if verbose:
             import traceback
+
             traceback.print_exc()
         return 1
 
@@ -105,7 +106,7 @@ def collect_statistics(vault_path: Path, start_date: datetime, end_date: datetim
         for task_file in tasks_dir.glob("task-*.md"):
             try:
                 metadata = load_metadata(task_file)
-                
+
                 # Проверить, попадает ли в период
                 created = parse_date(metadata.get("created"))
                 if not created or created < start_date or created > end_date:
@@ -140,9 +141,7 @@ def collect_statistics(vault_path: Path, start_date: datetime, end_date: datetim
 
     # Процент выполнения
     if stats["tasks"]["total"] > 0:
-        stats["tasks"]["completion_rate"] = (
-            stats["tasks"]["completed"] / stats["tasks"]["total"] * 100
-        )
+        stats["tasks"]["completion_rate"] = stats["tasks"]["completed"] / stats["tasks"]["total"] * 100
 
     # Статистика по заметкам
     notes_dir = vault_path / "notes"
@@ -150,7 +149,7 @@ def collect_statistics(vault_path: Path, start_date: datetime, end_date: datetim
         for note_file in notes_dir.glob("note-*.md"):
             try:
                 metadata = load_metadata(note_file)
-                
+
                 created = parse_date(metadata.get("created"))
                 if not created or created < start_date or created > end_date:
                     continue
@@ -170,7 +169,7 @@ def collect_statistics(vault_path: Path, start_date: datetime, end_date: datetim
         for event_file in events_dir.glob("event-*.md"):
             try:
                 metadata = load_metadata(event_file)
-                
+
                 start = parse_date(metadata.get("start"))
                 if not start or start < start_date or start > end_date:
                     continue
@@ -196,13 +195,13 @@ def display_statistics(stats: dict, period_name: str, verbose: bool) -> None:
     task_stats = stats["tasks"]
     click.echo(f"\n📋 Задачи:")
     click.echo(f"  Всего создано: {task_stats['total']}")
-    
+
     if task_stats["total"] > 0:
         click.echo(f"  ✅ Завершено: {task_stats['completed']} ({task_stats['completion_rate']:.1f}%)")
         click.echo(f"  🔄 В работе: {task_stats['in_progress']}")
         click.echo(f"  ⏳ В очереди: {task_stats['todo']}")
         click.echo(f"  🚫 Заблокировано: {task_stats['blocked']}")
-        
+
         if task_stats["overdue"] > 0:
             click.echo(f"  🔴 Просрочено: {task_stats['overdue']}")
 
@@ -230,10 +229,10 @@ def display_statistics(stats: dict, period_name: str, verbose: bool) -> None:
 
     # Общая продуктивность
     click.echo(f"\n🎯 Продуктивность:")
-    
+
     total_items = task_stats["total"] + note_stats["total"]
     click.echo(f"  Всего создано: {total_items} элементов")
-    
+
     if task_stats["total"] > 0:
         if task_stats["completion_rate"] >= 80:
             productivity_emoji = "🔥"
@@ -290,4 +289,3 @@ def main(args: list[str] | None = None) -> int:
 
 if __name__ == "__main__":
     sys.exit(main())
-

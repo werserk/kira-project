@@ -137,9 +137,7 @@ class Policy:
             raise PermissionDeniedError("net", "Network access not granted in manifest")
 
         if not self.sandbox_config.network_access:
-            raise PermissionDeniedError(
-                "net", "Network access disabled in sandbox configuration"
-            )
+            raise PermissionDeniedError("net", "Network access disabled in sandbox configuration")
 
     def check_fs_read_access(self, path: str | Path) -> None:
         """Check if filesystem read access to path is allowed.
@@ -265,9 +263,7 @@ class Policy:
         return violations
 
 
-def check_permission(
-    permission: str, granted_permissions: Sequence[str], plugin_name: str = "unknown"
-) -> None:
+def check_permission(permission: str, granted_permissions: Sequence[str], plugin_name: str = "unknown") -> None:
     """Standalone helper to check if permission is granted.
 
     Parameters
@@ -285,9 +281,7 @@ def check_permission(
         If permission not granted
     """
     if permission not in granted_permissions:
-        raise PermissionDeniedError(
-            permission, f"Plugin '{plugin_name}' lacks permission '{permission}'"
-        )
+        raise PermissionDeniedError(permission, f"Plugin '{plugin_name}' lacks permission '{permission}'")
 
 
 def check_fs_access(
@@ -329,9 +323,7 @@ def check_fs_access(
 
     # Check allowlist
     if not allowlist:
-        raise PermissionDeniedError(
-            f"fs.{mode}", f"No {mode} paths configured in allowlist"
-        )
+        raise PermissionDeniedError(f"fs.{mode}", f"No {mode} paths configured in allowlist")
 
     for allowed_prefix in allowlist:
         try:
@@ -340,7 +332,4 @@ def check_fs_access(
         except ValueError:
             continue
 
-    raise PermissionDeniedError(
-        f"fs.{mode}", f"Path {path} not in {mode} allowlist: {allowlist}"
-    )
-
+    raise PermissionDeniedError(f"fs.{mode}", f"Path {path} not in {mode} allowlist: {allowlist}")

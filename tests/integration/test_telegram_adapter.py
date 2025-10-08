@@ -176,11 +176,7 @@ class TestTelegramAdapter:
 
     def test_send_message_with_keyboard(self) -> None:
         """Test sending message with inline keyboard."""
-        keyboard = {
-            "inline_keyboard": [
-                [{"text": "Button 1", "callback_data": "btn1"}]
-            ]
-        }
+        keyboard = {"inline_keyboard": [[{"text": "Button 1", "callback_data": "btn1"}]]}
 
         response = self.adapter.send_message(
             123456,

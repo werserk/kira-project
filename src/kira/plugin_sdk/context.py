@@ -139,9 +139,7 @@ class EventBus:
         for handler in self._subscribers.get(event_name, []):
             result = handler(context, data)
             if hasattr(result, "__await__"):
-                raise RuntimeError(
-                    "Async handlers are not supported by the default EventBus mock."
-                )
+                raise RuntimeError("Async handlers are not supported by the default EventBus mock.")
 
     def subscribe(self, event_name: str, handler: EventHandler[EventPayload]) -> None:
         """Register ``handler`` to be invoked when ``event_name`` is published."""

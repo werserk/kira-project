@@ -639,4 +639,3 @@ class TestEndToEndTraceability:
         assert len(trace_logs) >= 7
         assert trace_logs[0]["message"].startswith("Started: handle_request")
         assert trace_logs[-1]["message"].startswith("Completed: handle_request")
-

@@ -78,10 +78,10 @@ class Vault:
         """
         self.config = config
         self.vault_path = config.vault_path
-        
+
         # Create HostAPI for validation and event emission
         self.host_api = create_host_api(self.vault_path)
-        
+
         # File lock handles (uid -> file handle)
         self._locks: dict[str, int] = {}
 
@@ -143,13 +143,13 @@ class Vault:
         if not entity_id:
             # Let HostAPI generate ID
             pass
-        
+
         # Acquire file lock for this entity
         with self._acquire_entity_lock(entity_id) if entity_id else self._no_lock():
             # Delegate to HostAPI for validation and event emission
             # HostAPI will handle atomic writes via md_io.write_markdown(atomic=True)
             entity = self.host_api.upsert_entity(entity_type, data, content=content)
-            
+
             return entity
 
     def delete(self, uid: str) -> None:
@@ -238,7 +238,7 @@ class Vault:
 
             # Atomic rename
             tmp_path.rename(file_path)
-            
+
             # Fsync directory to ensure rename is persisted
             dir_fd = os.open(file_path.parent, os.O_RDONLY)
             try:
@@ -264,7 +264,7 @@ class Vault:
         """
         if not self.config.enable_file_locks:
             return self._no_lock()
-        
+
         return EntityLock(self, entity_id, self.config.lock_timeout)
 
     def _no_lock(self) -> NoOpLock:
@@ -298,19 +298,20 @@ class EntityLock:
         # Create locks directory
         locks_dir = self.vault.vault_path / ".kira" / "locks"
         locks_dir.mkdir(parents=True, exist_ok=True)
-        
+
         # Create lock file for this entity
         # Use entity ID as filename (safe since IDs are validated)
         lock_filename = self.entity_id.replace("/", "_")
         self.lock_file = locks_dir / f"{lock_filename}.lock"
-        
+
         # Open lock file
         self.lock_fd = os.open(self.lock_file, os.O_CREAT | os.O_RDWR, 0o644)
-        
+
         # Acquire exclusive lock (with timeout via LOCK_NB + retry)
         import time
+
         start_time = time.time()
-        
+
         while True:
             try:
                 fcntl.flock(self.lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
@@ -320,11 +321,10 @@ class EntityLock:
                 if time.time() - start_time > self.timeout:
                     os.close(self.lock_fd)
                     raise VaultError(
-                        f"Failed to acquire lock for entity {self.entity_id} "
-                        f"after {self.timeout}s timeout"
+                        f"Failed to acquire lock for entity {self.entity_id} " f"after {self.timeout}s timeout"
                     )
                 time.sleep(0.05)  # Wait 50ms before retry
-        
+
         return self
 
     def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
@@ -335,7 +335,7 @@ class EntityLock:
                 os.close(self.lock_fd)
             except Exception:
                 pass  # Best effort cleanup
-            
+
             self.lock_fd = None
 
 
@@ -374,12 +374,11 @@ def get_vault(config: VaultConfig | None = None) -> Vault:
         if config is None:
             # Default configuration
             from ..core.config import load_config
-            
+
             cfg = load_config()
             vault_path = Path(cfg.get("vault", {}).get("path", "vault"))
             config = VaultConfig(vault_path=vault_path)
-        
+
         _global_vault = Vault(config)
 
     return _global_vault
-

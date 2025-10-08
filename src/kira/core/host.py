@@ -270,7 +270,7 @@ class HostAPI:
                 reason=f"Validation failed for {entity_type}",
                 quarantine_dir=quarantine_dir,
             )
-            
+
             raise ValidationError(
                 f"Entity validation failed for {entity_type} '{entity_id}'",
                 errors=validation_result.errors,
@@ -415,7 +415,7 @@ class HostAPI:
                 reason=f"Update validation failed for {entity.entity_type}",
                 quarantine_dir=quarantine_dir,
             )
-            
+
             raise ValidationError(
                 f"Entity validation failed for {entity.entity_type} '{entity_id}'",
                 errors=validation_result.errors,

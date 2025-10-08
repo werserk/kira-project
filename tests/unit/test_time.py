@@ -192,11 +192,7 @@ class TestLoadTimezoneFromConfig:
         original = TimeConfig.get_default_timezone_name()
 
         try:
-            config = {
-                "vault": {
-                    "tz": "America/New_York"
-                }
-            }
+            config = {"vault": {"tz": "America/New_York"}}
 
             load_timezone_from_config(config)
 
@@ -209,11 +205,7 @@ class TestLoadTimezoneFromConfig:
         original = TimeConfig.get_default_timezone_name()
 
         try:
-            config = {
-                "vault": {
-                    "tz": "Invalid/Timezone"
-                }
-            }
+            config = {"vault": {"tz": "Invalid/Timezone"}}
 
             load_timezone_from_config(config)
 

@@ -23,7 +23,7 @@ __all__ = [
 
 class QuarantineRecord:
     """Record of a quarantined entity.
-    
+
     Attributes
     ----------
     timestamp : str
@@ -39,7 +39,7 @@ class QuarantineRecord:
     file_path : Path
         Path to quarantined file
     """
-    
+
     def __init__(
         self,
         timestamp: str,
@@ -66,10 +66,10 @@ def quarantine_invalid_entity(
     quarantine_dir: Path | None = None,
 ) -> QuarantineRecord:
     """Quarantine an invalid entity (Phase 1, Point 6).
-    
+
     Persists rejected payload and reasons under artifacts/quarantine/
     for later inspection.
-    
+
     Parameters
     ----------
     entity_type
@@ -82,12 +82,12 @@ def quarantine_invalid_entity(
         High-level reason for quarantine
     quarantine_dir
         Optional custom quarantine directory
-        
+
     Returns
     -------
     QuarantineRecord
         Record of quarantined entity
-        
+
     Example
     -------
     >>> payload = {"title": "", "status": "invalid"}
@@ -102,15 +102,15 @@ def quarantine_invalid_entity(
     # Get current UTC time
     now = get_current_utc()
     timestamp_str = format_utc_iso8601(now)
-    
+
     # Determine quarantine directory
     if quarantine_dir is None:
         # Default: artifacts/quarantine/ in current directory
         quarantine_dir = Path("artifacts/quarantine")
-    
+
     # Ensure directory exists
     quarantine_dir.mkdir(parents=True, exist_ok=True)
-    
+
     # Generate filename with timestamp
     # Format: {entity_type}_{timestamp}_{id_or_hash}.json
     timestamp_compact = now.strftime("%Y%m%d_%H%M%S_%f")
@@ -119,7 +119,7 @@ def quarantine_invalid_entity(
     safe_id = entity_id.replace("/", "_").replace("\\", "_")[:50]
     filename = f"{entity_type}_{timestamp_compact}_{safe_id}.json"
     file_path = quarantine_dir / filename
-    
+
     # Create quarantine record
     record_data = {
         "timestamp": timestamp_str,
@@ -132,11 +132,11 @@ def quarantine_invalid_entity(
             "payload_size_bytes": len(json.dumps(payload)),
         },
     }
-    
+
     # Write to file
     with open(file_path, "w", encoding="utf-8") as f:
         json.dump(record_data, f, indent=2, ensure_ascii=False)
-    
+
     # Create and return record
     record = QuarantineRecord(
         timestamp=timestamp_str,
@@ -146,7 +146,7 @@ def quarantine_invalid_entity(
         payload=payload,
         file_path=file_path,
     )
-    
+
     return record
 
 
@@ -157,7 +157,7 @@ def list_quarantined_items(
     limit: int | None = None,
 ) -> list[QuarantineRecord]:
     """List quarantined items.
-    
+
     Parameters
     ----------
     quarantine_dir
@@ -166,7 +166,7 @@ def list_quarantined_items(
         Optional filter by entity type
     limit
         Optional maximum number of items to return
-        
+
     Returns
     -------
     list[QuarantineRecord]
@@ -174,19 +174,19 @@ def list_quarantined_items(
     """
     if quarantine_dir is None:
         quarantine_dir = Path("artifacts/quarantine")
-    
+
     if not quarantine_dir.exists():
         return []
-    
+
     records = []
-    
+
     # Find all .json files
     pattern = f"{entity_type}_*.json" if entity_type else "*.json"
     for file_path in quarantine_dir.glob(pattern):
         try:
             with open(file_path, encoding="utf-8") as f:
                 data = json.load(f)
-            
+
             record = QuarantineRecord(
                 timestamp=data["timestamp"],
                 entity_type=data["entity_type"],
@@ -199,25 +199,25 @@ def list_quarantined_items(
         except (json.JSONDecodeError, KeyError, OSError):
             # Skip malformed files
             continue
-    
+
     # Sort by timestamp (newest first)
     records.sort(key=lambda r: r.timestamp, reverse=True)
-    
+
     # Apply limit
     if limit:
         records = records[:limit]
-    
+
     return records
 
 
 def get_quarantine_stats(quarantine_dir: Path | None = None) -> dict[str, Any]:
     """Get statistics about quarantined items.
-    
+
     Parameters
     ----------
     quarantine_dir
         Quarantine directory (default: artifacts/quarantine)
-        
+
     Returns
     -------
     dict[str, Any]
@@ -225,31 +225,31 @@ def get_quarantine_stats(quarantine_dir: Path | None = None) -> dict[str, Any]:
     """
     if quarantine_dir is None:
         quarantine_dir = Path("artifacts/quarantine")
-    
+
     if not quarantine_dir.exists():
         return {
             "total_quarantined": 0,
             "by_entity_type": {},
             "quarantine_dir": str(quarantine_dir),
         }
-    
+
     stats = {
         "total_quarantined": 0,
         "by_entity_type": {},
         "quarantine_dir": str(quarantine_dir),
     }
-    
+
     for file_path in quarantine_dir.glob("*.json"):
         try:
             with open(file_path, encoding="utf-8") as f:
                 data = json.load(f)
-            
+
             entity_type = data.get("entity_type", "unknown")
             stats["total_quarantined"] += 1
             stats["by_entity_type"][entity_type] = stats["by_entity_type"].get(entity_type, 0) + 1
         except (json.JSONDecodeError, OSError):
             continue
-    
+
     return stats
 
 
@@ -259,14 +259,14 @@ def cleanup_old_quarantine(
     days_old: int = 30,
 ) -> int:
     """Clean up old quarantined items.
-    
+
     Parameters
     ----------
     quarantine_dir
         Quarantine directory (default: artifacts/quarantine)
     days_old
         Delete items older than this many days
-        
+
     Returns
     -------
     int
@@ -274,33 +274,32 @@ def cleanup_old_quarantine(
     """
     if quarantine_dir is None:
         quarantine_dir = Path("artifacts/quarantine")
-    
+
     if not quarantine_dir.exists():
         return 0
-    
+
     now = datetime.now(timezone.utc)
     deleted_count = 0
-    
+
     for file_path in quarantine_dir.glob("*.json"):
         try:
             with open(file_path, encoding="utf-8") as f:
                 data = json.load(f)
-            
+
             timestamp_str = data.get("timestamp")
             if not timestamp_str:
                 continue
-            
+
             # Parse timestamp
             timestamp = datetime.fromisoformat(timestamp_str.replace("Z", "+00:00"))
-            
+
             # Check age
             age_days = (now - timestamp).days
-            
+
             if age_days > days_old:
                 file_path.unlink()
                 deleted_count += 1
         except (json.JSONDecodeError, OSError, ValueError):
             continue
-    
-    return deleted_count
 
+    return deleted_count

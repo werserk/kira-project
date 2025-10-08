@@ -39,6 +39,7 @@ def cli(tomorrow: bool, verbose: bool) -> int:
         # Определить целевую дату
         now = datetime.now(timezone.utc)
         from datetime import timedelta
+
         target_date = now.date() if not tomorrow else (now + timedelta(days=1)).date()
 
         # Заголовок
@@ -67,14 +68,16 @@ def cli(tomorrow: bool, verbose: bool) -> int:
                 click.echo("📋 Дедлайны завтра:")
             else:
                 click.echo("📋 Дедлайны сегодня:")
-            
+
             for task in due_tasks:
                 title = task.get("title", "Untitled")
                 status = task.get("status", "todo")
                 task_id = task.get("id", "")
-                
-                status_icon = {"todo": "⏳", "doing": "🔄", "review": "👀", "done": "✅", "blocked": "🚫"}.get(status, "❓")
-                
+
+                status_icon = {"todo": "⏳", "doing": "🔄", "review": "👀", "done": "✅", "blocked": "🚫"}.get(
+                    status, "❓"
+                )
+
                 click.echo(f"  {status_icon} {title}")
                 if verbose:
                     click.echo(f"      ID: {task_id}, Статус: {status}")
@@ -89,10 +92,10 @@ def cli(tomorrow: bool, verbose: bool) -> int:
                 start = event.get("start")
                 end = event.get("end")
                 location = event.get("location")
-                
+
                 time_str = format_time_range(start, end) if start else ""
                 location_str = f" @ {location}" if location else ""
-                
+
                 click.echo(f"  • {time_str}: {title}{location_str}")
                 if verbose:
                     click.echo(f"      ID: {event.get('id')}")
@@ -107,10 +110,10 @@ def cli(tomorrow: bool, verbose: bool) -> int:
                     title = task.get("title", "Untitled")
                     due = task.get("due")
                     task_id = task.get("id", "")
-                    
+
                     due_date = parse_date(due).date() if due else None
                     days_overdue = (target_date - due_date).days if due_date else 0
-                    
+
                     click.echo(f"  ⚠️  {title} (просрочено на {days_overdue} дн.)")
                     if verbose:
                         click.echo(f"      ID: {task_id}, Дедлайн: {due}")
@@ -157,11 +160,13 @@ def cli(tomorrow: bool, verbose: bool) -> int:
         click.echo(f"❌ Ошибка: {exc}")
         if verbose:
             import traceback
+
             traceback.print_exc()
         return 1
 
 
 # Helper functions
+
 
 def load_doing_tasks(vault_path: Path) -> list[dict]:
     """Загрузить задачи в статусе doing."""
@@ -368,4 +373,3 @@ def main(args: list[str] | None = None) -> int:
 
 if __name__ == "__main__":
     sys.exit(main())
-

@@ -34,9 +34,9 @@ class DeadlinesManager:
         self.logger = context.logger
 
         # Subscribe to FSM transition events
-        context.event_bus.subscribe("task.enter_doing", self._on_task_enter_doing)
-        context.event_bus.subscribe("task.enter_done", self._on_task_enter_done)
-        context.event_bus.subscribe("task.enter_blocked", self._on_task_enter_blocked)
+        context.events.subscribe("task.enter_doing", self._on_task_enter_doing)
+        context.events.subscribe("task.enter_done", self._on_task_enter_done)
+        context.events.subscribe("task.enter_blocked", self._on_task_enter_blocked)
 
         self.logger.info("DeadlinesManager initialized with FSM integration")
 
@@ -202,12 +202,7 @@ class DeadlinesManager:
                 frontmatter_lines.append(f"{key}: {json.dumps(value)}")
 
         # Rebuild content
-        new_content = (
-            "---\n"
-            + "\n".join(frontmatter_lines)
-            + "\n---\n"
-            + "\n".join(lines[end_idx + 1 :])
-        )
+        new_content = "---\n" + "\n".join(frontmatter_lines) + "\n---\n" + "\n".join(lines[end_idx + 1 :])
 
         task_file.write_text(new_content)
 

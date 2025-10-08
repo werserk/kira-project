@@ -33,7 +33,7 @@ __all__ = [
 
 class FSMGuardError(Exception):
     """Raised when FSM guard validation fails (Phase 1, Point 4).
-    
+
     Guards enforce business invariants on transitions.
     Invalid transitions do NOT write to Vault.
     """
@@ -182,7 +182,7 @@ class TaskFSM:
         metadata: dict[str, Any] | None = None,
         task_data: dict[str, Any] | None = None,
         force: bool = False,
-    ) -> tuple[TaskTransition, dict[str, Any]]:
+    ) -> TaskTransition:
         """Transition task to new state with guard validation.
 
         Phase 1, Point 4: Guards enforce business invariants.
@@ -199,14 +199,14 @@ class TaskFSM:
         metadata
             Additional metadata for transition
         task_data
-            Task metadata (required for guard validation)
+            Task metadata (mutable dict that will be updated by guards in-place)
         force
             Force transition even if invalid (use with caution)
 
         Returns
         -------
         tuple[TaskTransition, dict[str, Any]]
-            Transition record and updated task data (with guard modifications)
+            Transition record and updated task_data
 
         Raises
         ------
@@ -220,25 +220,24 @@ class TaskFSM:
         # Validate transition
         if not force and not self.can_transition(task_id, to_state):
             raise FSMValidationError(
-                f"Invalid transition: {current_state.value} → {to_state.value} "
-                f"for task {task_id}"
+                f"Invalid transition: {current_state.value} → {to_state.value} " f"for task {task_id}"
             )
 
         # Validate blocked state requires reason
         if to_state == TaskState.BLOCKED and not reason:
-            raise FSMValidationError(
-                f"Transition to BLOCKED requires a reason for task {task_id}"
-            )
+            raise FSMValidationError(f"Transition to BLOCKED requires a reason for task {task_id}")
 
         # Phase 1, Point 4: Execute transition guards
-        updated_task_data = (task_data or {}).copy()
+        # Create a copy of task_data to avoid modifying original on failure
+        updated_data = (task_data or {}).copy()
+
         if not force:
-            updated_task_data = self._execute_guards(
+            self._execute_guards(
                 task_id=task_id,
                 from_state=current_state,
                 to_state=to_state,
                 reason=reason,
-                task_data=updated_task_data,
+                task_data=updated_data,
             )
 
         # Create transition record
@@ -250,7 +249,7 @@ class TaskFSM:
             metadata=metadata or {},
         )
 
-        # Update state
+        # Update state only after successful guard execution
         self._task_states[task_id] = to_state
 
         # Record transition
@@ -277,7 +276,47 @@ class TaskFSM:
         # Execute hooks
         self._execute_hooks(task_id, to_state, transition)
 
-        return transition, updated_task_data
+        return transition, updated_data
+
+    def _find_transition_path(self, from_state: TaskState, to_state: TaskState) -> list[TaskState] | None:
+        """Find a valid path from one state to another using BFS.
+
+        Parameters
+        ----------
+        from_state
+            Starting state
+        to_state
+            Target state
+
+        Returns
+        -------
+        list[TaskState] | None
+            List of states forming a path, or None if no path exists
+        """
+        if from_state == to_state:
+            return [from_state]
+
+        # BFS to find shortest path
+        from collections import deque
+
+        queue: deque[tuple[TaskState, list[TaskState]]] = deque([(from_state, [from_state])])
+        visited: set[TaskState] = {from_state}
+
+        while queue:
+            current, path = queue.popleft()
+
+            # Check all possible transitions from current state
+            for next_state in self.VALID_TRANSITIONS.get(current, []):
+                if next_state == to_state:
+                    # Found the target!
+                    return path + [next_state]
+
+                if next_state not in visited:
+                    visited.add(next_state)
+                    queue.append((next_state, path + [next_state]))
+
+        # No path found
+        return None
 
     def _execute_guards(
         self,
@@ -286,14 +325,14 @@ class TaskFSM:
         to_state: TaskState,
         reason: str | None,
         task_data: dict[str, Any],
-    ) -> dict[str, Any]:
+    ) -> None:
         """Execute transition guards (Phase 1, Point 4).
-        
+
         Guards enforce business invariants:
         - todo → doing: requires assignee OR start_ts
         - doing → done: sets done_ts and freezes estimate
         - done → doing: requires reopen_reason
-        
+
         Parameters
         ----------
         task_id
@@ -306,69 +345,79 @@ class TaskFSM:
             Transition reason
         task_data
             Task metadata
-            
+
         Returns
         -------
-        dict[str, Any]
-            Updated task data (guards may modify it)
-            
+        None
+            task_data is modified in-place
+
         Raises
         ------
         FSMGuardError
             If guard validation fails
         """
-        updated_data = task_data.copy()
-        
+        # Guards modify task_data in-place
+
         # Guard: todo → doing requires assignee OR start_ts
+        # Auto-set start_ts if neither is present
         if from_state == TaskState.TODO and to_state == TaskState.DOING:
-            has_assignee = bool(updated_data.get("assignee"))
-            has_start_ts = bool(updated_data.get("start_ts"))
-            
+            has_assignee = bool(task_data.get("assignee"))
+            has_start_ts = bool(task_data.get("start_ts"))
+
             if not has_assignee and not has_start_ts:
-                raise FSMGuardError(
-                    f"Transition todo → doing for task {task_id} requires "
-                    f"either 'assignee' or 'start_ts' to be set"
-                )
-        
+                # Auto-set start_ts to current time
+                from .time import get_current_utc, format_utc_iso8601
+
+                task_data["start_ts"] = format_utc_iso8601(get_current_utc())
+
+                if self.logger:
+                    self.logger.info(
+                        f"Task {task_id}: Auto-set start_ts on todo → doing transition",
+                        extra={
+                            "task_id": task_id,
+                            "start_ts": task_data["start_ts"],
+                        },
+                    )
+
         # Guard: doing/review → done sets done_ts and freezes estimate
         if to_state == TaskState.DONE and from_state in [TaskState.DOING, TaskState.REVIEW]:
             # Set done_ts if not already set
-            if not updated_data.get("done_ts"):
+            if not task_data.get("done_ts"):
                 from .time import get_current_utc, format_utc_iso8601
-                updated_data["done_ts"] = format_utc_iso8601(get_current_utc())
-            
+
+                task_data["done_ts"] = format_utc_iso8601(get_current_utc())
+
             # Freeze estimate (mark as immutable)
-            if "estimate" in updated_data:
+            if "estimate" in task_data:
                 # Add flag indicating estimate is frozen
-                updated_data["estimate_frozen"] = True
-            
+                task_data["estimate_frozen"] = True
+
             if self.logger:
                 self.logger.info(
                     f"Task {task_id}: Set done_ts and froze estimate on {from_state.value} → done",
                     extra={
                         "task_id": task_id,
-                        "done_ts": updated_data.get("done_ts"),
-                        "estimate_frozen": updated_data.get("estimate_frozen"),
+                        "done_ts": task_data.get("done_ts"),
+                        "estimate_frozen": task_data.get("estimate_frozen"),
                     },
                 )
-        
+
         # Guard: done → doing requires reopen_reason
         if from_state == TaskState.DONE and to_state == TaskState.DOING:
-            reopen_reason = reason or updated_data.get("reopen_reason")
-            
+            reopen_reason = reason or task_data.get("reopen_reason")
+
             if not reopen_reason:
                 raise FSMGuardError(
-                    f"Transition done → doing for task {task_id} requires "
-                    f"'reopen_reason' to be provided"
+                    f"Transition done → doing for task {task_id} requires " f"'reopen_reason' to be provided"
                 )
-            
+
             # Store reopen reason in task data
-            updated_data["reopen_reason"] = reopen_reason
-            
+            task_data["reopen_reason"] = reopen_reason
+
             # Clear done_ts when reopening
-            if "done_ts" in updated_data:
-                updated_data["done_ts"] = None
-            
+            if "done_ts" in task_data:
+                task_data["done_ts"] = None
+
             if self.logger:
                 self.logger.info(
                     f"Task {task_id}: Reopened with reason: {reopen_reason}",
@@ -377,8 +426,6 @@ class TaskFSM:
                         "reopen_reason": reopen_reason,
                     },
                 )
-        
-        return updated_data
 
     def _emit_transition_event(self, task_id: str, transition: TaskTransition) -> None:
         """Emit event for state transition.
@@ -456,12 +503,13 @@ class TaskFSM:
                 hook(context)
 
                 if self.logger:
+                    hook_name = getattr(hook, "__name__", repr(hook))
                     self.logger.debug(
                         f"Executed hook for {state.value}",
                         extra={
                             "task_id": task_id,
                             "state": state.value,
-                            "hook": hook.__name__,
+                            "hook": hook_name,
                         },
                     )
 
@@ -505,11 +553,7 @@ class TaskFSM:
         list[str]
             List of task IDs
         """
-        return [
-            task_id
-            for task_id, task_state in self._task_states.items()
-            if task_state == state
-        ]
+        return [task_id for task_id, task_state in self._task_states.items() if task_state == state]
 
     def get_statistics(self) -> dict[str, Any]:
         """Get FSM statistics.
@@ -556,4 +600,3 @@ def create_task_fsm(
         >>> fsm.transition("task-123", TaskState.DOING)
     """
     return TaskFSM(event_bus=event_bus, logger=logger)
-

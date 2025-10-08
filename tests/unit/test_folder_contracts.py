@@ -52,10 +52,7 @@ class TestFolderContracts:
 
         host_api = HostAPI(vault_path)
 
-        task = host_api.create_entity(
-            "task",
-            {"id": "task-custom-123", "title": "Custom Task", "status": "todo"}
-        )
+        task = host_api.create_entity("task", {"id": "task-custom-123", "title": "Custom Task", "status": "todo"})
 
         # Check filename follows pattern {id}.md
         assert task.path.name == "task-custom-123.md"

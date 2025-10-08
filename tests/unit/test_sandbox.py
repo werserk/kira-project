@@ -263,4 +263,3 @@ class TestSandboxADR004Compliance:
         sandbox = Sandbox(config=config)
 
         assert sandbox.config.grace_period_seconds == 10.0
-

@@ -369,4 +369,3 @@ def create_sync_pipeline(
     config = SyncPipelineConfig(**config_kwargs)
 
     return SyncPipeline(config, event_bus=event_bus, scheduler=scheduler, logger=logger)
-

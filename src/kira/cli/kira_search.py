@@ -106,6 +106,7 @@ def cli(
         click.echo(f"❌ Ошибка поиска: {exc}")
         if verbose:
             import traceback
+
             traceback.print_exc()
         return 1
 
@@ -194,7 +195,7 @@ def search_vault(
     def sort_key(r):
         return (
             -len(r["title_matches"]),  # Больше совпадений в заголовке
-            -len(r["body_matches"]),   # Больше совпадений в теле
+            -len(r["body_matches"]),  # Больше совпадений в теле
             r["metadata"].get("updated", r["metadata"].get("created", "")),  # Новее
         )
 
@@ -299,4 +300,3 @@ def main(args: list[str] | None = None) -> int:
 
 if __name__ == "__main__":
     sys.exit(main())
-

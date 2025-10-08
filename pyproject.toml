@@ -36,6 +36,7 @@ ruff = "^0.8.0"
 mypy = "^1.18.2"
 pre-commit = "^4.3.0"
 pytest-cov = "^7.0.0"
+pytz = "^2025.2"
 
 [build-system]
 requires = ["poetry-core"]

@@ -276,4 +276,3 @@ def create_vault_facade(host_api: HostAPI) -> VaultFacade:
         >>> vault = create_vault_facade(host_api)
     """
     return VaultFacade(host_api)
-

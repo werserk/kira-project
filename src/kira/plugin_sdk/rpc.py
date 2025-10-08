@@ -233,9 +233,7 @@ class StdioTransport:
         try:
             content_length = int(header_line.decode("ascii").split(":")[1].strip())
         except (ValueError, IndexError) as exc:
-            raise JSONRPCError(
-                f"Invalid Content-Length: {header_line!r}", JSONRPCError.PARSE_ERROR
-            ) from exc
+            raise JSONRPCError(f"Invalid Content-Length: {header_line!r}", JSONRPCError.PARSE_ERROR) from exc
 
         # Read empty line
         empty_line = self.input.readline()

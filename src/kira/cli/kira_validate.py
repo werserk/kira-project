@@ -2,7 +2,7 @@
 
 Provides commands for validating knowledge graph consistency:
 - Orphan detection
-- Cycle detection  
+- Cycle detection
 - Broken link detection
 - Duplicate entity detection
 """
@@ -230,10 +230,7 @@ def check_duplicates(vault_root: Path | None, threshold: float):
     if duplicates:
         click.echo(f"⚠️  Found {len(duplicates)} potential duplicate(s):\n")
         for dup in duplicates:
-            click.echo(
-                f"  {dup.entity_id_1} ≈ {dup.entity_id_2} "
-                f"(similarity: {dup.similarity:.2%})"
-            )
+            click.echo(f"  {dup.entity_id_1} ≈ {dup.entity_id_2} " f"(similarity: {dup.similarity:.2%})")
             click.echo(f"    Reason: {dup.reason}")
     else:
         click.echo("✅ No duplicates found")
@@ -283,10 +280,7 @@ def display_report(report: ValidationReport, ignore_orphans: bool = False):
     if report.duplicates:
         click.echo(f"\n⚠️  Potential duplicates: {len(report.duplicates)}")
         for dup in report.duplicates[:5]:
-            click.echo(
-                f"  {dup.entity_id_1} ≈ {dup.entity_id_2} "
-                f"({dup.similarity:.0%})"
-            )
+            click.echo(f"  {dup.entity_id_1} ≈ {dup.entity_id_2} " f"({dup.similarity:.0%})")
         if len(report.duplicates) > 5:
             click.echo(f"  ... and {len(report.duplicates) - 5} more")
     else:
@@ -307,10 +301,7 @@ def display_report(report: ValidationReport, ignore_orphans: bool = False):
 
     # Summary
     if report.has_issues():
-        click.echo(
-            f"⚠️  Validation found {report.issue_count()} issue(s) "
-            "that need attention"
-        )
+        click.echo(f"⚠️  Validation found {report.issue_count()} issue(s) " "that need attention")
     else:
         click.echo("✅ Knowledge graph is healthy!")
 
@@ -385,10 +376,7 @@ def save_report(
         lines.append(f"⚠️  **Found {len(report.duplicates)} potential duplicate(s)**")
         lines.append("")
         for dup in report.duplicates:
-            lines.append(
-                f"- `{dup.entity_id_1}` ≈ `{dup.entity_id_2}` "
-                f"(similarity: {dup.similarity:.0%})"
-            )
+            lines.append(f"- `{dup.entity_id_1}` ≈ `{dup.entity_id_2}` " f"(similarity: {dup.similarity:.0%})")
             lines.append(f"  - {dup.reason}")
         lines.append("")
         lines.append("**Action**: Review and merge duplicates if appropriate")
@@ -406,9 +394,7 @@ def save_report(
             for entity_id in report.orphans:
                 lines.append(f"- `{entity_id}`")
             lines.append("")
-            lines.append(
-                "**Action**: Add links to integrate orphans or archive if obsolete"
-            )
+            lines.append("**Action**: Add links to integrate orphans or archive if obsolete")
         else:
             lines.append("✅ No orphaned entities")
         lines.append("")
@@ -420,4 +406,3 @@ def save_report(
 
 if __name__ == "__main__":
     validate_command()
-

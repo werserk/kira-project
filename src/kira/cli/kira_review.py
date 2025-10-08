@@ -62,6 +62,7 @@ def weekly_command(save: str | None, verbose: bool) -> int:
         click.echo(f"❌ Ошибка: {exc}")
         if verbose:
             import traceback
+
             traceback.print_exc()
         return 1
 
@@ -104,6 +105,7 @@ def monthly_command(save: str | None, verbose: bool) -> int:
         click.echo(f"❌ Ошибка: {exc}")
         if verbose:
             import traceback
+
             traceback.print_exc()
         return 1
 
@@ -240,11 +242,13 @@ def pending_command(verbose: bool) -> int:
         click.echo(f"❌ Ошибка: {exc}")
         if verbose:
             import traceback
+
             traceback.print_exc()
         return 1
 
 
 # Helper functions
+
 
 def collect_review_data(vault_path: Path, start_date: datetime, end_date: datetime) -> dict:
     """Собрать данные для обзора."""
@@ -271,16 +275,16 @@ def collect_review_data(vault_path: Path, start_date: datetime, end_date: dateti
             try:
                 metadata = load_metadata(task_file)
                 created = parse_date(metadata.get("created"))
-                
+
                 if created and start_date <= created <= end_date:
                     data["tasks"]["created"].append(metadata)
-                
+
                 # Завершенные
                 if metadata.get("status") == "done":
                     updated = parse_date(metadata.get("updated"))
                     if updated and start_date <= updated <= end_date:
                         data["tasks"]["completed"].append(metadata)
-                
+
                 # В работе
                 if metadata.get("status") == "doing":
                     data["tasks"]["in_progress"].append(metadata)
@@ -295,7 +299,7 @@ def collect_review_data(vault_path: Path, start_date: datetime, end_date: dateti
             try:
                 metadata = load_metadata(note_file)
                 created = parse_date(metadata.get("created"))
-                
+
                 if created and start_date <= created <= end_date:
                     data["notes"]["created"].append(metadata)
 
@@ -309,7 +313,7 @@ def collect_review_data(vault_path: Path, start_date: datetime, end_date: dateti
             try:
                 metadata = load_metadata(event_file)
                 start = parse_date(metadata.get("start"))
-                
+
                 if start and start_date <= start <= end_date:
                     data["events"]["attended"].append(metadata)
 
@@ -326,9 +330,9 @@ def display_weekly_review(data: dict, verbose: bool) -> None:
     click.echo(f"  ✅ Завершено: {len(data['tasks']['completed'])}")
     click.echo(f"  🔄 В работе: {len(data['tasks']['in_progress'])}")
 
-    if data['tasks']['completed'] and verbose:
+    if data["tasks"]["completed"] and verbose:
         click.echo(f"\n  Завершенные задачи:")
-        for task in data['tasks']['completed'][:10]:
+        for task in data["tasks"]["completed"][:10]:
             click.echo(f"    • {task.get('title', 'Untitled')}")
 
     click.echo(f"\n📝 Заметки:")
@@ -338,8 +342,8 @@ def display_weekly_review(data: dict, verbose: bool) -> None:
     click.echo(f"  Посещено: {len(data['events']['attended'])}")
 
     # Completion rate
-    created = len(data['tasks']['created'])
-    completed = len(data['tasks']['completed'])
+    created = len(data["tasks"]["created"])
+    completed = len(data["tasks"]["completed"])
     if created > 0:
         rate = (completed / created) * 100
         click.echo(f"\n🎯 Процент завершения: {rate:.1f}%")
@@ -355,27 +359,27 @@ def display_monthly_review(data: dict, verbose: bool) -> None:
 def save_review_to_file(data: dict, file_path: Path, review_type: str) -> None:
     """Сохранить обзор в markdown файл."""
     lines = []
-    
+
     lines.append(f"# {review_type.title()} Review")
     lines.append(f"\nПериод: {data['period_start'].strftime('%Y-%m-%d')} - {data['period_end'].strftime('%Y-%m-%d')}\n")
-    
+
     lines.append("## Задачи\n")
     lines.append(f"- Создано: {len(data['tasks']['created'])}")
     lines.append(f"- Завершено: {len(data['tasks']['completed'])}")
     lines.append(f"- В работе: {len(data['tasks']['in_progress'])}\n")
-    
-    if data['tasks']['completed']:
+
+    if data["tasks"]["completed"]:
         lines.append("### Завершенные задачи\n")
-        for task in data['tasks']['completed']:
+        for task in data["tasks"]["completed"]:
             lines.append(f"- [x] {task.get('title', 'Untitled')}")
         lines.append("")
-    
+
     lines.append("## Заметки\n")
     lines.append(f"- Создано: {len(data['notes']['created'])}\n")
-    
+
     lines.append("## События\n")
     lines.append(f"- Посещено: {len(data['events']['attended'])}\n")
-    
+
     file_path.write_text("\n".join(lines), encoding="utf-8")
 
 
@@ -416,4 +420,3 @@ def main(args: list[str] | None = None) -> int:
 
 if __name__ == "__main__":
     sys.exit(main())
-

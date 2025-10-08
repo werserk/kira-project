@@ -96,7 +96,7 @@ class MarkdownDocument:
 
     def to_markdown_string(self) -> str:
         """Convert to full Markdown string with frontmatter.
-        
+
         Uses deterministic serialization (Phase 0, Point 2) with:
         - Fixed key ordering
         - ISO-8601 UTC timestamps
@@ -216,13 +216,13 @@ def write_markdown(
     fsync: bool = True,
 ) -> None:
     """Write Markdown document to file.
-    
+
     Phase 3, Point 11: Full atomic write protocol:
     1. Write to *.tmp on same filesystem
     2. fsync(tmp) - flush file data to disk
     3. atomic rename(tmp→real) - atomically replace target
     4. fsync(dir) - flush directory metadata to disk
-    
+
     This ensures crash-safety: kill -9 mid-write leaves either
     old or new file, never partial.
 
@@ -258,7 +258,7 @@ def write_markdown(
             # Phase 3, Point 11: Full atomic write protocol
             tmp_fd = None
             tmp_path = None
-            
+
             try:
                 # 1. Write to *.tmp on same filesystem (important for atomic rename)
                 with tempfile.NamedTemporaryFile(
@@ -272,14 +272,14 @@ def write_markdown(
                     tmp_file.flush()
                     tmp_fd = tmp_file.fileno()
                     tmp_path = Path(tmp_file.name)
-                    
+
                     # 2. fsync(tmp) - flush file data to disk
                     if fsync:
                         os.fsync(tmp_fd)
-                
+
                 # 3. atomic rename(tmp→real) - atomically replace target
                 tmp_path.rename(path)
-                
+
                 # 4. fsync(dir) - flush directory metadata to disk
                 if fsync:
                     dir_fd = os.open(str(path.parent), os.O_RDONLY)
@@ -287,7 +287,7 @@ def write_markdown(
                         os.fsync(dir_fd)
                     finally:
                         os.close(dir_fd)
-            
+
             except Exception:
                 # Clean up temp file on error
                 if tmp_path and tmp_path.exists():

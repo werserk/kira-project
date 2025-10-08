@@ -76,6 +76,7 @@ def list_command(tag: str | None, limit: int, sort: str, verbose: bool) -> int:
         click.echo(f"❌ Ошибка: {exc}")
         if verbose:
             import traceback
+
             traceback.print_exc()
         return 1
 
@@ -101,6 +102,7 @@ def show_command(note_id: str, verbose: bool) -> int:
         click.echo(f"❌ Ошибка: {exc}")
         if verbose:
             import traceback
+
             traceback.print_exc()
         return 1
 
@@ -122,7 +124,7 @@ def add_command(title: str, tag: tuple[str, ...], content: str | None, verbose: 
 
         # Создание заметки
         host_api = create_host_api(vault_path)
-        
+
         entity_data = {
             "title": title,
             "created": datetime.now(timezone.utc).isoformat(),
@@ -151,6 +153,7 @@ def add_command(title: str, tag: tuple[str, ...], content: str | None, verbose: 
         click.echo(f"❌ Ошибка создания заметки: {exc}")
         if verbose:
             import traceback
+
             traceback.print_exc()
         return 1
 
@@ -188,6 +191,7 @@ def edit_command(note_id: str, verbose: bool) -> int:
         click.echo(f"❌ Ошибка: {exc}")
         if verbose:
             import traceback
+
             traceback.print_exc()
         return 1
 
@@ -233,7 +237,7 @@ def tag_command(note_id: str, tags: tuple[str, ...], remove: bool, verbose: bool
         if not entity_id:
             click.echo("❌ Заметка не имеет ID")
             return 1
-        
+
         host_api = create_host_api(vault_path)
         host_api.update_entity(entity_id, {"tags": sorted(current_tags)})
 
@@ -247,6 +251,7 @@ def tag_command(note_id: str, tags: tuple[str, ...], remove: bool, verbose: bool
         click.echo(f"❌ Ошибка: {exc}")
         if verbose:
             import traceback
+
             traceback.print_exc()
         return 1
 
@@ -282,11 +287,13 @@ def delete_command(note_id: str, force: bool, verbose: bool) -> int:
         click.echo(f"❌ Ошибка удаления: {exc}")
         if verbose:
             import traceback
+
             traceback.print_exc()
         return 1
 
 
 # Helper functions
+
 
 def load_notes(notes_dir: Path) -> list[dict]:
     """Загрузить все заметки."""
@@ -405,4 +412,3 @@ def main(args: list[str] | None = None) -> int:
 
 if __name__ == "__main__":
     sys.exit(main())
-

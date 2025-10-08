@@ -32,7 +32,7 @@ __all__ = [
 @dataclass
 class SyncLedgerEntry:
     """Entry in sync ledger tracking remote entity state.
-    
+
     Attributes
     ----------
     remote_id : str
@@ -46,7 +46,7 @@ class SyncLedgerEntry:
     entity_id : str | None
         Local entity ID (if mapped)
     """
-    
+
     remote_id: str
     version_seen: int
     etag_seen: str | None
@@ -56,18 +56,18 @@ class SyncLedgerEntry:
 
 class SyncLedger:
     """Sync ledger for tracking remote state (Phase 4, Point 15).
-    
+
     Maintains ledger: remote_id → (version_seen, etag, last_sync_ts)
-    
+
     Purpose:
     - Prevent echo loops by ignoring mirrored updates
     - Detect conflicts by comparing versions/timestamps
     - Track what we've seen from each remote
     """
-    
+
     def __init__(self, db_path: Path | str) -> None:
         """Initialize sync ledger.
-        
+
         Parameters
         ----------
         db_path
@@ -76,15 +76,16 @@ class SyncLedger:
         self.db_path = Path(db_path)
         self._conn: sqlite3.Connection | None = None
         self._init_database()
-    
+
     def _init_database(self) -> None:
         """Initialize database schema."""
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
-        
+
         conn = self._get_connection()
         cursor = conn.cursor()
-        
-        cursor.execute("""
+
+        cursor.execute(
+            """
             CREATE TABLE IF NOT EXISTS sync_ledger (
                 remote_id TEXT PRIMARY KEY,
                 version_seen INTEGER NOT NULL,
@@ -93,31 +94,34 @@ class SyncLedger:
                 entity_id TEXT,
                 metadata TEXT
             )
-        """)
-        
+        """
+        )
+
         # Index for entity_id lookups
-        cursor.execute("""
+        cursor.execute(
+            """
             CREATE INDEX IF NOT EXISTS idx_sync_ledger_entity_id
             ON sync_ledger(entity_id)
-        """)
-        
+        """
+        )
+
         conn.commit()
-    
+
     def _get_connection(self) -> sqlite3.Connection:
         """Get database connection."""
         if self._conn is None:
             self._conn = sqlite3.connect(str(self.db_path))
             self._conn.row_factory = sqlite3.Row
         return self._conn
-    
+
     def get_entry(self, remote_id: str) -> SyncLedgerEntry | None:
         """Get ledger entry for remote entity.
-        
+
         Parameters
         ----------
         remote_id
             Remote entity ID
-            
+
         Returns
         -------
         SyncLedgerEntry | None
@@ -125,16 +129,13 @@ class SyncLedger:
         """
         conn = self._get_connection()
         cursor = conn.cursor()
-        
-        cursor.execute(
-            "SELECT * FROM sync_ledger WHERE remote_id = ?",
-            (remote_id,)
-        )
-        
+
+        cursor.execute("SELECT * FROM sync_ledger WHERE remote_id = ?", (remote_id,))
+
         row = cursor.fetchone()
         if row is None:
             return None
-        
+
         return SyncLedgerEntry(
             remote_id=row["remote_id"],
             version_seen=row["version_seen"],
@@ -142,7 +143,7 @@ class SyncLedger:
             last_sync_ts=row["last_sync_ts"],
             entity_id=row["entity_id"],
         )
-    
+
     def record_sync(
         self,
         remote_id: str,
@@ -152,7 +153,7 @@ class SyncLedger:
         entity_id: str | None = None,
     ) -> None:
         """Record that we've synced a remote entity.
-        
+
         Parameters
         ----------
         remote_id
@@ -166,44 +167,47 @@ class SyncLedger:
         """
         conn = self._get_connection()
         cursor = conn.cursor()
-        
+
         now = format_utc_iso8601(get_current_utc())
-        
-        cursor.execute("""
+
+        cursor.execute(
+            """
             INSERT OR REPLACE INTO sync_ledger
             (remote_id, version_seen, etag_seen, last_sync_ts, entity_id)
             VALUES (?, ?, ?, ?, ?)
-        """, (remote_id, version, etag, now, entity_id))
-        
+        """,
+            (remote_id, version, etag, now, entity_id),
+        )
+
         conn.commit()
-    
+
     def is_echo(self, remote_id: str, remote_version: int) -> bool:
         """Check if remote update is an echo of our write (Phase 4, Point 15).
-        
+
         Echo detection: If remote version matches what we last wrote,
         it's likely an echo and should be ignored.
-        
+
         Parameters
         ----------
         remote_id
             Remote entity ID
         remote_version
             Version from remote
-            
+
         Returns
         -------
         bool
             True if this appears to be an echo
         """
         entry = self.get_entry(remote_id)
-        
+
         if entry is None:
             # Never seen before, not an echo
             return False
-        
+
         # If remote version matches what we last saw/wrote, it's an echo
         return remote_version == entry.version_seen
-    
+
     def should_import(
         self,
         remote_id: str,
@@ -211,11 +215,11 @@ class SyncLedger:
         remote_etag: str | None = None,
     ) -> bool:
         """Check if we should import a remote update.
-        
+
         Criteria:
         - Not an echo (version changed)
         - ETag changed (if provided)
-        
+
         Parameters
         ----------
         remote_id
@@ -224,37 +228,37 @@ class SyncLedger:
             Remote version
         remote_etag
             Optional remote ETag
-            
+
         Returns
         -------
         bool
             True if we should import
         """
         entry = self.get_entry(remote_id)
-        
+
         if entry is None:
             # Never seen before, should import
             return True
-        
+
         # Check version
         if remote_version != entry.version_seen:
             return True
-        
+
         # Check ETag if available
         if remote_etag and remote_etag != entry.etag_seen:
             return True
-        
+
         # No changes detected
         return False
-    
+
     def get_entity_id(self, remote_id: str) -> str | None:
         """Get local entity ID for remote entity.
-        
+
         Parameters
         ----------
         remote_id
             Remote entity ID
-            
+
         Returns
         -------
         str | None
@@ -262,17 +266,17 @@ class SyncLedger:
         """
         entry = self.get_entry(remote_id)
         return entry.entity_id if entry else None
-    
+
     def close(self) -> None:
         """Close database connection."""
         if self._conn:
             self._conn.close()
             self._conn = None
-    
+
     def __enter__(self) -> SyncLedger:
         """Context manager entry."""
         return self
-    
+
     def __exit__(self, exc_type, exc_val, exc_tb) -> None:
         """Context manager exit."""
         self.close()
@@ -280,12 +284,12 @@ class SyncLedger:
 
 def create_sync_ledger(vault_path: Path) -> SyncLedger:
     """Create sync ledger for a vault.
-    
+
     Parameters
     ----------
     vault_path
         Path to vault
-        
+
     Returns
     -------
     SyncLedger
@@ -302,9 +306,9 @@ def should_import_remote_update(
     remote_etag: str | None = None,
 ) -> bool:
     """Determine if remote update should be imported (Phase 4, Point 15).
-    
+
     Prevents echo loops by checking ledger.
-    
+
     Parameters
     ----------
     ledger
@@ -315,7 +319,7 @@ def should_import_remote_update(
         Remote version
     remote_etag
         Optional remote ETag
-        
+
     Returns
     -------
     bool
@@ -324,7 +328,7 @@ def should_import_remote_update(
     # Check for echo
     if ledger.is_echo(remote_id, remote_version):
         return False
-    
+
     # Check if changed
     return ledger.should_import(remote_id, remote_version, remote_etag)
 
@@ -334,16 +338,16 @@ def resolve_conflict(
     remote_last_write_ts: str,
 ) -> Literal["local", "remote", "tie"]:
     """Resolve sync conflict using latest-wins policy (Phase 4, Point 15).
-    
+
     Policy: Latest-wins by last_write_ts
-    
+
     Parameters
     ----------
     local_last_write_ts
         Local last write timestamp (ISO-8601 UTC)
     remote_last_write_ts
         Remote last write timestamp (ISO-8601 UTC)
-        
+
     Returns
     -------
     Literal["local", "remote", "tie"]
@@ -352,7 +356,7 @@ def resolve_conflict(
     try:
         local_dt = parse_utc_iso8601(local_last_write_ts)
         remote_dt = parse_utc_iso8601(remote_last_write_ts)
-        
+
         if local_dt > remote_dt:
             return "local"
         elif remote_dt > local_dt:
@@ -362,4 +366,3 @@ def resolve_conflict(
     except (ValueError, AttributeError):
         # If timestamps can't be parsed, treat as tie
         return "tie"
-

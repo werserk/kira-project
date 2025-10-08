@@ -185,12 +185,12 @@ class PluginLoader:
         if required.startswith("~"):
             # Tilde range: compatible within same minor version
             base_version = version.parse(required[1:])
-            return (
-                current_ver >= base_version
-                and current_ver < version.parse(f"{base_version.major}.{base_version.minor + 1}.0")
+            return current_ver >= base_version and current_ver < version.parse(
+                f"{base_version.major}.{base_version.minor + 1}.0"
             )
         # Use packaging's version specifier
         from packaging.specifiers import SpecifierSet
+
         spec = SpecifierSet(required)
         return current_ver in spec
 
@@ -295,10 +295,7 @@ class PluginLoader:
         violations = policy.get_violations()
         if violations:
             for violation in violations:
-                print(
-                    f"Warning: Policy violation in {plugin_name}: "
-                    f"{violation.permission} - {violation.reason}"
-                )
+                print(f"Warning: Policy violation in {plugin_name}: " f"{violation.permission} - {violation.reason}")
 
         # Launch in sandbox
         try:
@@ -310,9 +307,7 @@ class PluginLoader:
                 context_config=dict(self.context.config) if self.context.config else None,
             )
         except Exception as exc:
-            raise PluginLoadError(
-                f"Failed to launch {plugin_name} in sandbox: {exc}"
-            ) from exc
+            raise PluginLoadError(f"Failed to launch {plugin_name} in sandbox: {exc}") from exc
 
         # Store plugin info
         plugin_info = {

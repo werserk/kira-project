@@ -91,6 +91,7 @@ def show_command(entity_id: str, direction: str, verbose: bool) -> int:
         click.echo(f"❌ Ошибка: {exc}")
         if verbose:
             import traceback
+
             traceback.print_exc()
         return 1
 
@@ -137,6 +138,7 @@ def add_command(from_id: str, to_id: str, bidirectional: bool, verbose: bool) ->
         click.echo(f"❌ Ошибка: {exc}")
         if verbose:
             import traceback
+
             traceback.print_exc()
         return 1
 
@@ -162,7 +164,7 @@ def graph_command(entity_id: str, depth: int, verbose: bool) -> int:
             return 1
 
         metadata = load_metadata(entity_file)
-        
+
         click.echo(f"\n🕸️  Граф связей для: {metadata.get('title')} (глубина: {depth})\n")
 
         # Построить граф
@@ -180,6 +182,7 @@ def graph_command(entity_id: str, depth: int, verbose: bool) -> int:
         click.echo(f"❌ Ошибка: {exc}")
         if verbose:
             import traceback
+
             traceback.print_exc()
         return 1
 
@@ -239,11 +242,13 @@ def orphans_command(verbose: bool) -> int:
         click.echo(f"❌ Ошибка: {exc}")
         if verbose:
             import traceback
+
             traceback.print_exc()
         return 1
 
 
 # Helper functions
+
 
 def find_entity_file(vault_path: Path, entity_id: str) -> Path | None:
     """Найти файл entity по ID."""
@@ -285,7 +290,7 @@ def find_outgoing_links(file_path: Path) -> list[str]:
         content = f.read()
 
     # Найти все wikilinks [[entity-id]]
-    wikilink_pattern = r'\[\[([a-z]+-\d{8}-\d{4}(?:-[a-z0-9-]+)?)\]\]'
+    wikilink_pattern = r"\[\[([a-z]+-\d{8}-\d{4}(?:-[a-z0-9-]+)?)\]\]"
     matches = re.findall(wikilink_pattern, content)
 
     return list(set(matches))
@@ -314,7 +319,7 @@ def find_incoming_links(vault_path: Path, target_id: str) -> list[Path]:
 
 def add_link_to_file(file_path: Path, target_id: str, target_title: str) -> None:
     """Добавить ссылку в конец файла (Phase 0, Point 2: Single Writer).
-    
+
     Uses HostAPI to route all mutations through vault.py.
     No direct file writes allowed.
     """
@@ -322,10 +327,10 @@ def add_link_to_file(file_path: Path, target_id: str, target_title: str) -> None
     from ..core.md_io import read_markdown
     from ..core.host import create_host_api
     from ..core.config import load_config
-    
+
     doc = read_markdown(file_path)
     content = doc.content
-    
+
     # Проверить, есть ли уже эта ссылка
     if f"[[{target_id}]]" in content:
         return
@@ -337,16 +342,16 @@ def add_link_to_file(file_path: Path, target_id: str, target_title: str) -> None
     # Добавить ссылку
     link_text = f"- [[{target_id}]] - {target_title}\n"
     content += link_text
-    
+
     # Use HostAPI for single writer pattern (Phase 0, Point 2)
     entity_id = doc.get_metadata("id")
     if not entity_id:
         raise ValueError("File missing 'id' field")
-    
+
     config = load_config()
     vault_path = Path(config.get("vault", {}).get("path", "vault"))
     host_api = create_host_api(vault_path)
-    
+
     # Update through single writer with new content
     host_api.update_entity(entity_id, {}, content=content)
 
@@ -363,11 +368,8 @@ def build_graph(vault_path: Path, entity_id: str, depth: int, visited: set) -> d
         return {}
 
     outgoing = find_outgoing_links(entity_file)
-    
-    graph = {
-        "id": entity_id,
-        "children": []
-    }
+
+    graph = {"id": entity_id, "children": []}
 
     for link_id in outgoing:
         child_graph = build_graph(vault_path, link_id, depth - 1, visited)
@@ -384,7 +386,7 @@ def display_graph(graph: dict, vault_path: Path, level: int, verbose: bool) -> N
 
     indent = "  " * level
     entity_id = graph.get("id")
-    
+
     entity_file = find_entity_file(vault_path, entity_id)
     if entity_file:
         metadata = load_metadata(entity_file)
@@ -409,4 +411,3 @@ def main(args: list[str] | None = None) -> int:
 
 if __name__ == "__main__":
     sys.exit(main())
-

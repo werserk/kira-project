@@ -409,7 +409,7 @@ class EventBus:
                 if attempt < policy.max_attempts - 1:
                     # Calculate delay with exponential backoff
                     delay = min(
-                        policy.initial_delay * (policy.backoff_multiplier ** attempt),
+                        policy.initial_delay * (policy.backoff_multiplier**attempt),
                         policy.max_delay,
                     )
 
@@ -451,9 +451,7 @@ class EventBus:
                         )
 
         duration_ms = (time.time() - start_time) * 1000
-        return HandlerResult(
-            success=False, duration_ms=duration_ms, error=last_error, attempts=attempts
-        )
+        return HandlerResult(success=False, duration_ms=duration_ms, error=last_error, attempts=attempts)
 
 
 def create_event_bus(logger: Any = None) -> EventBus:
@@ -470,4 +468,3 @@ def create_event_bus(logger: Any = None) -> EventBus:
         Configured event bus
     """
     return EventBus(logger=logger)
-

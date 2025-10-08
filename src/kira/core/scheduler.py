@@ -155,9 +155,7 @@ class Job:
         try:
             from croniter import croniter  # type: ignore[import-untyped]
 
-            base_time = datetime.fromtimestamp(
-                self.last_run_at or time.time(), tz=timezone.utc
-            )
+            base_time = datetime.fromtimestamp(self.last_run_at or time.time(), tz=timezone.utc)
             cron = croniter(self.trigger.cron_expression, base_time)
             return float(cron.get_next())
         except ImportError:
@@ -589,4 +587,3 @@ def create_scheduler(logger: Any = None) -> Scheduler:
         Configured scheduler
     """
     return Scheduler(logger=logger)
-

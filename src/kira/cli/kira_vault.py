@@ -98,7 +98,7 @@ def validate_vault_cmd(vault_path: str | None, verbose: bool) -> int:
         if verbose:
             info = get_vault_info(vault_path_obj)
             click.echo("\n📊 Статистика Vault:")
-            for entity_type, count in info['entity_counts'].items():
+            for entity_type, count in info["entity_counts"].items():
                 click.echo(f"  - {entity_type}: {count} entities")
             click.echo(f"  - inbox: {info['inbox_items']} items")
             click.echo(f"  - processed: {info['processed_items']} items")
@@ -116,9 +116,7 @@ def validate_vault_cmd(vault_path: str | None, verbose: bool) -> int:
 @click.option("--vault-path", type=str, help="Путь к Vault")
 @click.option("--template", is_flag=True, help="Создать только шаблон (не файл)")
 @click.option("--verbose", "-v", is_flag=True, help="Подробный вывод")
-def new_entity_cmd(
-    entity_type: str, title: str, vault_path: str | None, template: bool, verbose: bool
-) -> int:
+def new_entity_cmd(entity_type: str, title: str, vault_path: str | None, template: bool, verbose: bool) -> int:
     """Создать новую entity."""
     try:
         config = load_config()
@@ -181,7 +179,9 @@ created: {datetime.now(timezone.utc).isoformat()}
 
         # Create actual entity
         host_api = create_host_api(vault_path_obj)
-        entity = host_api.create_entity(entity_type, entity_data, content="<!-- Add your content here -->\n\n*Created by Kira CLI*")
+        entity = host_api.create_entity(
+            entity_type, entity_data, content="<!-- Add your content here -->\n\n*Created by Kira CLI*"
+        )
 
         click.echo(f"✅ Entity создана: {entity.id}")
         click.echo(f"📁 Файл: {entity.path}")
@@ -197,6 +197,7 @@ created: {datetime.now(timezone.utc).isoformat()}
         click.echo(f"❌ Ошибка создания entity: {exc}")
         if verbose:
             import traceback
+
             traceback.print_exc()
         return 1
 
@@ -207,9 +208,7 @@ created: {datetime.now(timezone.utc).isoformat()}
 @click.option("--validate", is_flag=True, help="Валидировать все схемы")
 @click.option("--install", is_flag=True, help="Установить/обновить схемы")
 @click.option("--verbose", "-v", is_flag=True, help="Подробный вывод")
-def schemas_cmd(
-    vault_path: str | None, list_schemas: bool, validate: bool, install: bool, verbose: bool
-) -> int:
+def schemas_cmd(vault_path: str | None, list_schemas: bool, validate: bool, install: bool, verbose: bool) -> int:
     """Управление схемами entity."""
     try:
         config = load_config()
@@ -224,6 +223,7 @@ def schemas_cmd(
 
         if install:
             from ..core.vault_init import install_schemas
+
             install_schemas(vault_path_obj)
             click.echo("✅ Схемы установлены/обновлены")
 
@@ -293,8 +293,8 @@ def info_cmd(vault_path: str | None, verbose: bool) -> int:
         click.echo(f"📋 Схемы: {info['schema_count']}")
 
         click.echo("\n📊 Entities:")
-        total_entities = sum(info['entity_counts'].values())
-        for entity_type, count in info['entity_counts'].items():
+        total_entities = sum(info["entity_counts"].values())
+        for entity_type, count in info["entity_counts"].items():
             click.echo(f"  - {entity_type}: {count}")
         click.echo(f"  📈 Всего: {total_entities}")
 
@@ -302,12 +302,12 @@ def info_cmd(vault_path: str | None, verbose: bool) -> int:
         click.echo(f"  - В inbox: {info['inbox_items']}")
         click.echo(f"  - В processed: {info['processed_items']}")
 
-        if not info['structure_valid']:
+        if not info["structure_valid"]:
             click.echo("\n❌ Проблемы:")
-            for issue in info['issues']:
+            for issue in info["issues"]:
                 click.echo(f"  - {issue}")
 
-        if verbose and info['structure_valid']:
+        if verbose and info["structure_valid"]:
             # Show more details
             click.echo("\n🔧 Подробная информация:")
             known_types = get_known_entity_types()

@@ -154,7 +154,7 @@ class SchemaCache:
 
         try:
             schema_files = list(self.schemas_dir.glob("*.json"))
-            
+
             if not schema_files:
                 # Directory exists but is empty, load defaults
                 self._load_default_schemas()
@@ -210,10 +210,7 @@ class SchemaCache:
         schema = self.get_schema(entity_type)
 
         if not schema:
-            return ValidationResult(
-                valid=False,
-                errors=[f"No schema found for entity type: {entity_type}"]
-            )
+            return ValidationResult(valid=False, errors=[f"No schema found for entity type: {entity_type}"])
 
         return schema.validate(data)
 
@@ -250,36 +247,37 @@ def create_default_schemas() -> dict[str, dict[str, Any]]:
     return {
         "task": {
             "$schema": "http://json-schema.org/draft-07/schema#",
+            "$id": "https://kira.schema/task.json",
+            "version": "1.0.0",
             "type": "object",
             "required": ["id", "title", "status", "created"],
             "properties": {
-                "id": {"type": "string", "pattern": "^task-[a-z0-9-]+$"},
+                "id": {"type": "string", "pattern": r"^task-[a-z0-9][a-z0-9-]*[a-z0-9]$"},
                 "title": {"type": "string", "minLength": 1, "maxLength": 200},
                 "description": {"type": "string"},
-                "status": {
-                    "type": "string",
-                    "enum": ["todo", "doing", "review", "done", "blocked"],
-                    "default": "todo"
-                },
-                "priority": {
-                    "type": "string",
-                    "enum": ["low", "medium", "high", "urgent"],
-                    "default": "medium"
-                },
+                "status": {"type": "string", "enum": ["todo", "doing", "review", "done", "blocked"], "default": "todo"},
+                "priority": {"type": "string", "enum": ["low", "medium", "high", "urgent"], "default": "medium"},
                 "due_date": {"type": "string", "format": "date-time"},
                 "created": {"type": "string", "format": "date-time"},
                 "updated": {"type": "string", "format": "date-time"},
                 "tags": {"type": "array", "items": {"type": "string"}},
                 "relates_to": {"type": "array", "items": {"type": "string"}},
                 "depends_on": {"type": "array", "items": {"type": "string"}},
-            }
+            },
+            "folder_contracts": {
+                "allowed_locations": ["tasks/", "projects/"],
+                "filename_pattern": r"^[a-z0-9][a-z0-9-]*[a-z0-9]\.md$",
+                "required_frontmatter": ["id", "title", "status", "created"],
+            },
         },
         "note": {
             "$schema": "http://json-schema.org/draft-07/schema#",
+            "$id": "https://kira.schema/note.json",
+            "version": "1.0.0",
             "type": "object",
             "required": ["id", "title", "created"],
             "properties": {
-                "id": {"type": "string", "pattern": "^note-[a-z0-9-]+$"},
+                "id": {"type": "string", "pattern": r"^note-[a-z0-9][a-z0-9-]*[a-z0-9]$"},
                 "title": {"type": "string", "minLength": 1, "maxLength": 200},
                 "category": {"type": "string"},
                 "tags": {"type": "array", "items": {"type": "string"}},
@@ -287,14 +285,21 @@ def create_default_schemas() -> dict[str, dict[str, Any]]:
                 "updated": {"type": "string", "format": "date-time"},
                 "source": {"type": "string"},
                 "relates_to": {"type": "array", "items": {"type": "string"}},
-            }
+            },
+            "folder_contracts": {
+                "allowed_locations": ["notes/", "projects/"],
+                "filename_pattern": r"^[a-z0-9][a-z0-9-]*[a-z0-9]\.md$",
+                "required_frontmatter": ["id", "title", "created"],
+            },
         },
         "event": {
             "$schema": "http://json-schema.org/draft-07/schema#",
+            "$id": "https://kira.schema/event.json",
+            "version": "1.0.0",
             "type": "object",
             "required": ["id", "title", "start_time"],
             "properties": {
-                "id": {"type": "string", "pattern": "^event-[a-z0-9-]+$"},
+                "id": {"type": "string", "pattern": r"^event-[a-z0-9][a-z0-9-]*[a-z0-9]$"},
                 "title": {"type": "string", "minLength": 1, "maxLength": 200},
                 "description": {"type": "string"},
                 "start_time": {"type": "string", "format": "date-time"},
@@ -305,28 +310,40 @@ def create_default_schemas() -> dict[str, dict[str, Any]]:
                 "created": {"type": "string", "format": "date-time"},
                 "updated": {"type": "string", "format": "date-time"},
                 "relates_to": {"type": "array", "items": {"type": "string"}},
-            }
+            },
+            "folder_contracts": {
+                "allowed_locations": ["events/", "calendar/"],
+                "filename_pattern": r"^[a-z0-9][a-z0-9-]*[a-z0-9]\.md$",
+                "required_frontmatter": ["id", "title", "start_time"],
+            },
         },
         "project": {
             "$schema": "http://json-schema.org/draft-07/schema#",
+            "$id": "https://kira.schema/project.json",
+            "version": "1.0.0",
             "type": "object",
             "required": ["id", "title", "status"],
             "properties": {
-                "id": {"type": "string", "pattern": "^project-[a-z0-9-]+$"},
+                "id": {"type": "string", "pattern": r"^project-[a-z0-9][a-z0-9-]*[a-z0-9]$"},
                 "title": {"type": "string", "minLength": 1, "maxLength": 200},
                 "description": {"type": "string"},
                 "status": {
                     "type": "string",
                     "enum": ["active", "on_hold", "completed", "cancelled"],
-                    "default": "active"
+                    "default": "active",
                 },
                 "start_date": {"type": "string", "format": "date"},
                 "end_date": {"type": "string", "format": "date"},
                 "created": {"type": "string", "format": "date-time"},
                 "updated": {"type": "string", "format": "date-time"},
                 "tags": {"type": "array", "items": {"type": "string"}},
-            }
-        }
+            },
+            "folder_contracts": {
+                "allowed_locations": ["projects/"],
+                "filename_pattern": r"^[a-z0-9][a-z0-9-]*[a-z0-9]\.md$",
+                "required_frontmatter": ["id", "title", "status"],
+            },
+        },
     }
 
 
@@ -368,9 +385,7 @@ def validate_vault_structure(vault_path: str) -> list[str]:
 
 
 def validate_entity(
-    entity_type: str,
-    data: dict[str, Any],
-    schema_cache: SchemaCache | None = None
+    entity_type: str, data: dict[str, Any], schema_cache: SchemaCache | None = None
 ) -> ValidationResult:
     """Validate entity data against schema.
 

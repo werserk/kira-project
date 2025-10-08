@@ -77,12 +77,7 @@ class TestGenerateEntityId:
 
     def test_generate_with_timezone(self):
         ts = datetime(2025, 1, 15, 12, 30, 0, tzinfo=timezone.utc)
-        entity_id = generate_entity_id(
-            "task",
-            title="Test",
-            timestamp=ts,
-            tz="Europe/Brussels"
-        )
+        entity_id = generate_entity_id("task", title="Test", timestamp=ts, tz="Europe/Brussels")
 
         # UTC 12:30 = Brussels 13:30 (or 14:30 in summer)
         assert entity_id.startswith("task-20250115-")
@@ -290,6 +285,7 @@ class TestADR008Compliance:
 
         # Should match pattern: task-YYYYMMDD-HHmm-slug
         import re
+
         pattern = r"^[a-z][a-z0-9]{1,19}-\d{8}-\d{4}-.+$"
         assert re.match(pattern, entity_id), f"ID doesn't match pattern: {entity_id}"
 
@@ -307,6 +303,7 @@ class TestADR008Compliance:
 
         # Should only contain a-z0-9-
         import re
+
         assert re.match(r"^[a-z0-9-]+$", entity_id)
 
     def test_determinism_same_minute(self):

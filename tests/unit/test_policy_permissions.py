@@ -329,4 +329,3 @@ class TestPolicyViolation:
         assert violation.permission == "net"
         assert "network_access" in violation.reason
         assert violation.context["plugin"] == "test"
-

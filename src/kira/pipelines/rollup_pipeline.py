@@ -244,17 +244,13 @@ class RollupPipeline:
 
         # Publish rollup.requested event (thin orchestration)
         # Plugins subscribe and contribute their rollup sections
-        sections = self._collect_rollup_sections(
-            rollup_type, period_start, period_end, trace_id
-        )
+        sections = self._collect_rollup_sections(rollup_type, period_start, period_end, trace_id)
 
         # Create rollup entity via Host API
         entity_id = None
         if self.host_api:
             try:
-                entity_id = self._create_rollup_entity(
-                    rollup_type, period_start, period_end, sections, trace_id
-                )
+                entity_id = self._create_rollup_entity(rollup_type, period_start, period_end, sections, trace_id)
             except Exception as exc:
                 self._log_event(
                     "entity_creation_failed",

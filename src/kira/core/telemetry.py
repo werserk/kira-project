@@ -124,7 +124,15 @@ class StructuredFormatter(logging.Formatter):
 
         # Error details
         if record.exc_info:
-            exc_type, exc_value, exc_tb = record.exc_info
+            # exc_info can be True or a tuple (type, value, traceback)
+            import sys
+
+            if record.exc_info is True:
+                exc_info = sys.exc_info()
+            else:
+                exc_info = record.exc_info
+
+            exc_type, exc_value, exc_tb = exc_info
             log_entry["error"] = {
                 "type": exc_type.__name__ if exc_type else "Unknown",
                 "message": str(exc_value),
@@ -502,4 +510,3 @@ def create_logger(
         level=level,
         trace_id=trace_id,
     )
-

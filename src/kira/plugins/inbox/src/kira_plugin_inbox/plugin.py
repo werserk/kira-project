@@ -373,13 +373,9 @@ class InboxNormalizer:
         content_lower = content.lower()
 
         if "встреча" in content_lower or "созвон" in content_lower:
-            alternatives.append(
-                EntityClassification(entity_type="meeting", confidence=0.6, extracted_fields={})
-            )
+            alternatives.append(EntityClassification(entity_type="meeting", confidence=0.6, extracted_fields={}))
         if "задача" in content_lower or "нужно" in content_lower:
-            alternatives.append(
-                EntityClassification(entity_type="task", confidence=0.5, extracted_fields={})
-            )
+            alternatives.append(EntityClassification(entity_type="task", confidence=0.5, extracted_fields={}))
 
         # Create request
         request = ClarificationRequest(
@@ -426,9 +422,7 @@ class InboxNormalizer:
         ]
 
         for alt in request.alternatives[:2]:
-            options.append(
-                {"text": f"🔄 {alt.entity_type.capitalize()}", "callback_data": f"alt_{alt.entity_type}"}
-            )
+            options.append({"text": f"🔄 {alt.entity_type.capitalize()}", "callback_data": f"alt_{alt.entity_type}"})
 
         options.append({"text": "❌ Skip", "callback_data": "skip"})
 

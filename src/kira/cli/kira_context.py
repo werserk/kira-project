@@ -63,6 +63,7 @@ def list_command(verbose: bool) -> int:
         click.echo(f"❌ Ошибка: {exc}")
         if verbose:
             import traceback
+
             traceback.print_exc()
         return 1
 
@@ -132,6 +133,7 @@ def show_command(context: str, status: str, verbose: bool) -> int:
         click.echo(f"❌ Ошибка: {exc}")
         if verbose:
             import traceback
+
             traceback.print_exc()
         return 1
 
@@ -169,24 +171,25 @@ def add_command(task_id: str, context: str, verbose: bool) -> int:
 
         # Добавить контекст
         current_tags.add(context_name)
-        
+
         # Use HostAPI for single writer pattern (Phase 0, Point 2)
         entity_id = metadata.get("id")
         if not entity_id:
             click.echo("❌ Задача не имеет ID")
             return 1
-        
+
         host_api = create_host_api(vault_path)
         host_api.update_entity(entity_id, {"tags": sorted(current_tags)})
 
         click.echo(f"✅ Контекст {context_name} добавлен к задаче {task_id}")
-        
+
         return 0
 
     except Exception as exc:
         click.echo(f"❌ Ошибка: {exc}")
         if verbose:
             import traceback
+
             traceback.print_exc()
         return 1
 
@@ -225,13 +228,13 @@ def remove_command(task_id: str, context: str, verbose: bool) -> int:
         # Удалить контекст
         if context_name in current_tags:
             current_tags.remove(context_name)
-            
+
             # Use HostAPI for single writer pattern (Phase 0, Point 2)
             entity_id = metadata.get("id")
             if not entity_id:
                 click.echo("❌ Задача не имеет ID")
                 return 1
-            
+
             host_api = create_host_api(vault_path)
             host_api.update_entity(entity_id, {"tags": sorted(current_tags)})
 
@@ -245,17 +248,19 @@ def remove_command(task_id: str, context: str, verbose: bool) -> int:
         click.echo(f"❌ Ошибка: {exc}")
         if verbose:
             import traceback
+
             traceback.print_exc()
         return 1
 
 
 # Helper functions
 
+
 def collect_contexts(vault_path: Path) -> dict[str, int]:
     """Собрать все контексты и их частоту использования."""
     contexts = {}
     tasks_dir = vault_path / "tasks"
-    
+
     if not tasks_dir.exists():
         return contexts
 
@@ -290,7 +295,7 @@ def find_tasks_by_context(vault_path: Path, context: str, status_filter: str) ->
     """Найти задачи по контексту."""
     tasks = []
     tasks_dir = vault_path / "tasks"
-    
+
     if not tasks_dir.exists():
         return tasks
 
@@ -371,4 +376,3 @@ def main(args: list[str] | None = None) -> int:
 
 if __name__ == "__main__":
     sys.exit(main())
-

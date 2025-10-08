@@ -26,7 +26,12 @@ def cli() -> None:
 
 
 @cli.command("list")
-@click.option("--status", type=click.Choice(["active", "completed", "archived", "all"]), default="active", help="Фильтр по статусу")
+@click.option(
+    "--status",
+    type=click.Choice(["active", "completed", "archived", "all"]),
+    default="active",
+    help="Фильтр по статусу",
+)
 @click.option("--verbose", "-v", is_flag=True, help="Подробный вывод")
 def list_command(status: str, verbose: bool) -> int:
     """Показать список проектов."""
@@ -63,6 +68,7 @@ def list_command(status: str, verbose: bool) -> int:
         click.echo(f"❌ Ошибка: {exc}")
         if verbose:
             import traceback
+
             traceback.print_exc()
         return 1
 
@@ -88,6 +94,7 @@ def show_command(project_id: str, verbose: bool) -> int:
         click.echo(f"❌ Ошибка: {exc}")
         if verbose:
             import traceback
+
             traceback.print_exc()
         return 1
 
@@ -109,7 +116,7 @@ def add_command(title: str, description: str | None, tag: tuple[str, ...], verbo
 
         # Создание проекта
         host_api = create_host_api(vault_path)
-        
+
         entity_data = {
             "title": title,
             "status": "active",
@@ -124,7 +131,7 @@ def add_command(title: str, description: str | None, tag: tuple[str, ...], verbo
             project_content += f"{description}\n\n"
         else:
             project_content += "## Описание\n\n<!-- Опишите проект -->\n\n"
-        
+
         project_content += "## Задачи\n\n<!-- Связанные задачи появятся здесь -->\n\n"
         project_content += "## Заметки\n\n<!-- Заметки по проекту -->\n\n"
 
@@ -142,6 +149,7 @@ def add_command(title: str, description: str | None, tag: tuple[str, ...], verbo
         click.echo(f"❌ Ошибка создания проекта: {exc}")
         if verbose:
             import traceback
+
             traceback.print_exc()
         return 1
 
@@ -204,6 +212,7 @@ def tasks_command(project_id: str, verbose: bool) -> int:
         click.echo(f"❌ Ошибка: {exc}")
         if verbose:
             import traceback
+
             traceback.print_exc()
         return 1
 
@@ -270,6 +279,7 @@ def progress_command(project_id: str, verbose: bool) -> int:
         click.echo(f"❌ Ошибка: {exc}")
         if verbose:
             import traceback
+
             traceback.print_exc()
         return 1
 
@@ -289,10 +299,13 @@ def complete_command(project_id: str, verbose: bool) -> int:
             return 1
 
         # Обновить статус
-        update_project_metadata(project_path, {
-            "status": "completed",
-            "completed": datetime.now(timezone.utc).isoformat(),
-        })
+        update_project_metadata(
+            project_path,
+            {
+                "status": "completed",
+                "completed": datetime.now(timezone.utc).isoformat(),
+            },
+        )
 
         click.echo(f"✅ Проект завершен: {project_id}")
         return 0
@@ -301,11 +314,13 @@ def complete_command(project_id: str, verbose: bool) -> int:
         click.echo(f"❌ Ошибка: {exc}")
         if verbose:
             import traceback
+
             traceback.print_exc()
         return 1
 
 
 # Helper functions
+
 
 def load_projects(projects_dir: Path) -> list[dict]:
     """Загрузить все проекты."""
@@ -430,7 +445,7 @@ def find_project_tasks(vault_path: Path, project_id: str) -> list[dict]:
     """Найти задачи, связанные с проектом."""
     tasks = []
     tasks_dir = vault_path / "tasks"
-    
+
     if not tasks_dir.exists():
         return tasks
 
@@ -447,7 +462,7 @@ def find_project_tasks(vault_path: Path, project_id: str) -> list[dict]:
                 continue
 
             metadata = yaml.safe_load(parts[1])
-            
+
             # Проверить, связана ли задача с проектом
             # Через поле project_id или через wikilink
             if metadata.get("project") == project_id:
@@ -463,7 +478,7 @@ def find_project_tasks(vault_path: Path, project_id: str) -> list[dict]:
 
 def update_project_metadata(project_path: Path, updates: dict) -> None:
     """Обновить метаданные проекта (Phase 0, Point 2: Single Writer).
-    
+
     Uses HostAPI to route all mutations through vault.py.
     No direct file writes allowed.
     """
@@ -471,18 +486,18 @@ def update_project_metadata(project_path: Path, updates: dict) -> None:
     from ..core.md_io import read_markdown
     from ..core.host import create_host_api
     from ..core.config import load_config
-    
+
     doc = read_markdown(project_path)
     entity_id = doc.get_metadata("id")
-    
+
     if not entity_id:
         raise ValueError("Project file missing 'id' field")
-    
+
     # Use HostAPI for single writer pattern (Phase 0, Point 2)
     config = load_config()
     vault_path = Path(config.get("vault", {}).get("path", "vault"))
     host_api = create_host_api(vault_path)
-    
+
     # Update through single writer
     host_api.update_entity(entity_id, updates)
 
@@ -499,4 +514,3 @@ def main(args: list[str] | None = None) -> int:
 
 if __name__ == "__main__":
     sys.exit(main())
-

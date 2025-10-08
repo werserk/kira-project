@@ -463,9 +463,7 @@ class TestGraphValidationIntegration:
                 for line in content.split("\n"):
                     if line.startswith("depends_on:"):
                         dep = line.split(":", 1)[1].strip()
-                        validator.link_graph.add_link(
-                            entity_id, dep, LinkType.DEPENDS_ON
-                        )
+                        validator.link_graph.add_link(entity_id, dep, LinkType.DEPENDS_ON)
 
         report = validator.validate()
 
@@ -489,4 +487,3 @@ class TestGraphValidationIntegration:
         assert isinstance(report.cycles, list)
         assert isinstance(report.broken_links, list)
         assert isinstance(report.duplicates, list)
-

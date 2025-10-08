@@ -263,9 +263,7 @@ def matches_filters(
     # Since filter
     if since_timestamp:
         try:
-            entry_time = datetime.fromisoformat(
-                log_entry.get("timestamp", "").replace("Z", "+00:00")
-            )
+            entry_time = datetime.fromisoformat(log_entry.get("timestamp", "").replace("Z", "+00:00"))
             if entry_time < since_timestamp:
                 return False
         except Exception:
@@ -468,9 +466,7 @@ def stats_command(category: str, since: str | None):
 
                         # Component stats
                         component = log_entry.get("component", "unknown")
-                        stats["by_component"][component] = (
-                            stats["by_component"].get(component, 0) + 1
-                        )
+                        stats["by_component"][component] = stats["by_component"].get(component, 0) + 1
 
                         # Error count
                         if level == "ERROR":
@@ -511,12 +507,9 @@ def stats_command(category: str, since: str | None):
         click.echo(f"  {level:8s}: {count:6d} ({percentage:5.1f}%)")
 
     click.echo("\n🔧 By Component:")
-    for component, count in sorted(
-        stats["by_component"].items(), key=lambda x: x[1], reverse=True
-    )[:10]:
+    for component, count in sorted(stats["by_component"].items(), key=lambda x: x[1], reverse=True)[:10]:
         click.echo(f"  {component:25s}: {count:6d}")
 
 
 if __name__ == "__main__":
     diag_command()
-

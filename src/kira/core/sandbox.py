@@ -89,9 +89,7 @@ class PluginProcess:
             self.process.stdin.write(data)
             self.process.stdin.flush()
         except (BrokenPipeError, OSError) as exc:
-            raise SandboxError(
-                f"Failed to send message to {self.plugin_name}: {exc}"
-            ) from exc
+            raise SandboxError(f"Failed to send message to {self.plugin_name}: {exc}") from exc
 
     def receive_message(self, timeout: float | None = None) -> JSONRPCMessage:
         """Receive JSON-RPC message from plugin process.
@@ -174,9 +172,7 @@ class PluginProcess:
         thread.join(timeout=timeout)
 
         if thread.is_alive():
-            raise TimeoutError(
-                f"Timeout reading from {self.plugin_name} (timeout={timeout}s)"
-            )
+            raise TimeoutError(f"Timeout reading from {self.plugin_name} (timeout={timeout}s)")
 
         if not result:
             raise SandboxError(f"No response from {self.plugin_name}")
@@ -426,9 +422,7 @@ time.sleep({self.config.timeout_ms / 1000.0})
 
         # Clean old restart times
         cutoff = time.time() - self.config.restart_window_seconds
-        self._restart_times[plugin_name] = [
-            t for t in self._restart_times[plugin_name] if t > cutoff
-        ]
+        self._restart_times[plugin_name] = [t for t in self._restart_times[plugin_name] if t > cutoff]
 
         return len(self._restart_times[plugin_name]) < self.config.max_restarts
 
@@ -521,10 +515,7 @@ def create_sandbox(
         If strategy is not "subprocess" (others not yet implemented)
     """
     if strategy != "subprocess":
-        raise ValueError(
-            f"Only 'subprocess' strategy is implemented, got: {strategy}"
-        )
+        raise ValueError(f"Only 'subprocess' strategy is implemented, got: {strategy}")
 
     config = SandboxConfig(strategy=strategy, timeout_ms=timeout_ms, **kwargs)
     return Sandbox(config=config)
-

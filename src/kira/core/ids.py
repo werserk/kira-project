@@ -113,6 +113,7 @@ def generate_entity_id(
     # Get timezone
     if tz is None:
         from .time import get_default_timezone
+
         tz_obj = get_default_timezone()
     elif isinstance(tz, str):
         tz_obj = ZoneInfo(tz)
@@ -234,8 +235,28 @@ def validate_entity_id(entity_id: str) -> str:
     return str(parsed)
 
 
+def _is_valid_entity_type_format(entity_type: str) -> bool:
+    """Check if entity type format is valid.
+
+    Parameters
+    ----------
+    entity_type
+        Entity type to check
+
+    Returns
+    -------
+    bool
+        True if format is valid
+    """
+    if not entity_type:
+        return False
+
+    # Must be lowercase letters/numbers, 2-20 chars
+    return bool(re.match(r"^[a-z][a-z0-9]{1,19}$", entity_type))
+
+
 def _is_valid_entity_type(entity_type: str) -> bool:
-    """Check if entity type is valid.
+    """Check if entity type is valid (both format and registered).
 
     Parameters
     ----------
@@ -250,8 +271,11 @@ def _is_valid_entity_type(entity_type: str) -> bool:
     if not entity_type:
         return False
 
-    # Must be lowercase letters/numbers, 2-20 chars
-    return bool(re.match(r"^[a-z][a-z0-9]{1,19}$", entity_type))
+    # Must be in known entity types and match format
+    if entity_type not in KNOWN_ENTITY_TYPES:
+        return False
+
+    return _is_valid_entity_type_format(entity_type)
 
 
 def _slugify(text: str) -> str:
@@ -351,7 +375,7 @@ def register_entity_type(entity_type: str) -> None:
     ValueError
         If entity type is invalid
     """
-    if not _is_valid_entity_type(entity_type):
+    if not _is_valid_entity_type_format(entity_type):
         raise ValueError(f"Invalid entity type: {entity_type}")
 
     KNOWN_ENTITY_TYPES.add(entity_type)

@@ -88,9 +88,7 @@ class ConfirmationRequest:
             Telegram inline keyboard markup
         """
         return {
-            "inline_keyboard": [
-                [{"text": opt["text"], "callback_data": opt["callback_data"]} for opt in self.options]
-            ]
+            "inline_keyboard": [[{"text": opt["text"], "callback_data": opt["callback_data"]} for opt in self.options]]
         }
 
 
@@ -949,7 +947,9 @@ class TelegramAdapter:
             self.config.csrf_secret.encode("utf-8"),
             message.encode("utf-8"),
             hashlib.sha256,
-        ).hexdigest()[:16]  # Use first 16 chars to keep callback data short
+        ).hexdigest()[
+            :16
+        ]  # Use first 16 chars to keep callback data short
         return signature
 
     def _verify_csrf_token(self, request_id: str, callback_data: str, signature: str) -> bool:
@@ -1187,6 +1187,7 @@ class BriefingScheduler:
             return False
         try:
             from datetime import date
+
             due_date = datetime.fromisoformat(due.replace("Z", "+00:00")).date()
             return due_date == date.today()
         except Exception:
@@ -1199,6 +1200,7 @@ class BriefingScheduler:
             return False
         try:
             from datetime import date
+
             start_date = datetime.fromisoformat(start.replace("Z", "+00:00")).date()
             return start_date == date.today()
         except Exception:
@@ -1211,6 +1213,7 @@ class BriefingScheduler:
             return False
         try:
             from datetime import date, timedelta
+
             due_date = datetime.fromisoformat(due.replace("Z", "+00:00")).date()
             today = date.today()
             week_end = today + timedelta(days=7)
@@ -1230,6 +1233,7 @@ class BriefingScheduler:
 
         try:
             from datetime import date, timedelta
+
             if isinstance(completed_at, str):
                 completed_date = datetime.fromisoformat(completed_at.replace("Z", "+00:00")).date()
             else:
@@ -1289,4 +1293,3 @@ def create_telegram_adapter(
     config = TelegramAdapterConfig(bot_token=bot_token, **config_kwargs)
 
     return TelegramAdapter(config, event_bus=event_bus, scheduler=scheduler, logger=logger)
-

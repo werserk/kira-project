@@ -7,7 +7,6 @@ and create folder contracts.
 from __future__ import annotations
 
 import json
-import shutil
 from pathlib import Path
 from typing import Any
 
@@ -18,6 +17,7 @@ __all__ = [
     "init_vault",
     "install_schemas",
     "verify_vault_structure",
+    "get_vault_info",
 ]
 
 
@@ -47,9 +47,7 @@ def init_vault(vault_path: Path | str, *, force: bool = False) -> None:
     # Check if Vault exists
     if vault_path.exists() and not force:
         if any(vault_path.iterdir()):
-            raise VaultInitError(
-                f"Vault directory is not empty: {vault_path}. Use force=True to overwrite."
-            )
+            raise VaultInitError(f"Vault directory is not empty: {vault_path}. Use force=True to overwrite.")
 
     try:
         # Create directory structure
@@ -150,27 +148,114 @@ def _install_folder_contracts(vault_path: Path) -> None:
     vault_path
         Vault root directory
     """
-    # Get the project root to find contract templates
-    project_root = Path(__file__).parent.parent.parent.parent
-    contracts_source = project_root / "vault"
-
     contracts = {
-        "tasks": "tasks/README.md",
-        "notes": "notes/README.md",
-        "projects": "projects/README.md",
-        "inbox": "inbox/README.md",
-        "processed": "processed/README.md",
-        ".kira": ".kira/README.md",
+        "tasks": """# Tasks Folder
+
+This folder contains task entities with the following structure:
+
+## Required Frontmatter
+- `id`: Unique task identifier (e.g., `task-20250108-1234-my-task`)
+- `title`: Task title
+- `status`: One of: todo, doing, review, done, blocked
+- `created`: ISO 8601 timestamp
+
+## Optional Frontmatter
+- `priority`: low, medium, high, urgent
+- `due_date`: ISO 8601 timestamp
+- `tags`: List of tags
+- `depends_on`: List of task IDs this task depends on
+- `relates_to`: List of related entity IDs
+
+## Folder Structure
+- `active/`: Currently active tasks
+- `completed/`: Finished tasks
+- `blocked/`: Tasks waiting on dependencies
+- `archived/`: Old completed tasks
+""",
+        "notes": """# Notes Folder
+
+This folder contains note entities for knowledge capture.
+
+## Required Frontmatter
+- `id`: Unique note identifier (e.g., `note-20250108-1234-my-note`)
+- `title`: Note title
+- `created`: ISO 8601 timestamp
+
+## Optional Frontmatter
+- `category`: Note category
+- `tags`: List of tags
+- `source`: Where this note came from
+- `relates_to`: List of related entity IDs
+
+## Folder Structure
+- `ideas/`: Ideas and brainstorming
+- `research/`: Research notes
+- `summaries/`: Summaries and reviews
+- `references/`: Reference material
+""",
+        "projects": """# Projects Folder
+
+This folder contains project entities.
+
+## Required Frontmatter
+- `id`: Unique project identifier (e.g., `project-20250108-my-project`)
+- `title`: Project title
+- `status`: One of: active, on_hold, completed, cancelled
+
+## Optional Frontmatter
+- `start_date`: ISO 8601 date
+- `end_date`: ISO 8601 date
+- `tags`: List of tags
+
+## Folder Structure
+- `active/`: Currently active projects
+- `archived/`: Completed or cancelled projects
+""",
+        "inbox": """# Inbox Folder
+
+This folder receives incoming items from external sources.
+
+## Purpose
+- Collects items from Telegram, email, etc.
+- Unprocessed raw content
+- Items are automatically classified and moved to appropriate folders
+
+## Processing
+Items in this folder are processed by the inbox pipeline and moved to:
+- Tasks folder (for actionable items)
+- Notes folder (for information)
+- Events folder (for calendar items)
+""",
+        "processed": """# Processed Folder
+
+This folder contains items that have been processed from the inbox.
+
+## Purpose
+- Archive of processed inbox items
+- Maintains history of what was ingested
+- Useful for troubleshooting and auditing
+
+## Structure
+Items are organized by date and source.
+""",
+        ".kira": """# .kira System Folder
+
+This folder contains Kira system files.
+
+## Contents
+- `schemas/`: JSON Schema definitions for entity types
+- `index/`: Search and link indices
+- `config/`: System configuration
+
+## Note
+Do not manually edit files in this folder unless you know what you're doing.
+""",
     }
 
-    for folder, contract_file in contracts.items():
-        source_file = contracts_source / contract_file
-        target_file = vault_path / contract_file
-
-        if source_file.exists():
-            # Copy contract file
-            target_file.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(source_file, target_file)
+    for folder, content in contracts.items():
+        target_file = vault_path / folder / "README.md"
+        target_file.parent.mkdir(parents=True, exist_ok=True)
+        target_file.write_text(content, encoding="utf-8")
 
 
 def _create_example_entities(vault_path: Path) -> None:

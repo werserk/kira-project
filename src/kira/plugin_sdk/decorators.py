@@ -100,9 +100,7 @@ def retry(max_attempts: int = 3, delay: float = 1.0) -> Callable[[Callable[P, R]
                 except Exception as exc:  # pragma: no cover - behaviour parity
                     last_exception = exc
                     if attempt < max_attempts - 1:
-                        print(
-                            f"🔄 Attempt {attempt + 1}/{max_attempts} failed, retrying in {delay}s"
-                        )
+                        print(f"🔄 Attempt {attempt + 1}/{max_attempts} failed, retrying in {delay}s")
                         time.sleep(delay)
                     else:
                         print("❌ All retry attempts exhausted")

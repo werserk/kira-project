@@ -99,9 +99,7 @@ class TestSDKSurfaceStability:
         }
 
         actual_exports = {name for name in dir(rpc) if not name.startswith("_")}
-        assert expected_exports.issubset(
-            actual_exports
-        ), f"Missing rpc exports: {expected_exports - actual_exports}"
+        assert expected_exports.issubset(actual_exports), f"Missing rpc exports: {expected_exports - actual_exports}"
 
     def test_types_module_has_expected_exports(self) -> None:
         """Test that types module exports expected types and protocols."""
@@ -116,9 +114,7 @@ class TestSDKSurfaceStability:
         }
 
         actual_exports = {name for name in dir(types) if not name.startswith("_")}
-        assert expected_exports.issubset(
-            actual_exports
-        ), f"Missing types exports: {expected_exports - actual_exports}"
+        assert expected_exports.issubset(actual_exports), f"Missing types exports: {expected_exports - actual_exports}"
 
     def test_plugin_context_signature_stability(self) -> None:
         """Test that PluginContext has stable signature."""

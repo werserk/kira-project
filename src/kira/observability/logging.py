@@ -36,7 +36,7 @@ LogLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
 @dataclass
 class LogEntry:
     """Structured log entry (Phase 5, Point 17).
-    
+
     Attributes
     ----------
     timestamp : str
@@ -58,7 +58,7 @@ class LogEntry:
     metadata : dict[str, Any]
         Additional structured data
     """
-    
+
     timestamp: str
     level: str
     event_type: str
@@ -68,10 +68,10 @@ class LogEntry:
     event_id: str | None = None
     source: str | None = None
     metadata: dict[str, Any] = field(default_factory=dict)
-    
+
     def to_json(self) -> str:
         """Convert to JSON string.
-        
+
         Returns
         -------
         str
@@ -83,13 +83,13 @@ class LogEntry:
 
 class StructuredLogger:
     """Structured logger with correlation support (Phase 5, Point 17).
-    
+
     Logs events with correlation IDs (event_id/uid) for tracing.
     All logs are structured JSON for easy parsing and analysis.
-    
+
     DoD: Reconstruct full processing chain from logs.
     """
-    
+
     def __init__(
         self,
         name: str,
@@ -98,7 +98,7 @@ class StructuredLogger:
         level: str = "INFO",
     ) -> None:
         """Initialize structured logger.
-        
+
         Parameters
         ----------
         name
@@ -111,23 +111,23 @@ class StructuredLogger:
         self.name = name
         self.log_file = log_file
         self.level = level.upper()
-        
+
         # Set up Python logger
         self._logger = logging.getLogger(name)
         self._logger.setLevel(getattr(logging, self.level))
-        
+
         # Console handler (JSON)
         console_handler = logging.StreamHandler(sys.stdout)
         console_handler.setFormatter(logging.Formatter("%(message)s"))
         self._logger.addHandler(console_handler)
-        
+
         # File handler (JSON)
         if log_file:
             log_file.parent.mkdir(parents=True, exist_ok=True)
             file_handler = logging.FileHandler(log_file)
             file_handler.setFormatter(logging.Formatter("%(message)s"))
             self._logger.addHandler(file_handler)
-    
+
     def log(
         self,
         level: str,
@@ -141,7 +141,7 @@ class StructuredLogger:
         metadata: dict[str, Any] | None = None,
     ) -> None:
         """Log structured entry (Phase 5, Point 17).
-        
+
         Parameters
         ----------
         level
@@ -172,30 +172,30 @@ class StructuredLogger:
             source=source,
             metadata=metadata or {},
         )
-        
+
         # Log as JSON
         log_json = entry.to_json()
-        
+
         # Use appropriate log level
         log_method = getattr(self._logger, level.lower(), self._logger.info)
         log_method(log_json)
-    
+
     def debug(self, event_type: str, message: str, **kwargs) -> None:
         """Log DEBUG entry."""
         self.log("DEBUG", event_type, message, **kwargs)
-    
+
     def info(self, event_type: str, message: str, **kwargs) -> None:
         """Log INFO entry."""
         self.log("INFO", event_type, message, **kwargs)
-    
+
     def warning(self, event_type: str, message: str, **kwargs) -> None:
         """Log WARNING entry."""
         self.log("WARNING", event_type, message, **kwargs)
-    
+
     def error(self, event_type: str, message: str, **kwargs) -> None:
         """Log ERROR entry."""
         self.log("ERROR", event_type, message, **kwargs)
-    
+
     def critical(self, event_type: str, message: str, **kwargs) -> None:
         """Log CRITICAL entry."""
         self.log("CRITICAL", event_type, message, **kwargs)
@@ -212,7 +212,7 @@ def create_logger(
     level: str = "INFO",
 ) -> StructuredLogger:
     """Create structured logger.
-    
+
     Parameters
     ----------
     name
@@ -221,7 +221,7 @@ def create_logger(
         Optional log file path
     level
         Minimum log level
-        
+
     Returns
     -------
     StructuredLogger
@@ -249,7 +249,7 @@ def log_ingress(
     metadata: dict[str, Any] | None = None,
 ) -> None:
     """Log ingress event (Phase 5, Point 17).
-    
+
     Parameters
     ----------
     source
@@ -279,7 +279,7 @@ def log_validation_success(
     metadata: dict[str, Any] | None = None,
 ) -> None:
     """Log successful validation (Phase 5, Point 17).
-    
+
     Parameters
     ----------
     entity_id
@@ -307,7 +307,7 @@ def log_validation_failure(
     metadata: dict[str, Any] | None = None,
 ) -> None:
     """Log validation failure (Phase 5, Point 17).
-    
+
     Parameters
     ----------
     entity_id
@@ -337,7 +337,7 @@ def log_upsert(
     metadata: dict[str, Any] | None = None,
 ) -> None:
     """Log entity upsert (Phase 5, Point 17).
-    
+
     Parameters
     ----------
     entity_id
@@ -367,7 +367,7 @@ def log_conflict(
     metadata: dict[str, Any] | None = None,
 ) -> None:
     """Log conflict detection and resolution (Phase 5, Point 17).
-    
+
     Parameters
     ----------
     entity_id
@@ -397,7 +397,7 @@ def log_quarantine(
     metadata: dict[str, Any] | None = None,
 ) -> None:
     """Log entity quarantined (Phase 5, Point 17).
-    
+
     Parameters
     ----------
     entity_id
@@ -417,4 +417,3 @@ def log_quarantine(
         correlation_id=entity_id,
         metadata=metadata or {"reason": reason, "quarantine_path": str(quarantine_path)},
     )
-

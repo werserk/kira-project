@@ -22,7 +22,7 @@ def test_ingress_result_boolean_conversion():
         source="test",
     )
     assert bool(valid_result) is True
-    
+
     invalid_result = IngressResult(
         valid=False,
         normalized_payload=None,
@@ -43,7 +43,7 @@ def test_ingress_validator_initialization():
 def test_validate_and_normalize_telegram():
     """Test validation and normalization of Telegram payload."""
     validator = IngressValidator()
-    
+
     payload = {
         "message": {
             "message_id": 123,
@@ -56,9 +56,9 @@ def test_validate_and_normalize_telegram():
             },
         },
     }
-    
+
     result = validator.validate_and_normalize("telegram", payload)
-    
+
     assert result.valid is True
     assert result.source == "telegram"
     assert result.normalized_payload["text"] == "Hello"
@@ -69,7 +69,7 @@ def test_validate_and_normalize_telegram():
 def test_validate_and_normalize_gcal():
     """Test validation and normalization of GCal payload."""
     validator = IngressValidator()
-    
+
     payload = {
         "id": "event-123",
         "summary": "Team Meeting",
@@ -82,9 +82,9 @@ def test_validate_and_normalize_gcal():
             {"email": "bob@example.com"},
         ],
     }
-    
+
     result = validator.validate_and_normalize("gcal", payload)
-    
+
     assert result.valid is True
     assert result.source == "gcal"
     assert result.normalized_payload["title"] == "Team Meeting"
@@ -95,15 +95,15 @@ def test_validate_and_normalize_gcal():
 def test_validate_and_normalize_cli():
     """Test validation and normalization of CLI payload."""
     validator = IngressValidator()
-    
+
     payload = {
         "command": "create-task",
         "args": ["Test Task"],
         "timestamp": "2025-10-08T12:00:00Z",
     }
-    
+
     result = validator.validate_and_normalize("cli", payload)
-    
+
     assert result.valid is True
     assert result.source == "cli"
     assert result.normalized_payload["source"] == "cli"
@@ -113,9 +113,9 @@ def test_validate_and_normalize_cli():
 def test_validate_and_normalize_rejects_invalid_type():
     """Test validation rejects non-dict payload."""
     validator = IngressValidator()
-    
+
     result = validator.validate_and_normalize("test", "not a dict")
-    
+
     assert result.valid is False
     assert len(result.errors) > 0
     assert "must be dict" in result.errors[0].lower()
@@ -124,11 +124,11 @@ def test_validate_and_normalize_rejects_invalid_type():
 def test_validate_and_normalize_generic_missing_type():
     """Test generic validation rejects payload without type."""
     validator = IngressValidator()
-    
+
     payload = {"data": "value"}  # Missing 'type'
-    
+
     result = validator.validate_and_normalize("custom", payload)
-    
+
     assert result.valid is False
     assert any("type" in err.lower() for err in result.errors)
 
@@ -136,11 +136,11 @@ def test_validate_and_normalize_generic_missing_type():
 def test_validate_and_normalize_generic_valid():
     """Test generic validation accepts valid payload."""
     validator = IngressValidator()
-    
+
     payload = {"type": "custom.event", "data": "value"}
-    
+
     result = validator.validate_and_normalize("custom", payload)
-    
+
     assert result.valid is True
     assert result.normalized_payload["type"] == "custom.event"
     assert result.normalized_payload["source"] == "custom"
@@ -149,11 +149,11 @@ def test_validate_and_normalize_generic_valid():
 def test_validator_tracks_acceptance_count():
     """Test validator tracks accepted payloads."""
     validator = IngressValidator()
-    
+
     for i in range(3):
         payload = {"type": "test", "id": i}
         validator.validate_and_normalize("custom", payload)
-    
+
     stats = validator.get_stats()
     assert stats["accepted"] == 3
     assert stats["rejected"] == 0
@@ -162,15 +162,15 @@ def test_validator_tracks_acceptance_count():
 def test_validator_tracks_rejection_count():
     """Test validator tracks rejected payloads."""
     validator = IngressValidator()
-    
+
     # Accept some
     validator.validate_and_normalize("custom", {"type": "test"})
     validator.validate_and_normalize("custom", {"type": "test"})
-    
+
     # Reject some
     validator.validate_and_normalize("test", "not a dict")
     validator.validate_and_normalize("test", "also not a dict")
-    
+
     stats = validator.get_stats()
     assert stats["accepted"] == 2
     assert stats["rejected"] == 2
@@ -192,9 +192,9 @@ def test_normalize_telegram_payload():
             },
         },
     }
-    
+
     normalized = normalize_telegram_payload(payload)
-    
+
     assert normalized["source"] == "telegram"
     assert normalized["type"] == "message"
     assert normalized["text"] == "Test message"
@@ -207,9 +207,9 @@ def test_normalize_telegram_payload():
 def test_normalize_telegram_payload_missing_fields():
     """Test Telegram normalization handles missing fields."""
     payload = {}
-    
+
     normalized = normalize_telegram_payload(payload)
-    
+
     assert normalized["source"] == "telegram"
     assert normalized["type"] == "message"
     assert normalized["text"] == ""
@@ -229,9 +229,9 @@ def test_normalize_gcal_payload():
             {"email": "bob@example.com"},
         ],
     }
-    
+
     normalized = normalize_gcal_payload(payload)
-    
+
     assert normalized["source"] == "gcal"
     assert normalized["type"] == "event"
     assert normalized["title"] == "Meeting"
@@ -251,9 +251,9 @@ def test_normalize_gcal_payload_all_day_event():
         "start": {"date": "2025-10-08"},
         "end": {"date": "2025-10-09"},
     }
-    
+
     normalized = normalize_gcal_payload(payload)
-    
+
     assert normalized["start_time"] == "2025-10-08"
     assert normalized["end_time"] == "2025-10-09"
 
@@ -265,9 +265,9 @@ def test_normalize_cli_payload():
         "args": ["task", "Test"],
         "timestamp": "2025-10-08T12:00:00Z",
     }
-    
+
     normalized = normalize_cli_payload(payload)
-    
+
     assert normalized["source"] == "cli"
     assert normalized["type"] == "cli.add"
     assert normalized["command"] == "add"
@@ -277,9 +277,9 @@ def test_normalize_cli_payload():
 def test_normalize_cli_payload_no_command():
     """Test CLI normalization handles missing command."""
     payload = {"data": "value"}
-    
+
     normalized = normalize_cli_payload(payload)
-    
+
     assert normalized["source"] == "cli"
     assert normalized["type"] == "cli.unknown"
 
@@ -288,9 +288,9 @@ def test_validate_shape_valid():
     """Test shape validation with valid payload."""
     payload = {"id": "123", "title": "Test", "status": "active"}
     required = ["id", "title", "status"]
-    
+
     errors = validate_shape(payload, required)
-    
+
     assert len(errors) == 0
 
 
@@ -298,9 +298,9 @@ def test_validate_shape_missing_fields():
     """Test shape validation catches missing fields."""
     payload = {"id": "123"}
     required = ["id", "title", "status"]
-    
+
     errors = validate_shape(payload, required)
-    
+
     assert len(errors) == 2
     assert any("title" in err for err in errors)
     assert any("status" in err for err in errors)
@@ -310,9 +310,9 @@ def test_validate_shape_null_fields():
     """Test shape validation catches null fields."""
     payload = {"id": "123", "title": None}
     required = ["id", "title"]
-    
+
     errors = validate_shape(payload, required)
-    
+
     assert len(errors) == 1
     assert "title" in errors[0]
     assert "null" in errors[0].lower()
@@ -332,9 +332,9 @@ def test_validate_types_valid():
         "active": bool,
         "tags": list,
     }
-    
+
     errors = validate_types(payload, type_specs)
-    
+
     assert len(errors) == 0
 
 
@@ -348,9 +348,9 @@ def test_validate_types_wrong_type():
         "id": str,
         "count": int,
     }
-    
+
     errors = validate_types(payload, type_specs)
-    
+
     assert len(errors) == 2
     assert any("id" in err and "str" in err for err in errors)
     assert any("count" in err and "int" in err for err in errors)
@@ -360,9 +360,9 @@ def test_validate_types_ignores_none():
     """Test type validation ignores None values."""
     payload = {"id": None, "count": 42}
     type_specs = {"id": str, "count": int}
-    
+
     errors = validate_types(payload, type_specs)
-    
+
     # None is allowed
     assert len(errors) == 0
 
@@ -371,30 +371,29 @@ def test_validate_types_ignores_missing_fields():
     """Test type validation ignores missing fields."""
     payload = {"count": 42}
     type_specs = {"id": str, "count": int}
-    
+
     errors = validate_types(payload, type_specs)
-    
+
     # Missing fields are not type errors
     assert len(errors) == 0
 
 
 def test_dod_invalid_ingress_never_reaches_consumers():
     """Test DoD: Invalid ingress never reaches consumers.
-    
+
     Demonstrated by rejected payloads returning valid=False,
     which prevents publishing to event bus.
     """
     validator = IngressValidator()
-    
+
     # Invalid payload
     result = validator.validate_and_normalize("test", "not a dict")
-    
+
     # Should be rejected
     assert result.valid is False
     assert result.normalized_payload is None
-    
+
     # In practice, adapter would check result.valid before publishing:
     if result.valid:
         # This code path would NOT be reached for invalid payload
         pytest.fail("Invalid payload should not reach this point")
-
