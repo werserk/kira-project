@@ -114,10 +114,9 @@ class Settings:
         # Validate required fields (Phase 5, Point 18: clear error messages)
         if not self.vault_path:
             raise ConfigError(
-                "KIRA_VAULT_PATH is required. "
-                "Set it in .env or environment (e.g., KIRA_VAULT_PATH=vault)"
+                "KIRA_VAULT_PATH is required. " "Set it in .env or environment (e.g., KIRA_VAULT_PATH=vault)"
             )
-        
+
         # Validate feature flag dependencies (Phase 5, Point 18)
         if self.gcal_enabled:
             if not self.gcal_calendar_id:
@@ -130,7 +129,7 @@ class Settings:
                     "KIRA_GCAL_CREDENTIALS_FILE is required when KIRA_GCAL_ENABLED=true. "
                     "Please provide path to GCal credentials JSON in .env"
                 )
-        
+
         if self.telegram_enabled:
             if not self.telegram_bot_token:
                 raise ConfigError(

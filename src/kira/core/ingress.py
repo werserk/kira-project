@@ -107,7 +107,7 @@ class IngressValidator:
     def _normalize_telegram(self, payload: dict[str, Any]) -> IngressResult:
         """Normalize Telegram payload."""
         normalized = normalize_telegram_payload(payload)
-        
+
         # Phase 5, Point 17: Log ingress
         if normalized.get("external_id"):
             log_ingress(
@@ -116,7 +116,7 @@ class IngressValidator:
                 message=f"Telegram message ingress: {normalized.get('text', '')[:50]}",
                 metadata={"user_id": normalized.get("user_id"), "message_id": normalized.get("message_id")},
             )
-        
+
         return IngressResult(
             valid=True,
             normalized_payload=normalized,
@@ -127,7 +127,7 @@ class IngressValidator:
     def _normalize_gcal(self, payload: dict[str, Any]) -> IngressResult:
         """Normalize Google Calendar payload."""
         normalized = normalize_gcal_payload(payload)
-        
+
         # Phase 5, Point 17: Log ingress
         if normalized.get("external_id"):
             log_ingress(
@@ -136,7 +136,7 @@ class IngressValidator:
                 message=f"GCal event ingress: {normalized.get('title', '')[:50]}",
                 metadata={"start_time": normalized.get("start_time"), "end_time": normalized.get("end_time")},
             )
-        
+
         return IngressResult(
             valid=True,
             normalized_payload=normalized,
@@ -147,7 +147,7 @@ class IngressValidator:
     def _normalize_cli(self, payload: dict[str, Any]) -> IngressResult:
         """Normalize CLI payload."""
         normalized = normalize_cli_payload(payload)
-        
+
         # Phase 5, Point 17: Log ingress
         if normalized.get("external_id"):
             log_ingress(
@@ -156,7 +156,7 @@ class IngressValidator:
                 message=f"CLI command ingress: {normalized.get('type', '')}",
                 metadata={"command": normalized.get("command"), "trace_id": normalized.get("trace_id")},
             )
-        
+
         return IngressResult(
             valid=True,
             normalized_payload=normalized,

@@ -59,7 +59,7 @@ def test_settings_with_string_path():
 
 def test_settings_validation_missing_vault_path():
     """Test DoD: Missing config produces clear errors."""
-    with pytest.raises(ConfigError, match="vault_path is required"):
+    with pytest.raises(ConfigError, match="KIRA_VAULT_PATH is required"):
         Settings(vault_path=None)
 
 
@@ -124,12 +124,17 @@ def test_settings_from_env():
     """Test DoD: Fresh checkout boots with single .env."""
     with tempfile.TemporaryDirectory() as tmpdir:
         env_file = Path(tmpdir) / ".env"
+        # Create dummy credentials file for test
+        creds_file = Path(tmpdir) / "gcal-creds.json"
+        creds_file.write_text("{}")
+        
         env_file.write_text(
-            """
+            f"""
 KIRA_VAULT_PATH=/test/vault
 KIRA_DEFAULT_TZ=UTC
 KIRA_GCAL_ENABLED=true
 KIRA_GCAL_CALENDAR_ID=test-calendar@group.calendar.google.com
+KIRA_GCAL_CREDENTIALS_FILE={creds_file}
 KIRA_SANDBOX_MAX_CPU=60.0
 KIRA_LOG_LEVEL=DEBUG
 """
@@ -361,10 +366,16 @@ def test_boolean_parsing():
     """Test boolean value parsing from strings."""
     with tempfile.TemporaryDirectory() as tmpdir:
         env_file = Path(tmpdir) / ".env"
+        # Create dummy credentials file for test
+        creds_file = Path(tmpdir) / "gcal-creds.json"
+        creds_file.write_text("{}")
+        
         env_file.write_text(
-            """
+            f"""
 KIRA_VAULT_PATH=/test
 KIRA_GCAL_ENABLED=true
+KIRA_GCAL_CALENDAR_ID=test@example.com
+KIRA_GCAL_CREDENTIALS_FILE={creds_file}
 KIRA_TELEGRAM_ENABLED=false
 KIRA_SANDBOX_ALLOW_NETWORK=True
 """
