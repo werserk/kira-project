@@ -16,26 +16,35 @@ from .kira_inbox import cli as inbox_cli
 from .kira_plugin_template import cli as plugin_cli
 from .kira_rollup import cli as rollup_cli
 from .kira_schedule import cli as schedule_cli
+from .kira_search import cli as search_cli
+from .kira_task import cli as task_cli
+from .kira_today import cli as today_cli
 from .kira_vault import cli as vault_cli
 
 CONTEXT_SETTINGS = {"help_option_names": ["-h", "--help"]}
 EPILOG = """
 Примеры использования:
-  kira inbox                    # Запустить inbox-конвейер
+  # Личный ассистент
+  kira today                   # Что нужно сделать сегодня
+  kira task list               # Список задач
+  kira task add "Купить молоко"  # Быстро создать задачу
+  kira task start <id>         # Начать работу над задачей
+  kira task done <id>          # Завершить задачу
+  kira search "отчет"          # Поиск по Vault
+  
+  # Работа с данными
+  kira inbox                   # Запустить inbox-конвейер
   kira calendar pull           # Синхронизировать календарь (pull)
   kira calendar push           # Синхронизировать календарь (push)
   kira schedule view --today   # Показать расписание на сегодня
   kira schedule conflicts      # Найти конфликты в расписании
-  kira schedule quick "Meeting tomorrow at 14:00"  # Быстро создать событие
   kira rollup daily            # Создать дневной rollup
-  kira rollup weekly           # Создать недельный rollup
-  kira vault init             # Инициализировать Vault
+  
+  # Управление
+  kira vault init              # Инициализировать Vault
   kira vault new --type task --title "My Task"  # Создать entity
-  kira ext list               # Показать список расширений
-  kira ext install <name>     # Установить расширение
-  kira ext enable <name>      # Включить расширение
-  kira ext disable <name>     # Отключить расширение
-  kira validate               # Валидация Vault
+  kira ext list                # Показать список расширений
+  kira validate                # Валидация Vault
 """.strip()
 
 
@@ -81,6 +90,9 @@ def validate_vault() -> int:
 
 
 # Подключаем подкоманды
+cli.add_command(today_cli, "today")
+cli.add_command(task_cli, "task")
+cli.add_command(search_cli, "search")
 cli.add_command(inbox_cli, "inbox")
 cli.add_command(calendar_cli, "calendar")
 cli.add_command(schedule_cli, "schedule")
