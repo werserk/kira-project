@@ -17,6 +17,7 @@ from .kira_diag import diag_command
 from .kira_ext import cli as ext_cli
 from .kira_inbox import cli as inbox_cli
 from .kira_links import cli as links_cli
+from .kira_migrate import cli as migrate_cli
 from .kira_note import cli as note_cli
 from .kira_plugin_template import cli as plugin_cli
 from .kira_project import cli as project_cli
@@ -51,6 +52,8 @@ EPILOG = """
   # Управление
   kira vault init              # Инициализировать Vault
   kira vault new --type task --title "My Task"  # Создать entity
+  kira migrate run --dry-run   # Preview migration changes (Phase 4)
+  kira migrate run             # Migrate vault to new schema (Phase 4)
   kira ext list                # Показать список расширений
   kira validate                # Валидация Vault
 """.strip()
@@ -116,6 +119,7 @@ cli.add_command(ext_cli, "ext")
 cli.add_command(plugin_cli, "plugin")
 cli.add_command(vault_cli, "vault")
 cli.add_command(backup_cli, "backup")
+cli.add_command(migrate_cli, "migrate")
 cli.add_command(diag_command, "diag")
 
 
