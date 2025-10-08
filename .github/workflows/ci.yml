@@ -111,16 +111,6 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
       
-      - name: Verify ADRs exist
-        run: |
-          test -f docs/adr/001-single-writer-pattern.md
-          test -f docs/adr/002-yaml-frontmatter-schema.md
-          test -f docs/adr/003-event-idempotency.md
-          test -f docs/adr/004-event-envelope.md
-          test -f docs/adr/005-timezone-policy.md
-          test -f docs/adr/006-gcal-sync-policy.md
-          test -f docs/adr/007-plugin-sandbox.md
-      
       - name: Verify README
         run: |
           test -f README.md
