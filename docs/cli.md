@@ -1,390 +1,655 @@
-# CLI Kira
+# Kira CLI Documentation
 
-## Обзор
+## Overview
 
-Kira предоставляет мощный командный интерфейс для управления системой через терминал. CLI поддерживает все основные операции: обработку inbox, синхронизацию календаря, создание отчетов и управление расширениями.
+The Kira CLI provides a unified command-line interface for all Kira operations. All commands are invoked through the `kira` entry point and follow consistent patterns for flags, output, and error handling.
 
-## Установка и настройка
+**Related ADRs:** ADR-010  
+**Status:** Stable
 
-### Быстрый старт
+## Installation
 
-```bash
-# Клонируйте репозиторий
-git clone <repository-url>
-cd kira-project
-
-# Сделайте скрипт исполняемым
-chmod +x kira
-
-# Запустите команду
-./kira --help
-```
-
-### Использование через Makefile
+The CLI is available after installing Kira:
 
 ```bash
-# Показать все доступные команды
-make help
+# From project root
+pip install -e .
 
-# Запустить inbox-конвейер
-make inbox
+# Or using Poetry
+poetry install
 
-# Синхронизировать календарь
-make calendar-pull
-make calendar-push
-
-# Создать отчеты
-make rollup-daily
-make rollup-weekly
-
-# Управление расширениями
-make ext-list
+# Verify installation
+kira --help
 ```
 
-## Основные команды
-
-### 1. Inbox - обработка входящих элементов
+## General Usage
 
 ```bash
-# Базовая обработка
-./kira inbox
-
-# Подробный вывод
-./kira inbox --verbose
-
-# Режим dry-run (показать что будет обработано)
-./kira inbox --dry-run --verbose
+kira [COMMAND] [SUBCOMMAND] [OPTIONS]
 ```
 
-**Опции:**
-- `--verbose, -v` - подробный вывод
-- `--dry-run` - показать что будет обработано без выполнения
-- `--config` - путь к файлу конфигурации
+### Global Flags
 
-### 2. Calendar - работа с календарем
+Available for all commands:
+
+- `--verbose, -v` - Enable verbose output
+- `--help, -h` - Show help message
+- `--version` - Show Kira version
+
+## Commands
+
+### 1. `kira inbox`
+
+Process items from the inbox folder.
+
+**Synopsis:**
 
 ```bash
-# Синхронизация (получение данных)
-./kira calendar pull
-
-# Синхронизация (отправка данных)
-./kira calendar push
-
-# Синхронизация конкретного календаря
-./kira calendar pull --calendar work
-
-# Синхронизация за определенный период
-./kira calendar pull --days 7
-
-# Dry-run для отправки
-./kira calendar push --dry-run --verbose
+kira inbox [OPTIONS]
 ```
 
-**Опции pull:**
-- `--calendar` - конкретный календарь
-- `--days` - количество дней (по умолчанию: 30)
-- `--verbose, -v` - подробный вывод
+**Options:**
 
-**Опции push:**
-- `--calendar` - конкретный календарь
-- `--dry-run` - показать что будет отправлено
-- `--verbose, -v` - подробный вывод
+- `--vault PATH` - Path to vault (default: from config)
+- `--dry-run` - Preview without making changes
+- `--max-items N` - Limit items to process (default: 100)
+- `--verbose` - Show detailed processing logs
 
-### 3. Rollup - создание отчетов
+**Examples:**
 
 ```bash
-# Дневной отчет
-./kira rollup daily
+# Process inbox with default settings
+kira inbox
 
-# Недельный отчет
-./kira rollup weekly
+# Dry run to preview what would be processed
+kira inbox --dry-run --verbose
 
-# Отчет за конкретную дату
-./kira rollup daily --date 2024-01-15
+# Process only first 10 items
+kira inbox --max-items 10
 
-# Отчет за конкретную неделю
-./kira rollup weekly --week 2024-W03
-
-# Сохранение в файл
-./kira rollup daily --output daily-report.md
+# Use custom vault path
+kira inbox --vault /path/to/vault
 ```
 
-**Опции:**
-- `--date` - дата для дневного отчета (YYYY-MM-DD)
-- `--week` - неделя для недельного отчета (YYYY-WW)
-- `--output` - путь для сохранения отчета
-- `--verbose, -v` - подробный вывод
+**Output:**
 
-### 4. Code - работа с кодом
+```
+📥 Processing inbox...
+✅ Scanned: 5 items
+✅ Processed: 5 items
+✅ Failed: 0 items
+⏱️  Duration: 1.2s
+```
+
+### 2. `kira calendar`
+
+Synchronize calendar events with Google Calendar.
+
+**Synopsis:**
 
 ```bash
-# Анализ кода
-./kira code analyze
-
-# Индексация для поиска
-./kira code index
-
-# Поиск в коде
-./kira code search "function_name"
-
-# Поиск по типу
-./kira code search "class" --type class
-
-# Ограничение результатов
-./kira code search "test" --limit 10
+kira calendar {pull|push} [OPTIONS]
 ```
 
-**Опции analyze:**
-- `--path` - путь для анализа
-- `--output` - файл для сохранения результатов
-- `--verbose, -v` - подробный вывод
+**Subcommands:**
 
-**Опции index:**
-- `--rebuild` - пересоздать индекс с нуля
-- `--verbose, -v` - подробный вывод
+- `pull` - Pull events from Google Calendar to Vault
+- `push` - Push events from Vault to Google Calendar
 
-**Опции search:**
-- `query` - поисковый запрос
-- `--type` - тип поиска (function, class, variable, comment, all)
-- `--limit` - максимальное количество результатов
-- `--verbose, -v` - подробный вывод
+**Options:**
 
-### 5. Ext - управление расширениями
+- `--calendar-id ID` - Google Calendar ID (default: primary)
+- `--days N` - Number of days to sync (default: 30)
+- `--dry-run` - Preview without making changes
+- `--verbose` - Show detailed sync logs
+
+**Examples:**
 
 ```bash
-# Список всех расширений
-./kira ext list
+# Pull events from Google Calendar
+kira calendar pull
 
-# Список только плагинов
-./kira ext list --type plugins
+# Pull next 7 days
+kira calendar pull --days 7
 
-# Список только включенных
-./kira ext list --status enabled
+# Push events to Google Calendar
+kira calendar push
 
-# Информация о расширении
-./kira ext info kira-calendar
+# Dry run push
+kira calendar push --dry-run --verbose
 
-# Включить расширение
-./kira ext enable kira-calendar
-
-# Отключить расширение
-./kira ext disable kira-calendar
-
-# Установить расширение
-./kira ext install kira-new-plugin
+# Use specific calendar
+kira calendar pull --calendar-id work@example.com
 ```
 
-**Опции list:**
-- `--type` - тип расширений (plugins, adapters, all)
-- `--status` - статус (enabled, disabled, all)
-- `--verbose, -v` - подробный вывод
+**Output:**
 
-**Опции install:**
-- `name` - имя расширения
-- `--source` - источник установки
-- `--verbose, -v` - подробный вывод
+```
+📅 Pulling events from Google Calendar...
+✅ Fetched: 15 events
+✅ Created: 3 new entities
+✅ Updated: 2 existing entities
+✅ Skipped: 10 unchanged
+⏱️  Duration: 2.5s
+```
 
-## Конфигурация
+### 3. `kira rollup`
 
-CLI использует файл `kira.yaml` для конфигурации. Основные настройки:
+Generate daily or weekly rollup reports.
+
+**Synopsis:**
+
+```bash
+kira rollup {daily|weekly} [OPTIONS]
+```
+
+**Subcommands:**
+
+- `daily` - Generate daily rollup
+- `weekly` - Generate weekly rollup
+
+**Options:**
+
+- `--date DATE` - Date for rollup (default: today, format: YYYY-MM-DD)
+- `--week WEEK` - Week number for weekly rollup (format: YYYY-Wnn)
+- `--output PATH` - Custom output path
+- `--verbose` - Show detailed generation logs
+
+**Examples:**
+
+```bash
+# Generate today's rollup
+kira rollup daily
+
+# Generate rollup for specific date
+kira rollup daily --date 2025-01-07
+
+# Generate this week's rollup
+kira rollup weekly
+
+# Generate specific week's rollup
+kira rollup weekly --week 2025-W01
+
+# Custom output location
+kira rollup daily --output /path/to/rollups/
+```
+
+**Output:**
+
+```
+📊 Generating daily rollup for 2025-01-07...
+✅ Tasks completed: 5
+✅ Events attended: 3
+✅ Notes created: 2
+✅ Rollup saved: vault/rollups/daily-20250107.md
+⏱️  Duration: 0.8s
+```
+
+### 4. `kira vault`
+
+Manage Vault structure and entities.
+
+**Synopsis:**
+
+```bash
+kira vault {init|validate|info|new|schemas} [OPTIONS]
+```
+
+**Subcommands:**
+
+- `init` - Initialize new Vault
+- `validate` - Validate Vault structure and entities
+- `info` - Show Vault statistics
+- `new` - Create new entity
+- `schemas` - Manage entity schemas
+
+**Options (varies by subcommand):**
+
+**init:**
+- `--path PATH` - Path for new vault (default: current directory)
+- `--template NAME` - Template to use (default: minimal)
+
+**validate:**
+- `--type TYPE` - Validate specific entity type only
+- `--fix` - Attempt to fix validation errors (with confirmation)
+
+**new:**
+- `--type TYPE` - Entity type (task, note, event, etc.)
+- `--title TITLE` - Entity title
+- `--template PATH` - Use custom template
+
+**schemas:**
+- `--list` - List available schemas
+- `--show TYPE` - Show schema for entity type
+- `--validate-schema PATH` - Validate schema file
+
+**Examples:**
+
+```bash
+# Initialize new Vault
+kira vault init --path /path/to/vault
+
+# Validate entire Vault
+kira vault validate --verbose
+
+# Validate only tasks
+kira vault validate --type task
+
+# Show Vault statistics
+kira vault info
+
+# Create new task
+kira vault new --type task --title "Fix bug in authentication"
+
+# Create new note
+kira vault new --type note --title "Meeting notes"
+
+# List available schemas
+kira vault schemas --list
+
+# Show task schema
+kira vault schemas --show task
+
+# Validate custom schema
+kira vault schemas --validate-schema /path/to/schema.json
+```
+
+**Output (info):**
+
+```
+📊 Vault Statistics
+
+Entities:
+  Tasks: 42
+  Notes: 18
+  Events: 25
+  Total: 85
+
+Status:
+  ✅ Valid: 83
+  ⚠️  Warnings: 2
+  ❌ Errors: 0
+
+Links:
+  Total: 156
+  Broken: 0
+  Orphaned entities: 3
+
+Last validated: 2025-01-07 14:30:00
+```
+
+### 5. `kira ext`
+
+Manage plugins and extensions.
+
+**Synopsis:**
+
+```bash
+kira ext {list|info|enable|disable|install} [OPTIONS]
+```
+
+**Subcommands:**
+
+- `list` - List all available plugins
+- `info` - Show plugin information
+- `enable` - Enable plugin
+- `disable` - Disable plugin
+- `install` - Install external plugin
+
+**Options:**
+
+- `NAME` - Plugin name (for info/enable/disable)
+- `--all` - Show all plugins including disabled (for list)
+- `--json` - Output in JSON format
+- `--verbose` - Show detailed information
+
+**Examples:**
+
+```bash
+# List enabled plugins
+kira ext list
+
+# List all plugins
+kira ext list --all
+
+# Show plugin information
+kira ext info kira-inbox
+
+# Enable plugin
+kira ext enable kira-calendar
+
+# Disable plugin
+kira ext disable kira-code
+
+# Install external plugin
+kira ext install /path/to/plugin/
+```
+
+**Output (list):**
+
+```
+📦 Installed Plugins
+
+kira-inbox v1.0.0 ✅ enabled
+  Normalizes incoming messages into typed entities
+
+kira-calendar v1.0.0 ✅ enabled
+  Synchronizes with Google Calendar
+
+kira-code v1.0.0 ⚪ disabled
+  Code analysis and indexing
+
+kira-deadlines v1.0.0 ✅ enabled
+  Deadline tracking and notifications
+
+Total: 4 plugins (3 enabled, 1 disabled)
+```
+
+### 6. `kira code`
+
+Code analysis and search (requires kira-code plugin).
+
+**Synopsis:**
+
+```bash
+kira code {analyze|index|search} [OPTIONS]
+```
+
+**Subcommands:**
+
+- `analyze` - Analyze code structure
+- `index` - Build code search index
+- `search` - Search code
+
+**Options:**
+
+- `--path PATH` - Path to analyze/index (default: current directory)
+- `QUERY` - Search query (for search)
+- `--lang LANGUAGE` - Filter by language
+- `--verbose` - Show detailed output
+
+**Examples:**
+
+```bash
+# Analyze code
+kira code analyze
+
+# Build search index
+kira code index --path /path/to/code
+
+# Search code
+kira code search "function_name"
+
+# Search Python only
+kira code search "class" --lang python
+```
+
+### 7. `kira diag`
+
+Diagnostics and troubleshooting.
+
+**Synopsis:**
+
+```bash
+kira diag {tail|status|logs} [OPTIONS]
+```
+
+**Subcommands:**
+
+- `tail` - Tail structured logs
+- `status` - Show system status
+- `logs` - Export logs for analysis
+
+**Options:**
+
+- `--component NAME` - Filter by component (core/adapter/plugin/pipeline)
+- `--trace-id ID` - Filter by trace ID
+- `--level LEVEL` - Filter by log level (debug/info/warning/error)
+- `--since DURATION` - Show logs since duration (e.g., "1h", "30m")
+- `--follow, -f` - Follow log output
+
+**Examples:**
+
+```bash
+# Tail all logs
+kira diag tail
+
+# Tail core component logs
+kira diag tail --component core
+
+# Follow logs in real-time
+kira diag tail --follow
+
+# Show logs for specific trace
+kira diag tail --trace-id abc-123-def
+
+# Show errors from last hour
+kira diag tail --level error --since 1h
+
+# Show system status
+kira diag status
+
+# Export logs
+kira diag logs --since 24h --output /tmp/kira-logs.jsonl
+```
+
+**Output (status):**
+
+```
+🔧 System Status
+
+Components:
+  ✅ Core: Running
+  ✅ Event Bus: Active (42 subscriptions)
+  ✅ Scheduler: Active (5 jobs)
+  ✅ Plugins: 3/4 active
+
+Recent Activity:
+  Events published: 156 (last hour)
+  Jobs executed: 12 (last hour)
+  Errors: 0 (last hour)
+
+Health: ✅ All systems operational
+```
+
+### 8. `kira validate`
+
+Validate configuration and manifests.
+
+**Synopsis:**
+
+```bash
+kira validate [OPTIONS]
+```
+
+**Options:**
+
+- `--config PATH` - Path to config file (default: kira.yaml)
+- `--manifest PATH` - Validate specific plugin manifest
+- `--all` - Validate all manifests in project
+- `--verbose` - Show detailed validation output
+
+**Examples:**
+
+```bash
+# Validate configuration
+kira validate
+
+# Validate all plugin manifests
+kira validate --all
+
+# Validate specific manifest
+kira validate --manifest src/kira/plugins/inbox/kira-plugin.json
+
+# Custom config path
+kira validate --config /path/to/config.yaml
+```
+
+**Output:**
+
+```
+✅ Configuration valid: kira.yaml
+✅ Manifest valid: kira-inbox
+✅ Manifest valid: kira-calendar
+✅ Manifest valid: kira-deadlines
+✅ Manifest valid: kira-code
+
+All validations passed! 🎉
+```
+
+## Makefile Integration
+
+Common workflows are available as Make targets:
+
+```bash
+# Inbox operations
+make inbox                # Process inbox
+make inbox-dry-run       # Preview inbox processing
+
+# Calendar operations
+make calendar-pull       # Pull from Google Calendar
+make calendar-push       # Push to Google Calendar
+
+# Rollup operations
+make rollup-daily        # Generate daily rollup
+make rollup-weekly       # Generate weekly rollup
+
+# Vault operations
+make vault-init          # Initialize Vault
+make vault-validate      # Validate Vault
+make vault-info          # Show Vault info
+
+# Extension management
+make ext-list            # List plugins
+make ext-enable NAME=... # Enable plugin
+make ext-disable NAME=...# Disable plugin
+
+# Validation
+make validate            # Validate everything
+
+# Help
+make help                # Show available commands
+```
+
+## Exit Codes
+
+Kira CLI uses standard exit codes:
+
+- `0` - Success
+- `1` - General error
+- `2` - Command-line usage error
+- `3` - Configuration error
+- `4` - Validation error
+- `5` - Network/API error
+
+## Environment Variables
+
+- `KIRA_VAULT_PATH` - Override vault path
+- `KIRA_CONFIG` - Override config file location
+- `KIRA_LOG_LEVEL` - Set log level (DEBUG/INFO/WARNING/ERROR)
+- `KIRA_GCAL_CREDENTIALS` - Path to Google Calendar credentials
+
+## Configuration
+
+CLI behavior can be configured in `kira.yaml`:
 
 ```yaml
 vault:
-  path: "/path/to/vault"
-  tz: "Europe/Moscow"
+  path: /path/to/vault
+  
+logging:
+  level: INFO
+  path: logs/
 
-adapters:
-  telegram:
-    enabled: true
-  gcal:
-    enabled: true
-    calendars:
-      work: "work@example.com"
-      personal: "personal@example.com"
+plugins:
+  enabled:
+    - kira-inbox
+    - kira-calendar
+    - kira-deadlines
 
-policies:
-  mode: "Focus"
-  confirm_external_writes: true
+calendar:
+  default_calendar_id: primary
+  sync_days: 30
+
+inbox:
+  max_items_per_run: 100
 ```
 
-## Примеры использования
+## Structured Output
 
-### Ежедневный workflow
+Many commands support `--json` flag for machine-readable output:
 
 ```bash
-# 1. Обработать inbox
-make inbox
-
-# 2. Синхронизировать календарь
-make calendar-pull
-
-# 3. Создать дневной отчет
-make rollup-daily
-
-# 4. Проверить статус расширений
-make ext-list
+# JSON output
+kira ext list --json
 ```
 
-### Еженедельный workflow
+```json
+{
+  "plugins": [
+    {
+      "name": "kira-inbox",
+      "version": "1.0.0",
+      "enabled": true,
+      "description": "Normalizes incoming messages"
+    }
+  ]
+}
+```
+
+## Error Handling
+
+Errors are displayed with context and suggestions:
+
+```
+❌ Error: Vault not found at /path/to/vault
+
+Suggestions:
+  • Initialize a new vault: kira vault init --path /path/to/vault
+  • Check your configuration: kira validate
+  • Specify vault path: kira inbox --vault /correct/path
+
+For more help: kira --help
+```
+
+## Debugging
+
+Enable verbose output for troubleshooting:
 
 ```bash
-# 1. Создать недельный отчет
-make rollup-weekly
+# Verbose output
+kira inbox --verbose
 
-# 2. Синхронизировать календарь
-make calendar-push
+# Debug level logging
+KIRA_LOG_LEVEL=DEBUG kira inbox
 
-# 3. Анализ кода
-make code-analyze
+# Tail logs while running command (in another terminal)
+kira diag tail --follow
 ```
 
-### Управление проектом
+## Shell Completion
+
+Generate shell completion scripts:
 
 ```bash
-# Поиск функций
-./kira code search "def process_" --type function
+# Bash
+kira completion bash > /etc/bash_completion.d/kira
 
-# Информация о плагинах
-./kira ext info kira-inbox --verbose
+# Zsh
+kira completion zsh > "${fpath[1]}/_kira"
 
-# Валидация системы
-make validate
+# Fish
+kira completion fish > ~/.config/fish/completions/kira.fish
 ```
 
-## Отладка и диагностика
+## See Also
 
-### Подробный вывод
+- [Configuration Documentation](configuration.md)
+- [Plugin SDK Documentation](sdk.md)
+- [Makefile Reference](../Makefile)
+- [ADR-010: CLI & Make](adr/ADR-010-cli-make-canonical-interface.md)
 
-Большинство команд поддерживают флаг `--verbose`:
+---
 
-```bash
-./kira inbox --verbose
-./kira calendar pull --verbose
-./kira rollup daily --verbose
-```
-
-### Dry-run режим
-
-Команды, которые изменяют данные, поддерживают dry-run:
-
-```bash
-./kira inbox --dry-run
-./kira calendar push --dry-run
-```
-
-### Проверка конфигурации
-
-```bash
-# Проверить зависимости
-make check-deps
-
-# Установить зависимости
-make install-deps
-
-# Тестирование CLI
-make test-cli
-```
-
-## Интеграция с другими инструментами
-
-### Makefile
-
-Используйте Makefile для автоматизации:
-
-```makefile
-# В вашем Makefile
-daily-report:
-	make inbox
-	make calendar-pull
-	make rollup-daily
-
-weekly-report:
-	make rollup-weekly
-	make calendar-push
-```
-
-### Cron
-
-Настройте автоматическое выполнение:
-
-```bash
-# Crontab
-0 9 * * * cd /path/to/kira && make inbox
-0 18 * * * cd /path/to/kira && make rollup-daily
-0 9 * * 1 cd /path/to/kira && make rollup-weekly
-```
-
-### CI/CD
-
-Интегрируйте в pipeline:
-
-```yaml
-# GitHub Actions
-- name: Validate Kira
-  run: make validate
-
-- name: Process Inbox
-  run: make inbox
-```
-
-## Устранение неполадок
-
-### Частые проблемы
-
-1. **Модуль не найден**
-   ```bash
-   # Убедитесь, что вы в корне проекта
-   cd /path/to/kira-project
-   ./kira --help
-   ```
-
-2. **Конфигурация не загружается**
-   ```bash
-   # Проверьте наличие kira.yaml
-   ls -la kira.yaml
-   ```
-
-3. **Расширения не работают**
-   ```bash
-   # Проверьте статус
-   ./kira ext list --verbose
-   ```
-
-### Логи и отладка
-
-```bash
-# Включить подробный вывод
-export KIRA_VERBOSE=1
-
-# Запустить с отладкой
-python3 -c "
-import sys
-sys.path.insert(0, 'src')
-from kira.cli.kira_inbox import main
-main(['--verbose'])
-"
-```
-
-## Расширение CLI
-
-### Добавление новых команд
-
-1. Создайте модуль в `src/kira/cli/`
-2. Добавьте функцию `main(args)`
-3. Обновите `__main__.py`
-4. Добавьте команду в Makefile
-
-### Кастомные команды
-
-```python
-# src/kira/cli/kira_custom.py
-def main(args):
-    print("Моя кастомная команда")
-    return 0
-```
-
-```bash
-# Добавьте в Makefile
-custom-command:
-	./kira custom
-```
+**Last Updated:** 2025-10-07  
+**CLI Version:** 1.0.0

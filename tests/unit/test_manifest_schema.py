@@ -1,6 +1,7 @@
 """
 Тесты для валидации манифеста плагина
 """
+
 import json
 import sys
 from pathlib import Path
@@ -38,13 +39,13 @@ class TestPluginManifestValidation:
             "capabilities": ["pull", "push", "timebox"],
             "configSchema": {
                 "calendar.default": {"type": "string"},
-                "timebox.length": {"type": "integer", "default": 90}
+                "timebox.length": {"type": "integer", "default": 90},
             },
             "contributes": {
                 "events": ["event.created", "task.due_soon"],
-                "commands": ["calendar.pull", "calendar.push"]
+                "commands": ["calendar.pull", "calendar.push"],
             },
-            "sandbox": {"strategy": "subprocess", "timeoutMs": 60000}
+            "sandbox": {"strategy": "subprocess", "timeoutMs": 60000},
         }
 
         errors = self.validator.validate_manifest(valid_manifest)
@@ -54,7 +55,7 @@ class TestPluginManifestValidation:
         """Тест отсутствующих обязательных полей"""
         incomplete_manifest = {
             "name": "test-plugin",
-            "version": "1.0.0"
+            "version": "1.0.0",
             # Отсутствуют обязательные поля
         }
 
@@ -74,7 +75,7 @@ class TestPluginManifestValidation:
             "permissions": ["vault.read"],
             "entry": "test.plugin:activate",
             "capabilities": ["pull"],
-            "contributes": {"events": [], "commands": []}
+            "contributes": {"events": [], "commands": []},
         }
 
         errors = self.validator.validate_manifest(invalid_manifest)
@@ -90,10 +91,13 @@ class TestPluginManifestValidation:
             "description": "Test description",
             "publisher": "test",
             "engines": {"kira": "^1.0.0"},
-            "permissions": ["invalid.permission", "another.invalid"],  # Неверные разрешения
+            "permissions": [
+                "invalid.permission",
+                "another.invalid",
+            ],  # Неверные разрешения
             "entry": "test.plugin:activate",
             "capabilities": ["pull"],
-            "contributes": {"events": [], "commands": []}
+            "contributes": {"events": [], "commands": []},
         }
 
         errors = self.validator.validate_manifest(invalid_manifest)
@@ -112,7 +116,7 @@ class TestPluginManifestValidation:
             "permissions": ["vault.read"],
             "entry": "test.plugin:activate",
             "capabilities": ["pull"],
-            "contributes": {"events": [], "commands": []}
+            "contributes": {"events": [], "commands": []},
         }
 
         errors = self.validator.validate_manifest(invalid_manifest)
@@ -131,7 +135,7 @@ class TestPluginManifestValidation:
             "permissions": ["vault.read"],
             "entry": "invalid-entry-format",  # Неверный формат
             "capabilities": ["pull"],
-            "contributes": {"events": [], "commands": []}
+            "contributes": {"events": [], "commands": []},
         }
 
         errors = self.validator.validate_manifest(invalid_manifest)
@@ -155,19 +159,16 @@ class TestPluginManifestValidation:
                 "test.string": {
                     "type": "string",
                     "default": "default_value",
-                    "description": "Test string config"
+                    "description": "Test string config",
                 },
                 "test.number": {
                     "type": "integer",
                     "minimum": 0,
                     "maximum": 100,
-                    "default": 50
+                    "default": 50,
                 },
-                "test.boolean": {
-                    "type": "boolean",
-                    "default": False
-                }
-            }
+                "test.boolean": {"type": "boolean", "default": False},
+            },
         }
 
         errors = self.validator.validate_manifest(manifest_with_config)
@@ -191,11 +192,8 @@ class TestPluginManifestValidation:
                 "timeoutMs": 30000,
                 "memoryLimit": 128,
                 "networkAccess": True,
-                "fsAccess": {
-                    "read": ["/tmp"],
-                    "write": ["/tmp/plugin"]
-                }
-            }
+                "fsAccess": {"read": ["/tmp"], "write": ["/tmp/plugin"]},
+            },
         }
 
         errors = self.validator.validate_manifest(manifest_with_sandbox)
@@ -213,17 +211,17 @@ class TestPluginManifestValidation:
             "permissions": ["vault.read"],
             "entry": "test.plugin:activate",
             "capabilities": ["pull"],
-            "contributes": {"events": [], "commands": []}
+            "contributes": {"events": [], "commands": []},
         }
 
-        assert validate_plugin_manifest(valid_manifest) == True
+        assert validate_plugin_manifest(valid_manifest)
 
         invalid_manifest = {
             "name": "test-plugin"
             # Отсутствуют обязательные поля
         }
 
-        assert validate_plugin_manifest(invalid_manifest) == False
+        assert not validate_plugin_manifest(invalid_manifest)
 
     def test_get_manifest_schema(self):
         """Тест получения схемы манифеста"""
@@ -272,11 +270,11 @@ class TestManifestFileValidation:
             "permissions": ["vault.read"],
             "entry": "test.plugin:activate",
             "capabilities": ["pull"],
-            "contributes": {"events": [], "commands": []}
+            "contributes": {"events": [], "commands": []},
         }
 
         manifest_file = self.test_dir / "valid-plugin.json"
-        with open(manifest_file, 'w') as f:
+        with open(manifest_file, "w") as f:
             json.dump(valid_manifest, f)
 
         errors = self.validator.validate_manifest_file(str(manifest_file))
@@ -285,7 +283,7 @@ class TestManifestFileValidation:
     def test_validate_invalid_json_file(self):
         """Тест валидации файла с неверным JSON"""
         invalid_json_file = self.test_dir / "invalid.json"
-        with open(invalid_json_file, 'w') as f:
+        with open(invalid_json_file, "w") as f:
             f.write("{ invalid json }")
 
         errors = self.validator.validate_manifest_file(str(invalid_json_file))
@@ -298,7 +296,7 @@ class TestManifestFileValidation:
 
         errors = self.validator.validate_manifest_file(str(nonexistent_file))
         assert len(errors) > 0
-        assert any("не найден" in error for error in errors)
+        assert any("not found" in error.lower() for error in errors)
 
 
 if __name__ == "__main__":

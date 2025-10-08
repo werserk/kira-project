@@ -1,0 +1,106 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kira.dev/schemas/task.json",
+  "title": "Task Entity",
+  "description": "Schema for task entities in Kira Vault",
+  "type": "object",
+  "required": [
+    "id",
+    "title",
+    "status",
+    "created",
+    "updated"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^task-\\d{8}-\\d{4}-.+$",
+      "description": "Unique task identifier (format: task-YYYYMMDD-HHmm-slug)"
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200,
+      "description": "Task title"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["todo", "doing", "review", "done", "blocked"],
+      "description": "Task state in FSM (ADR-014)"
+    },
+    "priority": {
+      "type": "string",
+      "enum": ["low", "medium", "high", "urgent"],
+      "default": "medium",
+      "description": "Task priority"
+    },
+    "due": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Due date (ISO 8601 format)"
+    },
+    "time_hint": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Estimated duration in minutes"
+    },
+    "project": {
+      "type": "string",
+      "description": "Parent project ID"
+    },
+    "depends_on": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Task IDs that this task depends on"
+    },
+    "blocks": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Task IDs that this task blocks"
+    },
+    "tags": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Task tags"
+    },
+    "created": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Creation timestamp (ISO 8601)"
+    },
+    "updated": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Last update timestamp (ISO 8601)"
+    },
+    "completed_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Completion timestamp (ISO 8601)"
+    },
+    "blocked_reason": {
+      "type": "string",
+      "description": "Reason for blocked status"
+    },
+    "gcal_event_id": {
+      "type": "string",
+      "description": "Google Calendar event ID for timeboxing"
+    },
+    "source": {
+      "type": "string",
+      "description": "Source of task creation (telegram, inbox, manual)"
+    }
+  },
+  "folder_contracts": {
+    "allowed_folders": ["tasks", "inbox"],
+    "required_frontmatter": ["id", "title", "status"],
+    "naming_pattern": "^task-\\d{8}-\\d{4}-.+\\.md$"
+  }
+}
+

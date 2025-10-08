@@ -1,0 +1,16 @@
+{
+  "name": "kira-code",
+  "version": "0.1.0",
+  "displayName": "Code Assistant",
+  "description": "Helps automate coding routines and orchestrate AI tooling.",
+  "publisher": "kira",
+  "engines": { "kira": "^1.0.0" },
+  "permissions": ["vault.read", "events.publish"],
+  "entry": "kira_plugin_code.plugin:activate",
+  "capabilities": ["transform", "notify"],
+  "contributes": {
+    "events": ["code.review_requested", "code.snippet_created"],
+    "commands": ["code.assist", "code.review"]
+  },
+  "sandbox": { "strategy": "subprocess", "timeoutMs": 20000 }
+}

@@ -1,1 +1,33 @@
-__pycache__/
+.venv
+.vscode
+.DS_Store
+.idea
+.pytest_cache
+.ruff_cache
+.mypy_cache
+.tox
+.coverage
+.coverage.*
+.coverage.xml
+.coverage.json
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+
+vault/
+
+# Configuration and secrets
+.env
+.env.local
+.env.*.local
+.secrets/
+.credentials/
+kira.yaml  # User config may contain secrets
+
+# Logs
+logs/*.jsonl
+logs/**/*.jsonl
+
+# Temporary/test scripts
+is_everything_ok.sh

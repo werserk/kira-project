@@ -1,17 +1,17 @@
 # Architecture Decision Records (ADR)
 
-Этот каталог содержит архитектурные решения (ADR) для проекта Kira. ADR документируют важные архитектурные решения, их контекст и последствия.
+This folder contains Architecture Decision Records (ADR) for Kira. ADRs document important architectural choices, their context, and consequences.
 
-## Статусы ADR
+## ADR statuses
 
-- **proposed** - предложено, обсуждается
-- **accepted** - принято, реализуется
-- **deprecated** - устарело, заменено
-- **superseded** - заменено другим ADR
+- **proposed** - proposed, under discussion
+- **accepted** - accepted, being implemented
+- **deprecated** - deprecated, replaced
+- **superseded** - superseded by another ADR
 
-## Список ADR
+## ADR list
 
-### Фундаментальные решения
+### Foundational
 
 | ID | Название | Статус | Дата | Владельцы |
 |----|----------|--------|------|-----------|
@@ -26,7 +26,7 @@
 | ID | Название | Статус | Дата | Владельцы |
 |----|----------|--------|------|-----------|
 | [ADR-006](ADR-006-vault-host-api-no-direct-fs.md) | Vault Host API; forbid direct FS writes by plugins | accepted | 2025-09-19 | kira-core |
-| [ADR-007](ADR-007-schemas-folder-contracts-single-source.md) | YAML Schemas & Folder-Contracts as the single source of truth | accepted | 2025-09-19 | kira-core |
+| [ADR-007](ADR-007-schemas-folder-contracts-single-source.md) | Schemas & Folder-Contracts as the single source of truth | accepted | 2025-09-19 | kira-core |
 | [ADR-008](ADR-008-ids-naming-conventions.md) | Stable identifiers and naming rules | accepted | 2025-09-19 | kira-core |
 
 ### Интеграции и интерфейсы
@@ -35,22 +35,22 @@
 |----|----------|--------|------|-----------|
 | [ADR-009](ADR-009-pipelines-thin-orchestration.md) | Pipelines as thin orchestration (adapters↔plugins) | accepted | 2025-09-19 | kira-core |
 | [ADR-010](ADR-010-cli-make-canonical-interface.md) | CLI & Make targets as canonical interface | accepted | 2025-09-19 | kira-core |
-| [ADR-011](ADR-011-telegram-adapter-primary-ux.md) | Telegram adapter as primary UX (capture, confirm, review) | proposed | 2025-09-19 | kira-adapters |
-| [ADR-012](ADR-012-google-calendar-adapter-plugin.md) | Google Calendar adapter + calendar plugin for sync & timeboxing | proposed | 2025-09-19 | kira-adapters, kira-plugins |
+| [ADR-011](ADR-011-telegram-adapter-primary-ux.md) | Telegram adapter as primary UX (capture, confirm, review) | accepted | 2025-09-19 | kira-adapters |
+| [ADR-012](ADR-012-google-calendar-adapter-plugin.md) | Google Calendar adapter + calendar plugin for sync & timeboxing | accepted | 2025-09-19 | kira-adapters, kira-plugins |
 
 ### Плагины и функциональность
 
 | ID | Название | Статус | Дата | Владельцы |
 |----|----------|--------|------|-----------|
 | [ADR-013](ADR-013-inbox-normalizer-plugin.md) | Inbox normalizer plugin (free-text → typed entities) | accepted | 2025-09-19 | kira-plugins |
-| [ADR-014](ADR-014-task-fsm-timeboxing-hooks.md) | Task FSM (todo→doing→review→done|blocked) with timeboxing hooks | proposed | 2025-09-19 | kira-core, kira-plugins |
+| [ADR-014](ADR-014-task-fsm-timeboxing-hooks.md) | Task FSM (todo→doing→review→done|blocked) with timeboxing hooks | accepted | 2025-09-19 | kira-core, kira-plugins |
 
 ### Наблюдаемость и качество
 
 | ID | Название | Статус | Дата | Владельцы |
 |----|----------|--------|------|-----------|
 | [ADR-015](ADR-015-logs-telemetry-jsonl-trace.md) | Structured logs/telemetry for core/adapters/plugins/pipelines | accepted | 2025-09-19 | kira-core |
-| [ADR-016](ADR-016-graph-consistency-dedup-guardrails.md) | Graph consistency checks and deduplication guardrails | proposed | 2025-09-19 | kira-core |
+| [ADR-016](ADR-016-graph-consistency-dedup-guardrails.md) | Graph consistency checks and deduplication guardrails | accepted | 2025-09-19 | kira-core |
 
 ## Создание нового ADR
 

@@ -1,12 +1,14 @@
-# Плагинная модель Kira
+# Kira Plugin Model
 
-## Обзор
+## Overview
 
-Kira использует модульную архитектуру с плагинами для расширения функциональности. Каждый плагин имеет манифест `kira-plugin.json`, который описывает его возможности, разрешения и конфигурацию.
+Kira exposes a modular architecture where functionality can be extended via
+plugins. Each plugin ships a `kira-plugin.json` manifest describing its
+capabilities, permissions and configuration surface.
 
-## Структура манифеста
+## Manifest structure
 
-### Обязательные поля
+### Required fields
 
 ```json
 {
@@ -26,29 +28,29 @@ Kira использует модульную архитектуру с плаг�
 }
 ```
 
-### Разрешения
+### Permissions
 
-- `calendar.read/write` - доступ к календарю
-- `vault.read/write` - доступ к хранилищу
-- `fs.read/write` - доступ к файловой системе
-- `net` - сетевой доступ
-- `secrets.read/write` - доступ к секретам
-- `events.publish/subscribe` - работа с событиями
-- `scheduler.create/cancel` - планировщик
-- `sandbox.execute` - выполнение в песочнице
+- `calendar.read/write` – calendar access.
+- `vault.read/write` – secure vault access.
+- `fs.read/write` – filesystem access (restricted to whitelisted paths).
+- `net` – outbound network access.
+- `secrets.read/write` – secrets manager access.
+- `events.publish/subscribe` – event bus interactions.
+- `scheduler.create/cancel` – scheduler operations.
+- `sandbox.execute` – execution in the isolated sandbox.
 
-### Возможности
+### Capabilities
 
-- `pull` - получение данных
-- `push` - отправка данных
-- `timebox` - работа с временными блоками
-- `notify` - уведомления
-- `schedule` - планирование
-- `transform` - преобразование данных
-- `validate` - валидация
-- `sync` - синхронизация
+- `pull` – retrieve data from remote systems.
+- `push` – push data to remote systems.
+- `timebox` – manage timeboxing workflows.
+- `notify` – send user notifications.
+- `schedule` – schedule future tasks.
+- `transform` – transform data between formats.
+- `validate` – validate external payloads.
+- `sync` – keep systems in sync.
 
-## Валидация манифеста
+## Manifest validation
 
 ### Python API
 
@@ -60,12 +62,12 @@ errors = validator.validate_manifest_file("path/to/kira-plugin.json")
 
 if errors:
     for error in errors:
-        print(f"Ошибка: {error}")
+        print(f"Validation error: {error}")
 else:
-    print("Манифест валиден!")
+    print("Manifest is valid!")
 ```
 
-### Быстрая проверка
+### Quick validation helper
 
 ```python
 from kira.plugin_sdk.manifest import validate_plugin_manifest
@@ -73,9 +75,9 @@ from kira.plugin_sdk.manifest import validate_plugin_manifest
 is_valid = validate_plugin_manifest(manifest_data)
 ```
 
-## Конфигурация плагина
+## Plugin configuration
 
-Плагины могут определять схему своей конфигурации:
+Plugins can describe their configuration schema:
 
 ```json
 {
@@ -98,15 +100,15 @@ is_valid = validate_plugin_manifest(manifest_data)
 }
 ```
 
-## Изоляция плагинов
+## Plugin isolation
 
-### Стратегии изоляции
+### Sandbox strategies
 
-- `subprocess` - отдельный процесс (по умолчанию)
-- `thread` - отдельный поток
-- `inline` - выполнение в основном потоке
+- `subprocess` – isolated child process (default).
+- `thread` – separate thread.
+- `inline` – execute in the host process (for trusted plugins only).
 
-### Конфигурация песочницы
+### Sandbox configuration
 
 ```json
 {
@@ -123,14 +125,14 @@ is_valid = validate_plugin_manifest(manifest_data)
 }
 ```
 
-## Создание плагина
+## Creating a plugin
 
-1. Создайте директорию для плагина
-2. Добавьте `kira-plugin.json` с манифестом
-3. Реализуйте точку входа в указанном модуле
-4. Протестируйте валидацию манифеста
+1. Create a directory for the plugin.
+2. Add the manifest `kira-plugin.json`.
+3. Implement the entry point referenced by the manifest.
+4. Validate the manifest before publishing.
 
-### Пример структуры
+### Example layout
 
 ```
 my-plugin/
@@ -142,33 +144,26 @@ my-plugin/
 └── README.md
 ```
 
-## SDK для плагинов
+## Plugin SDK
 
-Плагины получают доступ к функциональности через `PluginContext`:
+Plugins interact with the host through the `PluginContext` and decorators in
+the SDK:
 
 ```python
 from kira.plugin_sdk.context import PluginContext
-from kira.plugin_sdk.decorators import on_event, command
+from kira.plugin_sdk.decorators import command, on_event
 
-def activate(context: PluginContext):
-    # Инициализация плагина
-    pass
+
+def activate(context: PluginContext) -> None:
+    context.logger.info("Plugin activated")
+
 
 @on_event("event.created")
 def handle_event(context: PluginContext, event_data):
-    # Обработка события
-    pass
+    context.logger.info(f"Received event: {event_data}")
 
-@command("my.command")
-def my_command(context: PluginContext, args):
-    # Обработка команды
-    pass
-```
 
-## Тестирование
-
-Используйте встроенные тесты для проверки валидации:
-
-```bash
-python -m pytest tests/unit/test_manifest_schema.py
+@command("calendar.pull")
+def pull_calendar(context: PluginContext, params):
+    context.logger.info("Pulling calendar data")
 ```

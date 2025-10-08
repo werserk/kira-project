@@ -1,0 +1,128 @@
+[tool.poetry]
+name = "kira"
+version = "0.1.0"
+description = "Kira monorepo"
+authors = ["werserk"]
+readme = "README.md"
+packages = [{ include = "kira", from = "src" }]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+click = "^8.1.0"
+pyyaml = "^6.0"
+jsonschema = "^4.0"
+# Optional adapters (install as needed)
+python-telegram-bot = { version = "^20.0", optional = true }
+google-auth = { version = "^2.0", optional = true }
+google-auth-oauthlib = { version = "^1.0", optional = true }
+google-api-python-client = { version = "^2.0", optional = true }
+# Scheduler
+croniter = { version = "^2.0", optional = true }
+# HTTP client
+httpx = { version = "^0.27.0", optional = true }
+
+[tool.poetry.extras]
+telegram = ["python-telegram-bot", "httpx"]
+gcal = ["google-auth", "google-auth-oauthlib", "google-api-python-client"]
+all = ["python-telegram-bot", "google-auth", "google-auth-oauthlib", "google-api-python-client", "croniter", "httpx"]
+
+[tool.poetry.scripts]
+kira = "kira.cli.__main__:main"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.4.2"
+black = "^25.9.0"
+ruff = "^0.8.0"
+mypy = "^1.18.2"
+pre-commit = "^4.3.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.black]
+line-length = 120
+target-version = ['py311']
+include = '\.pyi?$'
+extend-exclude = '''
+/(
+  # directories
+  \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | build
+  | dist
+)/
+'''
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+preview = true
+
+[tool.ruff.lint]
+select = [
+  "E",   # pycodestyle: Enforces PEP 8 style errors
+  "F",   # pyflakes: Detects undefined or unused variables
+  "W",   # pycodestyle: Additional style warnings
+  "I",   # isort: Ensures imports are properly sorted
+  "UP",  # pyupgrade: Modernizes code to use newer Python features
+  "B",   # flake8-bugbear: Highlights common bugs and bad practices
+  "C4",  # flake8-comprehensions: Suggests improvements for comprehensions
+  "SIM", # flake8-simplify: Simplifies complex expressions
+  "Q",   # flake8-quotes: Enforces consistent usage of quotes
+  "RET", # flake8-return: Ensures return statements are consistent
+  "ARG", # flake8-unused-arguments: Warns about unused function arguments
+  "TCH", # flake8-type-checking: Improves type-checking practices
+  "ANN", # flake8-annotations: Encourages the use of type annotations
+  "RUF", # Ruff-specific rules: Adds optimizations specific to Ruff
+  "C90", # McCabe complexity checker
+]
+ignore = [
+  "CPY001", # Ignore annotations for self
+  "RUF001", # Ignore Cyrillic to Latin transliteration rule
+  "RUF002", # Ignore Cyrillic to Latin transliteration rule in docstring
+  "RUF003", # Ignore Cyrillic characters in comments
+  "ANN401", # Allow Any in decorators
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*" = [
+  "ARG001",
+  "ARG002",
+  "S101",
+  "ANN201",
+  "ANN204",
+  "C901",
+  "TC003",
+  "UP028",
+  "ANN001",
+] # use of assert, test methods
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+docstring-code-format = true
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+disallow_untyped_decorators = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_no_return = true
+warn_unreachable = true
+strict_equality = true
+
+[[tool.mypy.overrides]]
+module = "tests.*"
+disallow_untyped_defs = false

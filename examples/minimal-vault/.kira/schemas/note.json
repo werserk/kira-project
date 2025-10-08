@@ -1,0 +1,57 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kira.dev/schemas/note.json",
+  "title": "Note Entity",
+  "description": "Schema for note entities in Kira Vault",
+  "type": "object",
+  "required": [
+    "id",
+    "title",
+    "created",
+    "updated"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^note-\\d{8}-\\d{4}-.+$",
+      "description": "Unique note identifier"
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200,
+      "description": "Note title"
+    },
+    "tags": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Note tags"
+    },
+    "project": {
+      "type": "string",
+      "description": "Parent project ID"
+    },
+    "relates_to": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Related entity IDs"
+    },
+    "created": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "updated": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "source": {
+      "type": "string",
+      "description": "Source of note creation"
+    }
+  }
+}
+

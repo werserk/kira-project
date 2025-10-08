@@ -1,23 +1,78 @@
-vault:
-  path: "/abs/path/to/TestVault"
-  tz: "Europe/Brussels"
-  # mounts: [{name: personal, path: "/.../PersonalVault"}]
+# Kira User Configuration
+# This file overrides defaults from config/defaults.yaml
 
+# Vault settings
+vault:
+  path: "/abs/path/to/TestVault"  # ВАЖНО: Обновите этот путь к вашему реальному vault
+
+# Core system
+core:
+  timezone: "Europe/Brussels"  # Ваш локальный timezone
+
+# Enabled plugins
+plugins:
+  enabled:
+    - kira-inbox
+    - kira-calendar
+    - kira-deadlines
+    # - kira-code  # Раскомментируйте при необходимости
+  
+  # Plugin-specific settings
+  inbox:
+    confidence_threshold: 0.8  # Понизьте для большего количества подтверждений
+    clarification_timeout_hours: 24.0
+  
+  calendar:
+    default_calendar_id: "primary"  # Или укажите ваш calendar ID
+    sync_days_past: 7
+    sync_days_future: 30
+    timebox_default_minutes: 25  # Pomodoro по умолчанию
+  
+  deadlines:
+    warning_days: [7, 3, 1]  # Предупреждать за 7, 3, 1 день(и)
+    snooze_default_hours: 24
+
+# Adapters
 adapters:
   telegram:
     enabled: true
-    mode: "userbot"              # или "bot"
-    chat_whitelist: []
+    mode: "userbot"  # bot или userbot
+    # Токен берется из TELEGRAM_BOT_TOKEN env var
+    whitelist_chats: []  # Пустой = все чаты разрешены
+  
   gcal:
     enabled: true
-    calendars:
-      work: "<gcal_id>"
-      personal: "<gcal_id>"
+    # Credentials из GCAL_CREDENTIALS_PATH env var
+    timeout_seconds: 30
 
-policies:
-  mode: "Focus"                  # Focus | Travel | Night
-  confirm_external_writes: true  # гейт PR/email/calendar
+# Logging
+logging:
+  level: "INFO"  # DEBUG для разработки, INFO для продакшена
+  path: "logs"
+  console_output: true  # Вывод в консоль
+  file_output: true  # Запись в файлы
 
+# Security (advanced)
 security:
-  secrets_from_env: true
-  allow_fs_exec: false
+  permissions:
+    default_deny: true  # Запрещать по умолчанию, требовать явного разрешения
+    audit_log: true
+  sandbox:
+    network_default: false
+    fs_write_default: false
+
+# Feature flags
+features:
+  timeboxing: true  # Автоматическое создание блоков в календаре для задач
+  clarifications: true  # Запрашивать подтверждение при неуверенности
+  auto_rollup: true  # Автоматически генерировать дневные/недельные отчеты
+  graph_validation: true  # Валидировать граф знаний
+  telemetry: true  # Структурированное логирование
+  metrics: false  # Экспорт метрик Prometheus (будущее)
+
+# Development (for contributors)
+dev:
+  debug: false
+  hot_reload: false
+  profiling: false
+  test_mode: false
