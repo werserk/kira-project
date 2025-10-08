@@ -1,0 +1,304 @@
+"""Kira Agent HTTP service.
+
+FastAPI service providing:
+- POST /agent/chat: NL → plan → execute
+- POST /agent/execute: Execute predefined plan
+- GET /health: Health check
+- GET /agent/version: Version info
+"""
+
+from __future__ import annotations
+
+import json
+from datetime import UTC, datetime
+from pathlib import Path
+from typing import Any
+
+try:
+    from fastapi import FastAPI, HTTPException
+    from pydantic import BaseModel
+except ImportError:
+    raise ImportError(
+        "FastAPI dependencies not installed. Install with: poetry install --extras agent"
+    ) from None
+
+from ..adapters.llm import OpenAIAdapter, OpenRouterAdapter
+from ..core.host import create_host_api
+from .config import AgentConfig
+from .executor import AgentExecutor, ExecutionPlan, ExecutionStep
+from .kira_tools import RollupDailyTool, TaskCreateTool, TaskGetTool, TaskListTool, TaskUpdateTool
+from .tools import ToolRegistry
+
+__all__ = ["create_agent_app", "AuditLogger"]
+
+
+class AuditLogger:
+    """JSONL audit logger."""
+
+    def __init__(self, audit_dir: Path) -> None:
+        """Initialize audit logger.
+
+        Parameters
+        ----------
+        audit_dir
+            Directory for audit logs
+        """
+        self.audit_dir = audit_dir
+        self.audit_dir.mkdir(parents=True, exist_ok=True)
+
+    def log(self, event: dict[str, Any]) -> None:
+        """Log event to JSONL.
+
+        Parameters
+        ----------
+        event
+            Event to log
+        """
+        today = datetime.now(UTC).strftime("%Y-%m-%d")
+        log_file = self.audit_dir / f"audit-{today}.jsonl"
+
+        event["timestamp"] = datetime.now(UTC).isoformat()
+
+        with log_file.open("a") as f:
+            f.write(json.dumps(event) + "\n")
+
+
+# Request/Response models
+class ChatRequest(BaseModel):
+    """Chat request."""
+
+    message: str
+    execute: bool = True
+
+
+class ChatResponse(BaseModel):
+    """Chat response."""
+
+    status: str
+    results: list[dict[str, Any]] = []
+    error: str | None = None
+    trace_id: str = ""
+
+
+class ExecutePlanRequest(BaseModel):
+    """Execute plan request."""
+
+    steps: list[dict[str, Any]]
+
+
+class HealthResponse(BaseModel):
+    """Health check response."""
+
+    status: str
+    timestamp: str
+    version: str = "0.1.0"
+
+
+def create_agent_app(config: AgentConfig | None = None) -> FastAPI:
+    """Create FastAPI app for agent service.
+
+    Parameters
+    ----------
+    config
+        Agent configuration
+
+    Returns
+    -------
+    FastAPI
+        Configured FastAPI app
+    """
+    if config is None:
+        config = AgentConfig.from_env()
+
+    app = FastAPI(
+        title="Kira Agent",
+        description="NL → Plan → Dry-Run → Execute → Verify",
+        version="0.1.0",
+    )
+
+    # Initialize LLM adapter
+    if config.llm_provider == "openai":
+        if not config.openai_api_key:
+            raise ValueError("OPENAI_API_KEY not configured")
+        llm_adapter = OpenAIAdapter(
+            api_key=config.openai_api_key,
+            default_model=config.openai_default_model,
+        )
+    else:  # openrouter
+        if not config.openrouter_api_key:
+            raise ValueError("OPENROUTER_API_KEY not configured")
+        llm_adapter = OpenRouterAdapter(
+            api_key=config.openrouter_api_key,
+            default_model=config.openrouter_default_model,
+        )
+
+    # Initialize tool registry
+    tool_registry = ToolRegistry()
+
+    # Initialize HostAPI
+    if not config.vault_path:
+        raise ValueError("Vault path not configured")
+
+    host_api = create_host_api(config.vault_path)
+
+    # Register tools
+    tool_registry.register(TaskCreateTool(host_api=host_api))
+    tool_registry.register(TaskUpdateTool(host_api=host_api))
+    tool_registry.register(TaskGetTool(host_api=host_api))
+    tool_registry.register(TaskListTool(host_api=host_api))
+    tool_registry.register(RollupDailyTool(vault_path=config.vault_path))
+
+    # Initialize executor
+    executor = AgentExecutor(llm_adapter, tool_registry, config)
+
+    # Initialize audit logger
+    audit_dir = Path("artifacts/audit")
+    audit_logger = AuditLogger(audit_dir)
+
+    @app.get("/health", response_model=HealthResponse)
+    def health() -> HealthResponse:
+        """Health check endpoint."""
+        return HealthResponse(
+            status="ok",
+            timestamp=datetime.now(UTC).isoformat(),
+        )
+
+    @app.get("/agent/version")
+    def version() -> dict[str, str]:
+        """Get version info."""
+        return {
+            "version": "0.1.0",
+            "llm_provider": config.llm_provider,
+            "status": "alpha",
+        }
+
+    @app.post("/agent/chat", response_model=ChatResponse)
+    def chat(request: ChatRequest) -> ChatResponse:
+        """Handle chat request with optional execution.
+
+        Parameters
+        ----------
+        request
+            Chat request
+
+        Returns
+        -------
+        ChatResponse
+            Chat response with results
+        """
+        try:
+            # Log request
+            audit_logger.log(
+                {
+                    "event": "agent_chat",
+                    "message": request.message,
+                    "execute": request.execute,
+                }
+            )
+
+            if request.execute:
+                # Full execution
+                result = executor.chat_and_execute(request.message)
+
+                # Log result
+                audit_logger.log(
+                    {
+                        "event": "agent_execute",
+                        "trace_id": result.trace_id,
+                        "status": result.status,
+                        "results": result.results,
+                    }
+                )
+
+                return ChatResponse(
+                    status=result.status,
+                    results=result.results,
+                    error=result.error,
+                    trace_id=result.trace_id,
+                )
+            else:
+                # Plan only
+                plan = executor.plan(request.message)
+
+                return ChatResponse(
+                    status="ok",
+                    results=[
+                        {
+                            "plan": plan.plan_description,
+                            "reasoning": plan.reasoning,
+                            "steps": [
+                                {"tool": s.tool, "args": s.args, "dry_run": s.dry_run}
+                                for s in plan.steps
+                            ],
+                        }
+                    ],
+                    trace_id="plan-only",
+                )
+
+        except Exception as e:
+            audit_logger.log(
+                {
+                    "event": "agent_error",
+                    "error": str(e),
+                    "message": request.message,
+                }
+            )
+            raise HTTPException(status_code=500, detail=str(e)) from e
+
+    @app.post("/agent/execute", response_model=ChatResponse)
+    def execute_plan(request: ExecutePlanRequest) -> ChatResponse:
+        """Execute predefined plan.
+
+        Parameters
+        ----------
+        request
+            Execute plan request
+
+        Returns
+        -------
+        ChatResponse
+            Execution results
+        """
+        try:
+            # Parse steps
+            steps = [
+                ExecutionStep(
+                    tool=step["tool"],
+                    args=step.get("args", {}),
+                    dry_run=step.get("dry_run", False),
+                )
+                for step in request.steps
+            ]
+
+            plan = ExecutionPlan(steps=steps)
+
+            # Execute
+            result = executor.execute_plan(plan)
+
+            # Log
+            audit_logger.log(
+                {
+                    "event": "agent_execute_plan",
+                    "trace_id": result.trace_id,
+                    "status": result.status,
+                    "results": result.results,
+                }
+            )
+
+            return ChatResponse(
+                status=result.status,
+                results=result.results,
+                error=result.error,
+                trace_id=result.trace_id,
+            )
+
+        except Exception as e:
+            audit_logger.log(
+                {
+                    "event": "agent_execute_error",
+                    "error": str(e),
+                }
+            )
+            raise HTTPException(status_code=500, detail=str(e)) from e
+
+    return app
