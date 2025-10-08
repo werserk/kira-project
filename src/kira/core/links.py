@@ -22,14 +22,14 @@ __all__ = [
 ]
 
 
-@dataclass
+@dataclass(frozen=True)
 class Link:
     """Represents a link between two entities."""
 
     source_id: str
     target_id: str
     link_type: str
-    context: dict[str, Any] = field(default_factory=dict)
+    context: dict[str, Any] = field(default_factory=dict, hash=False, compare=False)
 
     def __str__(self) -> str:
         """String representation."""
