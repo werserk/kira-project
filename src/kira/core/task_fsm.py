@@ -330,8 +330,8 @@ class TaskFSM:
                     f"either 'assignee' or 'start_ts' to be set"
                 )
         
-        # Guard: doing → done sets done_ts and freezes estimate
-        if from_state == TaskState.DOING and to_state == TaskState.DONE:
+        # Guard: doing/review → done sets done_ts and freezes estimate
+        if to_state == TaskState.DONE and from_state in [TaskState.DOING, TaskState.REVIEW]:
             # Set done_ts if not already set
             if not updated_data.get("done_ts"):
                 from .time import get_current_utc, format_utc_iso8601
@@ -344,7 +344,7 @@ class TaskFSM:
             
             if self.logger:
                 self.logger.info(
-                    f"Task {task_id}: Set done_ts and froze estimate on doing → done",
+                    f"Task {task_id}: Set done_ts and froze estimate on {from_state.value} → done",
                     extra={
                         "task_id": task_id,
                         "done_ts": updated_data.get("done_ts"),

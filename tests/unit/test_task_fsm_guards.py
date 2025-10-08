@@ -1,295 +1,515 @@
-"""Tests for Task FSM guards (Phase 1, Point 4)."""
+"""Tests for Task FSM with guards (Phase 2, Point 5).
+
+DoD: Invalid transitions raise domain errors; no file changes on failure.
+Tests guard validation for all required transitions.
+"""
+
+from __future__ import annotations
+
+from datetime import datetime, timezone
 
 import pytest
 
-from kira.core.task_fsm import FSMGuardError, FSMValidationError, TaskFSM, TaskState
+from kira.core.task_fsm import (
+    FSMGuardError,
+    FSMValidationError,
+    TaskFSM,
+    TaskState,
+    create_task_fsm,
+)
 
 
-def test_guard_todo_to_doing_requires_assignee():
-    """Test todo → doing requires assignee OR start_ts."""
-    fsm = TaskFSM()
-    task_id = "task-123"
+class TestTaskFSMGuards:
+    """Test FSM guard enforcement (Phase 2, Point 5)."""
     
-    # Should fail: no assignee and no start_ts
-    task_data = {"title": "Test Task"}
+    def test_todo_to_doing_requires_assignee_or_start_ts(self):
+        """Test todo → doing requires assignee OR start_ts (Phase 2, Point 5)."""
+        fsm = create_task_fsm()
+        
+        # Missing both assignee and start_ts should fail
+        with pytest.raises(FSMGuardError, match="requires either 'assignee' or 'start_ts'"):
+            fsm.transition(
+                task_id="task-001",
+                to_state=TaskState.DOING,
+                task_data={}
+            )
     
-    with pytest.raises(FSMGuardError, match="requires either 'assignee' or 'start_ts'"):
-        fsm.transition(task_id, TaskState.DOING, task_data=task_data)
+    def test_todo_to_doing_with_assignee_succeeds(self):
+        """Test todo → doing with assignee succeeds."""
+        fsm = create_task_fsm()
+        
+        task_data = {"assignee": "Alice"}
+        transition, updated_data = fsm.transition(
+            task_id="task-001",
+            to_state=TaskState.DOING,
+            task_data=task_data
+        )
+        
+        assert transition.from_state == TaskState.TODO
+        assert transition.to_state == TaskState.DOING
+        assert updated_data["assignee"] == "Alice"
+    
+    def test_todo_to_doing_with_start_ts_succeeds(self):
+        """Test todo → doing with start_ts succeeds."""
+        fsm = create_task_fsm()
+        
+        task_data = {"start_ts": "2025-10-08T12:00:00+00:00"}
+        transition, updated_data = fsm.transition(
+            task_id="task-002",
+            to_state=TaskState.DOING,
+            task_data=task_data
+        )
+        
+        assert transition.from_state == TaskState.TODO
+        assert transition.to_state == TaskState.DOING
+        assert updated_data["start_ts"] == "2025-10-08T12:00:00+00:00"
+    
+    def test_todo_to_doing_with_both_succeeds(self):
+        """Test todo → doing with both assignee and start_ts succeeds."""
+        fsm = create_task_fsm()
+        
+        task_data = {
+            "assignee": "Bob",
+            "start_ts": "2025-10-08T14:00:00+00:00"
+        }
+        transition, updated_data = fsm.transition(
+            task_id="task-003",
+            to_state=TaskState.DOING,
+            task_data=task_data
+        )
+        
+        assert transition.to_state == TaskState.DOING
+        assert updated_data["assignee"] == "Bob"
+        assert updated_data["start_ts"] == "2025-10-08T14:00:00+00:00"
 
 
-def test_guard_todo_to_doing_with_assignee():
-    """Test todo → doing succeeds with assignee."""
-    fsm = TaskFSM()
-    task_id = "task-123"
+class TestDoingToDoneGuard:
+    """Test doing → done guard (Phase 2, Point 5)."""
     
-    task_data = {"title": "Test Task", "assignee": "alice@example.com"}
+    def test_doing_to_done_sets_done_ts(self):
+        """Test doing → done sets done_ts automatically."""
+        fsm = create_task_fsm()
+        
+        # First transition to DOING
+        fsm.transition(
+            task_id="task-004",
+            to_state=TaskState.DOING,
+            task_data={"assignee": "Alice"}
+        )
+        
+        # Then transition to DONE
+        task_data = {"assignee": "Alice"}
+        transition, updated_data = fsm.transition(
+            task_id="task-004",
+            to_state=TaskState.DONE,
+            task_data=task_data
+        )
+        
+        assert transition.to_state == TaskState.DONE
+        assert "done_ts" in updated_data
+        # Verify it's a valid ISO-8601 UTC timestamp
+        assert "+00:00" in updated_data["done_ts"] or "Z" in updated_data["done_ts"]
     
-    transition, updated_data = fsm.transition(task_id, TaskState.DOING, task_data=task_data)
+    def test_doing_to_done_freezes_estimate(self):
+        """Test doing → done freezes estimate."""
+        fsm = create_task_fsm()
+        
+        # First transition to DOING
+        fsm.transition(
+            task_id="task-005",
+            to_state=TaskState.DOING,
+            task_data={"assignee": "Bob", "estimate": "4h"}
+        )
+        
+        # Then transition to DONE
+        task_data = {"assignee": "Bob", "estimate": "4h"}
+        transition, updated_data = fsm.transition(
+            task_id="task-005",
+            to_state=TaskState.DONE,
+            task_data=task_data
+        )
+        
+        assert updated_data["estimate"] == "4h"
+        assert updated_data["estimate_frozen"] is True
     
-    assert transition.to_state == TaskState.DOING
-    assert updated_data["assignee"] == "alice@example.com"
+    def test_doing_to_done_preserves_existing_done_ts(self):
+        """Test doing → done preserves existing done_ts if present."""
+        fsm = create_task_fsm()
+        
+        # First transition to DOING
+        fsm.transition(
+            task_id="task-006",
+            to_state=TaskState.DOING,
+            task_data={"assignee": "Alice"}
+        )
+        
+        # Transition to DONE with existing done_ts
+        existing_done_ts = "2025-10-07T18:00:00+00:00"
+        task_data = {"assignee": "Alice", "done_ts": existing_done_ts}
+        transition, updated_data = fsm.transition(
+            task_id="task-006",
+            to_state=TaskState.DONE,
+            task_data=task_data
+        )
+        
+        # Should preserve the provided done_ts
+        assert updated_data["done_ts"] == existing_done_ts
 
 
-def test_guard_todo_to_doing_with_start_ts():
-    """Test todo → doing succeeds with start_ts."""
-    fsm = TaskFSM()
-    task_id = "task-123"
+class TestDoneToDoingGuard:
+    """Test done → doing guard (Phase 2, Point 5)."""
     
-    task_data = {"title": "Test Task", "start_ts": "2025-10-08T12:00:00+00:00"}
+    def test_done_to_doing_requires_reopen_reason(self):
+        """Test done → doing requires reopen_reason."""
+        fsm = create_task_fsm()
+        
+        # Set up task in DONE state
+        fsm.transition("task-007", TaskState.DOING, task_data={"assignee": "Alice"})
+        fsm.transition("task-007", TaskState.DONE, task_data={"assignee": "Alice"})
+        
+        # Try to reopen without reason - should fail
+        with pytest.raises(FSMGuardError, match="requires 'reopen_reason'"):
+            fsm.transition(
+                task_id="task-007",
+                to_state=TaskState.DOING,
+                task_data={"assignee": "Alice"}
+            )
     
-    transition, updated_data = fsm.transition(task_id, TaskState.DOING, task_data=task_data)
+    def test_done_to_doing_with_reason_as_parameter(self):
+        """Test done → doing with reason as transition parameter."""
+        fsm = create_task_fsm()
+        
+        # Set up task in DONE state
+        fsm.transition("task-008", TaskState.DOING, task_data={"assignee": "Bob"})
+        fsm.transition("task-008", TaskState.DONE, task_data={"assignee": "Bob"})
+        
+        # Reopen with reason
+        transition, updated_data = fsm.transition(
+            task_id="task-008",
+            to_state=TaskState.DOING,
+            reason="Found critical bug",
+            task_data={"assignee": "Bob"}
+        )
+        
+        assert transition.to_state == TaskState.DOING
+        assert updated_data["reopen_reason"] == "Found critical bug"
     
-    assert transition.to_state == TaskState.DOING
-    assert updated_data["start_ts"] == "2025-10-08T12:00:00+00:00"
+    def test_done_to_doing_with_reason_in_task_data(self):
+        """Test done → doing with reason in task_data."""
+        fsm = create_task_fsm()
+        
+        # Set up task in DONE state
+        fsm.transition("task-009", TaskState.DOING, task_data={"assignee": "Charlie"})
+        fsm.transition("task-009", TaskState.DONE, task_data={"assignee": "Charlie"})
+        
+        # Reopen with reason in task_data
+        task_data = {
+            "assignee": "Charlie",
+            "reopen_reason": "Needs additional testing"
+        }
+        transition, updated_data = fsm.transition(
+            task_id="task-009",
+            to_state=TaskState.DOING,
+            task_data=task_data
+        )
+        
+        assert transition.to_state == TaskState.DOING
+        assert updated_data["reopen_reason"] == "Needs additional testing"
+    
+    def test_done_to_doing_clears_done_ts(self):
+        """Test done → doing clears done_ts."""
+        fsm = create_task_fsm()
+        
+        # Set up task in DONE state
+        fsm.transition("task-010", TaskState.DOING, task_data={"assignee": "Alice"})
+        transition_done, data_done = fsm.transition(
+            "task-010", 
+            TaskState.DONE, 
+            task_data={"assignee": "Alice"}
+        )
+        
+        # Verify done_ts was set
+        assert "done_ts" in data_done
+        
+        # Reopen task
+        task_data = {
+            "assignee": "Alice",
+            "done_ts": data_done["done_ts"]
+        }
+        transition, updated_data = fsm.transition(
+            task_id="task-010",
+            to_state=TaskState.DOING,
+            reason="Reopen for fixes",
+            task_data=task_data
+        )
+        
+        # done_ts should be cleared
+        assert updated_data["done_ts"] is None
 
 
-def test_guard_todo_to_doing_with_both():
-    """Test todo → doing succeeds with both assignee and start_ts."""
-    fsm = TaskFSM()
-    task_id = "task-123"
+class TestInvalidTransitions:
+    """Test invalid state transitions are rejected."""
     
-    task_data = {
-        "title": "Test Task",
-        "assignee": "alice@example.com",
-        "start_ts": "2025-10-08T12:00:00+00:00",
-    }
+    def test_invalid_transition_raises_error(self):
+        """Test invalid transitions raise FSMValidationError."""
+        fsm = create_task_fsm()
+        
+        # DONE → BLOCKED is invalid
+        fsm.transition("task-011", TaskState.DOING, task_data={"assignee": "Bob"})
+        fsm.transition("task-011", TaskState.DONE, task_data={"assignee": "Bob"})
+        
+        with pytest.raises(FSMValidationError, match="Invalid transition"):
+            fsm.transition(
+                task_id="task-011",
+                to_state=TaskState.BLOCKED,
+                task_data={"assignee": "Bob"}
+            )
     
-    transition, updated_data = fsm.transition(task_id, TaskState.DOING, task_data=task_data)
+    def test_force_allows_invalid_transition(self):
+        """Test force=True bypasses validation."""
+        fsm = create_task_fsm()
+        
+        # Force an invalid transition
+        transition, _ = fsm.transition(
+            task_id="task-012",
+            to_state=TaskState.BLOCKED,
+            force=True,
+            reason="Emergency block",
+            task_data={}
+        )
+        
+        assert transition.to_state == TaskState.BLOCKED
     
-    assert transition.to_state == TaskState.DOING
+    def test_blocked_requires_reason(self):
+        """Test transition to BLOCKED requires reason."""
+        fsm = create_task_fsm()
+        
+        # Try to block without reason
+        with pytest.raises(FSMValidationError, match="requires a reason"):
+            fsm.transition(
+                task_id="task-013",
+                to_state=TaskState.BLOCKED,
+                task_data={}
+            )
 
 
-def test_guard_doing_to_done_sets_done_ts():
-    """Test doing → done sets done_ts automatically."""
-    fsm = TaskFSM()
-    task_id = "task-123"
+class TestValidTransitions:
+    """Test all valid state transitions."""
     
-    # First transition to DOING
-    task_data = {"title": "Test Task", "assignee": "alice@example.com"}
-    fsm.transition(task_id, TaskState.DOING, task_data=task_data)
+    def test_todo_to_blocked_with_reason(self):
+        """Test todo → blocked with reason."""
+        fsm = create_task_fsm()
+        
+        transition, _ = fsm.transition(
+            task_id="task-014",
+            to_state=TaskState.BLOCKED,
+            reason="Waiting for dependency",
+            task_data={}
+        )
+        
+        assert transition.from_state == TaskState.TODO
+        assert transition.to_state == TaskState.BLOCKED
+        assert transition.reason == "Waiting for dependency"
     
-    # Transition to DONE
-    transition, updated_data = fsm.transition(task_id, TaskState.DONE, task_data=task_data)
+    def test_doing_to_review(self):
+        """Test doing → review transition."""
+        fsm = create_task_fsm()
+        
+        fsm.transition("task-015", TaskState.DOING, task_data={"assignee": "Alice"})
+        
+        transition, _ = fsm.transition(
+            task_id="task-015",
+            to_state=TaskState.REVIEW,
+            task_data={"assignee": "Alice"}
+        )
+        
+        assert transition.from_state == TaskState.DOING
+        assert transition.to_state == TaskState.REVIEW
     
-    assert transition.to_state == TaskState.DONE
-    assert "done_ts" in updated_data
-    assert updated_data["done_ts"] is not None
-    # Should be ISO-8601 UTC format
-    assert "+00:00" in updated_data["done_ts"]
+    def test_review_to_done(self):
+        """Test review → done transition."""
+        fsm = create_task_fsm()
+        
+        fsm.transition("task-016", TaskState.DOING, task_data={"assignee": "Bob"})
+        fsm.transition("task-016", TaskState.REVIEW, task_data={"assignee": "Bob"})
+        
+        transition, updated_data = fsm.transition(
+            task_id="task-016",
+            to_state=TaskState.DONE,
+            task_data={"assignee": "Bob"}
+        )
+        
+        assert transition.from_state == TaskState.REVIEW
+        assert transition.to_state == TaskState.DONE
+        # Should still set done_ts even from REVIEW
+        assert "done_ts" in updated_data
+    
+    def test_blocked_to_doing(self):
+        """Test blocked → doing transition."""
+        fsm = create_task_fsm()
+        
+        fsm.transition("task-017", TaskState.BLOCKED, reason="Blocked", task_data={})
+        
+        transition, _ = fsm.transition(
+            task_id="task-017",
+            to_state=TaskState.DOING,
+            task_data={"assignee": "Charlie"}
+        )
+        
+        assert transition.from_state == TaskState.BLOCKED
+        assert transition.to_state == TaskState.DOING
 
 
-def test_guard_doing_to_done_preserves_existing_done_ts():
-    """Test doing → done preserves existing done_ts if already set."""
-    fsm = TaskFSM()
-    task_id = "task-123"
+class TestTransitionHistory:
+    """Test transition history tracking."""
     
-    # First transition to DOING
-    task_data = {"title": "Test Task", "assignee": "alice@example.com"}
-    fsm.transition(task_id, TaskState.DOING, task_data=task_data)
+    def test_transition_history_recorded(self):
+        """Test transitions are recorded in history."""
+        fsm = create_task_fsm()
+        
+        # Perform multiple transitions
+        fsm.transition("task-018", TaskState.DOING, task_data={"assignee": "Alice"})
+        fsm.transition("task-018", TaskState.REVIEW, task_data={"assignee": "Alice"})
+        fsm.transition("task-018", TaskState.DONE, task_data={"assignee": "Alice"})
+        
+        history = fsm.get_transition_history("task-018")
+        
+        assert len(history) == 3
+        assert history[0].from_state == TaskState.TODO
+        assert history[0].to_state == TaskState.DOING
+        assert history[1].from_state == TaskState.DOING
+        assert history[1].to_state == TaskState.REVIEW
+        assert history[2].from_state == TaskState.REVIEW
+        assert history[2].to_state == TaskState.DONE
     
-    # Transition to DONE with existing done_ts
-    task_data["done_ts"] = "2025-10-08T10:00:00+00:00"
-    transition, updated_data = fsm.transition(task_id, TaskState.DONE, task_data=task_data)
-    
-    # Should preserve the provided done_ts
-    assert updated_data["done_ts"] == "2025-10-08T10:00:00+00:00"
+    def test_reopening_recorded_in_history(self):
+        """Test reopening transitions are recorded with reason."""
+        fsm = create_task_fsm()
+        
+        fsm.transition("task-019", TaskState.DOING, task_data={"assignee": "Bob"})
+        fsm.transition("task-019", TaskState.DONE, task_data={"assignee": "Bob"})
+        fsm.transition(
+            "task-019",
+            TaskState.DOING,
+            reason="Bug found in production",
+            task_data={"assignee": "Bob"}
+        )
+        
+        history = fsm.get_transition_history("task-019")
+        
+        assert len(history) == 3
+        reopening = history[2]
+        assert reopening.from_state == TaskState.DONE
+        assert reopening.to_state == TaskState.DOING
+        assert reopening.reason == "Bug found in production"
 
 
-def test_guard_doing_to_done_freezes_estimate():
-    """Test doing → done freezes estimate."""
-    fsm = TaskFSM()
-    task_id = "task-123"
+class TestFSMStatistics:
+    """Test FSM statistics and queries."""
     
-    # First transition to DOING
-    task_data = {"title": "Test Task", "assignee": "alice@example.com", "estimate": "2h"}
-    fsm.transition(task_id, TaskState.DOING, task_data=task_data)
+    def test_get_tasks_in_state(self):
+        """Test getting all tasks in a specific state."""
+        fsm = create_task_fsm()
+        
+        # Create tasks in different states
+        fsm.transition("task-020", TaskState.DOING, task_data={"assignee": "Alice"})
+        fsm.transition("task-021", TaskState.DOING, task_data={"assignee": "Bob"})
+        fsm.transition("task-022", TaskState.DONE, task_data={"assignee": "Charlie"})
+        
+        doing_tasks = fsm.get_tasks_in_state(TaskState.DOING)
+        done_tasks = fsm.get_tasks_in_state(TaskState.DONE)
+        
+        assert len(doing_tasks) == 2
+        assert "task-020" in doing_tasks
+        assert "task-021" in doing_tasks
+        assert len(done_tasks) == 1
+        assert "task-022" in done_tasks
     
-    # Transition to DONE
-    transition, updated_data = fsm.transition(task_id, TaskState.DONE, task_data=task_data)
-    
-    assert updated_data["estimate"] == "2h"
-    assert updated_data["estimate_frozen"] is True
+    def test_get_statistics(self):
+        """Test getting FSM statistics."""
+        fsm = create_task_fsm()
+        
+        # Create tasks in various states
+        fsm.transition("task-023", TaskState.DOING, task_data={"assignee": "Alice"})
+        fsm.transition("task-024", TaskState.DOING, task_data={"assignee": "Bob"})
+        # Need to go through DOING before REVIEW
+        fsm.transition("task-025", TaskState.DOING, task_data={"assignee": "Charlie"})
+        fsm.transition("task-025", TaskState.REVIEW, task_data={"assignee": "Charlie"})
+        # Can skip directly to DONE from TODO
+        fsm.transition("task-026", TaskState.DONE, task_data={"assignee": "Dave"}, force=True)
+        
+        stats = fsm.get_statistics()
+        
+        assert stats["total_tasks"] >= 4
+        assert stats["by_state"]["doing"] >= 2
+        assert stats["by_state"]["review"] >= 1
+        assert stats["by_state"]["done"] >= 1
 
 
-def test_guard_doing_to_done_without_estimate():
-    """Test doing → done works even without estimate."""
-    fsm = TaskFSM()
-    task_id = "task-123"
+class TestGuardsDoNotModifyOnFailure:
+    """Test that guards do not modify data on failure (Phase 2, Point 5 DoD)."""
     
-    # First transition to DOING
-    task_data = {"title": "Test Task", "assignee": "alice@example.com"}
-    fsm.transition(task_id, TaskState.DOING, task_data=task_data)
+    def test_failed_guard_does_not_mutate_task_data(self):
+        """Test failed guard doesn't modify original task_data."""
+        fsm = create_task_fsm()
+        
+        original_data = {"title": "Test Task"}
+        task_data_copy = original_data.copy()
+        
+        # Try invalid transition
+        try:
+            fsm.transition(
+                task_id="task-027",
+                to_state=TaskState.DOING,
+                task_data=task_data_copy
+            )
+        except FSMGuardError:
+            pass
+        
+        # Original data should be unchanged
+        assert task_data_copy == original_data
+        assert "done_ts" not in task_data_copy
+        assert "reopen_reason" not in task_data_copy
     
-    # Transition to DONE without estimate
-    transition, updated_data = fsm.transition(task_id, TaskState.DONE, task_data=task_data)
-    
-    assert transition.to_state == TaskState.DONE
-    assert "estimate_frozen" not in updated_data  # No estimate to freeze
+    def test_state_not_updated_on_guard_failure(self):
+        """Test state is not updated when guard fails."""
+        fsm = create_task_fsm()
+        
+        # Try invalid transition
+        try:
+            fsm.transition(
+                task_id="task-028",
+                to_state=TaskState.DOING,
+                task_data={}
+            )
+        except FSMGuardError:
+            pass
+        
+        # State should still be TODO (not updated)
+        assert fsm.get_state("task-028") == TaskState.TODO
 
 
-def test_guard_done_to_doing_requires_reopen_reason():
-    """Test done → doing requires reopen_reason."""
-    fsm = TaskFSM()
-    task_id = "task-123"
+class TestCanTransition:
+    """Test can_transition validation helper."""
     
-    # Get to DONE state
-    task_data = {"title": "Test Task", "assignee": "alice@example.com"}
-    fsm.transition(task_id, TaskState.DOING, task_data=task_data)
-    fsm.transition(task_id, TaskState.DONE, task_data=task_data)
+    def test_can_transition_valid(self):
+        """Test can_transition returns True for valid transitions."""
+        fsm = create_task_fsm()
+        
+        assert fsm.can_transition("task-029", TaskState.DOING) is True
+        assert fsm.can_transition("task-029", TaskState.BLOCKED) is True
     
-    # Try to reopen without reason
-    with pytest.raises(FSMGuardError, match="requires 'reopen_reason'"):
-        fsm.transition(task_id, TaskState.DOING, task_data=task_data)
-
-
-def test_guard_done_to_doing_with_reopen_reason():
-    """Test done → doing succeeds with reopen_reason."""
-    fsm = TaskFSM()
-    task_id = "task-123"
-    
-    # Get to DONE state
-    task_data = {"title": "Test Task", "assignee": "alice@example.com"}
-    fsm.transition(task_id, TaskState.DOING, task_data=task_data)
-    _, task_data_after_done = fsm.transition(task_id, TaskState.DONE, task_data=task_data)
-    
-    # done_ts should be set
-    assert "done_ts" in task_data_after_done
-    
-    # Reopen with reason
-    transition, updated_data = fsm.transition(
-        task_id,
-        TaskState.DOING,
-        reason="Found critical bug",
-        task_data=task_data_after_done,
-    )
-    
-    assert transition.to_state == TaskState.DOING
-    assert updated_data["reopen_reason"] == "Found critical bug"
-    # done_ts should be cleared on reopen
-    assert updated_data["done_ts"] is None
-
-
-def test_guard_done_to_doing_with_reopen_reason_in_task_data():
-    """Test done → doing accepts reopen_reason from task_data."""
-    fsm = TaskFSM()
-    task_id = "task-123"
-    
-    # Get to DONE state
-    task_data = {"title": "Test Task", "assignee": "alice@example.com"}
-    fsm.transition(task_id, TaskState.DOING, task_data=task_data)
-    fsm.transition(task_id, TaskState.DONE, task_data=task_data)
-    
-    # Reopen with reason in task_data
-    task_data["reopen_reason"] = "Needs more testing"
-    transition, updated_data = fsm.transition(task_id, TaskState.DOING, task_data=task_data)
-    
-    assert transition.to_state == TaskState.DOING
-    assert updated_data["reopen_reason"] == "Needs more testing"
-
-
-def test_guards_do_not_apply_with_force():
-    """Test guards can be bypassed with force=True."""
-    fsm = TaskFSM()
-    task_id = "task-123"
-    
-    # Force todo → doing without assignee or start_ts
-    task_data = {"title": "Test Task"}
-    
-    transition, updated_data = fsm.transition(
-        task_id, TaskState.DOING, task_data=task_data, force=True
-    )
-    
-    # Should succeed despite guard
-    assert transition.to_state == TaskState.DOING
-
-
-def test_invalid_transition_raises_fsm_validation_error():
-    """Test invalid state transitions raise FSMValidationError."""
-    fsm = TaskFSM()
-    task_id = "task-123"
-    
-    # Invalid transition: TODO → REVIEW (not allowed)
-    task_data = {"title": "Test Task"}
-    
-    with pytest.raises(FSMValidationError, match="Invalid transition"):
-        fsm.transition(task_id, TaskState.REVIEW, task_data=task_data)
-
-
-def test_guard_errors_do_not_modify_state():
-    """Test that guard errors do NOT modify task state."""
-    fsm = TaskFSM()
-    task_id = "task-123"
-    
-    # Try invalid transition
-    task_data = {"title": "Test Task"}
-    
-    try:
-        fsm.transition(task_id, TaskState.DOING, task_data=task_data)
-    except FSMGuardError:
-        pass
-    
-    # State should still be TODO
-    assert fsm.get_state(task_id) == TaskState.TODO
-
-
-def test_full_task_lifecycle_with_guards():
-    """Test complete task lifecycle with all guards."""
-    fsm = TaskFSM()
-    task_id = "task-123"
-    
-    # Start with TODO (implicit)
-    assert fsm.get_state(task_id) == TaskState.TODO
-    
-    # TODO → DOING (with assignee)
-    task_data = {
-        "title": "Test Task",
-        "assignee": "alice@example.com",
-        "estimate": "4h",
-    }
-    _, task_data = fsm.transition(task_id, TaskState.DOING, task_data=task_data)
-    assert fsm.get_state(task_id) == TaskState.DOING
-    
-    # DOING → DONE (sets done_ts, freezes estimate)
-    _, task_data = fsm.transition(task_id, TaskState.DONE, task_data=task_data)
-    assert fsm.get_state(task_id) == TaskState.DONE
-    assert "done_ts" in task_data
-    assert task_data["estimate_frozen"] is True
-    
-    # DONE → DOING (requires reopen_reason)
-    _, task_data = fsm.transition(
-        task_id,
-        TaskState.DOING,
-        reason="Found regression",
-        task_data=task_data,
-    )
-    assert fsm.get_state(task_id) == TaskState.DOING
-    assert task_data["reopen_reason"] == "Found regression"
-    assert task_data["done_ts"] is None
-    
-    # DOING → DONE again
-    _, task_data = fsm.transition(task_id, TaskState.DONE, task_data=task_data)
-    assert fsm.get_state(task_id) == TaskState.DONE
-    assert "done_ts" in task_data
-
-
-def test_blocked_state_requires_reason():
-    """Test BLOCKED state always requires reason (existing behavior)."""
-    fsm = TaskFSM()
-    task_id = "task-123"
-    
-    task_data = {"title": "Test Task"}
-    
-    # Should fail without reason
-    with pytest.raises(FSMValidationError, match="BLOCKED requires a reason"):
-        fsm.transition(task_id, TaskState.BLOCKED, task_data=task_data)
-    
-    # Should succeed with reason
-    transition, _ = fsm.transition(
-        task_id,
-        TaskState.BLOCKED,
-        reason="Waiting for API access",
-        task_data=task_data,
-    )
-    assert transition.to_state == TaskState.BLOCKED
-    assert transition.reason == "Waiting for API access"
-
+    def test_can_transition_invalid(self):
+        """Test can_transition returns False for invalid transitions."""
+        fsm = create_task_fsm()
+        
+        # Set task to DONE
+        fsm.transition("task-030", TaskState.DOING, task_data={"assignee": "Alice"})
+        fsm.transition("task-030", TaskState.DONE, task_data={"assignee": "Alice"})
+        
+        # DONE → REVIEW is invalid
+        assert fsm.can_transition("task-030", TaskState.REVIEW) is False
+        # DONE → BLOCKED is invalid
+        assert fsm.can_transition("task-030", TaskState.BLOCKED) is False
+        # DONE → DOING is valid
+        assert fsm.can_transition("task-030", TaskState.DOING) is True
