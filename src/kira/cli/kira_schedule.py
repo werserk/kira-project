@@ -165,7 +165,7 @@ def conflicts_command(period: str, verbose: bool) -> int:
 def quick_command(description: str, date: str | None, time: str | None, duration: int, verbose: bool) -> int:
     """Быстро создать событие."""
     try:
-        from ..core.vault_facade import VaultFacade
+        from ..core.host import create_host_api
 
         config = load_config()
         vault_path = Path(config.get("vault", {}).get("path", "vault"))
@@ -182,16 +182,17 @@ def quick_command(description: str, date: str | None, time: str | None, duration
         end_date = event_date + timedelta(minutes=duration)
 
         # Create event
-        vault = VaultFacade(vault_path)
-        entity_id = vault.create_entity(
+        host_api = create_host_api(vault_path)
+        entity = host_api.create_entity(
             entity_type="event",
-            metadata={
+            data={
                 "title": description,
                 "start": event_date.isoformat(),
                 "end": end_date.isoformat(),
             },
             content=f"# {description}\n\n<!-- Notes -->\n",
         )
+        entity_id = entity.id
 
         click.echo(f"✅ Событие создано: {entity_id}")
         if verbose:

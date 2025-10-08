@@ -1,10 +1,10 @@
 adapters:
   - name: kira-telegram
     path: "src/kira/adapters/telegram"
-    enabled: true
+    description: "Telegram bot adapter for message capture and briefings"
   - name: kira-gcal
     path: "src/kira/adapters/gcal"
-    enabled: true
+    description: "Google Calendar two-way sync adapter"
   - name: kira-filesystem
     path: "src/kira/adapters/filesystem"
-    enabled: true
+    description: "Filesystem watcher for file events"
