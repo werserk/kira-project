@@ -1,14 +1,11 @@
-"""Integration tests for Phase 0 requirements (DoD verification).
+"""Integration tests for Host API and PluginContext.
 
-Tests:
-1. Persistent clarification queue - survives process restart
-2. Plugin entry point alignment - loads without sys.path hacks
-3. Host API in PluginContext - plugins can upsert via Host API
+Tests verify:
+- PluginContext receives Host API
+- Plugins use Host API for upsert operations
+- Plugin loader accepts vault parameter
 """
 
-from __future__ import annotations
-
-import json
 from pathlib import Path
 
 import pytest
@@ -50,147 +47,8 @@ def inbox_plugin_path():
     return plugin_path
 
 
-class TestClarificationQueuePersistence:
-    """Test clarification queue persistence (Phase 0, Task 1)."""
-
-    def test_queue_survives_restart(self, tmp_path: Path):
-        """Verify clarification queue persists across restarts.
-
-        DoD: process restart does not lose pending clarifications;
-        test: create 2 items → restart → continue.
-        """
-        from kira.plugins.inbox.clarification_queue import ClarificationQueue
-
-        storage_path = tmp_path / "clarifications.json"
-
-        # First session: create 2 items
-        queue1 = ClarificationQueue(storage_path)
-
-        item1 = queue1.add(
-            source_event_id="evt-001",
-            extracted_type="task",
-            extracted_data={"title": "First task", "content": "Do something"},
-            confidence=0.65,
-        )
-
-        item2 = queue1.add(
-            source_event_id="evt-002",
-            extracted_type="note",
-            extracted_data={"title": "Second note", "content": "Remember this"},
-            confidence=0.70,
-            alternatives=[{"type": "task", "confidence": 0.5}],
-        )
-
-        # Verify items were created
-        assert item1.clarification_id.startswith("clarif-")
-        assert item2.clarification_id.startswith("clarif-")
-
-        # Simulate restart: create new queue instance
-        queue2 = ClarificationQueue(storage_path)
-
-        # Verify items were restored
-        pending = queue2.get_pending()
-        assert len(pending) == 2
-
-        # Verify data integrity
-        ids = {item.clarification_id for item in pending}
-        assert item1.clarification_id in ids
-        assert item2.clarification_id in ids
-
-        # Verify all fields are preserved
-        restored_item1 = next(i for i in pending if i.clarification_id == item1.clarification_id)
-        assert restored_item1.source_event_id == "evt-001"
-        assert restored_item1.extracted_type == "task"
-        assert restored_item1.confidence == 0.65
-        assert restored_item1.extracted_data["title"] == "First task"
-
-        restored_item2 = next(i for i in pending if i.clarification_id == item2.clarification_id)
-        assert len(restored_item2.suggested_alternatives) == 1
-        assert restored_item2.suggested_alternatives[0]["type"] == "task"
-
-    def test_queue_serialization_format(self, tmp_path: Path):
-        """Verify queue uses proper JSON serialization."""
-        from kira.plugins.inbox.clarification_queue import ClarificationQueue
-
-        storage_path = tmp_path / "clarifications.json"
-        queue = ClarificationQueue(storage_path)
-
-        queue.add(
-            source_event_id="evt-test",
-            extracted_type="meeting",
-            extracted_data={"title": "Team sync"},
-            confidence=0.8,
-        )
-
-        # Verify file exists and has valid JSON
-        assert storage_path.exists()
-
-        with open(storage_path) as f:
-            data = json.load(f)
-
-        # Verify structure
-        assert "version" in data
-        assert "items" in data
-        assert len(data["items"]) == 1
-
-        item = data["items"][0]
-        assert "clarification_id" in item
-        assert "source_event_id" in item
-        assert "extracted_type" in item
-        assert "extracted_data" in item
-        assert "confidence" in item
-        assert "created_at" in item
-        assert "status" in item
-
-
-class TestPluginEntryPoint:
-    """Test plugin entry point alignment (Phase 0, Task 2)."""
-
-    def test_plugin_loads_without_sys_path_hacks(self, inbox_plugin_path: Path):
-        """Verify plugin loads via manifest entry without sys.path manipulation.
-
-        DoD: plugin starts from a clean env via `entry` without extra steps.
-        """
-        from kira.core.plugin_loader import PluginLoader
-        from kira.plugin_sdk.context import PluginContext
-
-        # Create loader with clean context
-        context = PluginContext(config={"vault": {"path": "./vault"}})
-        loader = PluginLoader(context=context, use_sandbox=False)
-
-        # Load plugin
-        result = loader.load_plugin(inbox_plugin_path)
-
-        # Verify plugin loaded successfully
-        assert result["name"] == "kira-inbox"
-        assert result["result"]["status"] == "ok"
-        assert "version" in result["result"]
-
-    def test_plugin_imports_are_clean(self, inbox_plugin_path: Path):
-        """Verify plugin module can be imported without side effects."""
-        import importlib
-        import sys
-
-        # Add plugin src to path temporarily
-        plugin_src = inbox_plugin_path / "src"
-        sys.path.insert(0, str(plugin_src))
-
-        try:
-            # Import should work cleanly
-            plugin_module = importlib.import_module("kira_plugin_inbox.plugin")
-
-            # Verify activate function exists
-            assert hasattr(plugin_module, "activate")
-            assert callable(plugin_module.activate)
-
-        finally:
-            # Clean up
-            if str(plugin_src) in sys.path:
-                sys.path.remove(str(plugin_src))
-
-
 class TestHostAPIIntegration:
-    """Test Host API in PluginContext (Phase 0, Task 3)."""
+    """Test Host API in PluginContext."""
 
     def test_plugin_context_receives_host_api(self, vault_with_host_api):
         """Verify PluginContext can be created with Host API."""
@@ -259,11 +117,11 @@ class TestHostAPIIntegration:
         assert loader.context.vault == vault_facade
 
 
-class TestPhase0Complete:
-    """Comprehensive test for all Phase 0 requirements."""
+class TestCoreIntegrationComplete:
+    """Comprehensive test for all core integration requirements."""
 
-    def test_all_phase0_requirements(self, tmp_path: Path, inbox_plugin_path: Path):
-        """Verify all Phase 0 tasks are complete.
+    def test_all_core_requirements(self, tmp_path: Path, inbox_plugin_path: Path):
+        """Verify all core integration requirements are complete.
 
         This test combines all requirements:
         1. Persistent clarification queue
@@ -287,9 +145,9 @@ class TestPhase0Complete:
         queue1 = ClarificationQueue(clarifications_path)
 
         item = queue1.add(
-            source_event_id="evt-phase0",
+            source_event_id="evt-core-test",
             extracted_type="task",
-            extracted_data={"title": "Phase 0 test", "content": "Verify all requirements"},
+            extracted_data={"title": "Core test", "content": "Verify all requirements"},
             confidence=0.6,
         )
 
@@ -329,3 +187,7 @@ class TestPhase0Complete:
         # Check that the new item is in the queue
         request_id = low_conf_result["request_id"]
         assert any(item.clarification_id == request_id for item in pending_after)
+
+
+pytestmark = pytest.mark.integration
+

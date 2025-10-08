@@ -1,8 +1,9 @@
-"""Integration tests for Phase 4 requirements (Migration & Compatibility).
+"""Integration tests for vault migration and compatibility.
 
-Phase 4 DoD:
-- Point 15: Vault migrator normalizes all .md, adds missing UIDs, converts timestamps to UTC
-- Point 16: Migration dry-run validates in read-only mode with detailed report
+Tests verify:
+- Vault migrator normalizes .md files, adds missing UIDs, converts timestamps to UTC
+- Migration dry-run validates in read-only mode with detailed report
+- Round-trip validation after migration
 """
 
 import json
@@ -18,11 +19,8 @@ from kira.core.time import format_utc_iso8601
 from kira.migration.migrator import migrate_vault, validate_migration
 
 
-class TestPhase4Point15VaultMigrator:
-    """Test Phase 4, Point 15: Vault migrator.
-
-    DoD: After migration, every file parses and passes round-trip tests.
-    """
+class TestVaultMigrator:
+    """Test vault migrator functionality."""
 
     def test_migrator_adds_missing_uids(self):
         """Test migrator adds missing UIDs to files."""
@@ -90,8 +88,8 @@ Content"""
             assert any("created" in change for change in changes)
             assert any("updated" in change for change in changes)
 
-    def test_dod_round_trip_after_migration(self):
-        """Test DoD: After migration, every file passes round-trip tests."""
+    def test_round_trip_after_migration(self):
+        """After migration, every file passes round-trip tests."""
         with tempfile.TemporaryDirectory() as tmpdir:
             vault_path = Path(tmpdir)
 
@@ -114,11 +112,8 @@ Content"""
                     assert is_valid, f"Round-trip failed for {result.file_path}: {errors}"
 
 
-class TestPhase4Point16MigrationDryRun:
-    """Test Phase 4, Point 16: Migration dry-run.
-
-    DoD: Report shows 0 critical errors before live run.
-    """
+class TestMigrationDryRun:
+    """Test migration dry-run functionality."""
 
     def test_dry_run_does_not_modify_files(self):
         """Test dry-run mode does not modify files."""
@@ -180,8 +175,8 @@ class TestPhase4Point16MigrationDryRun:
             needs_migration_result = next(r for r in results if "needs_migration" in str(r.file_path))
             assert len(needs_migration_result.changes) > 0
 
-    def test_dod_zero_critical_errors(self):
-        """Test DoD: Report shows 0 critical errors before live run."""
+    def test_zero_critical_errors(self):
+        """Report shows 0 critical errors before live run."""
         with tempfile.TemporaryDirectory() as tmpdir:
             vault_path = Path(tmpdir)
 
@@ -204,8 +199,8 @@ class TestPhase4Point16MigrationDryRun:
             assert critical_errors == 0, f"DoD failed: {critical_errors} critical errors found"
 
 
-class TestPhase4CLIIntegration:
-    """Test Phase 4 CLI integration."""
+class TestMigrationCLI:
+    """Test migration CLI integration."""
 
     def test_cli_dry_run_flag(self, tmp_path):
         """Test CLI --dry-run flag works."""
@@ -309,8 +304,8 @@ class TestPhase4CLIIntegration:
         assert exit_code == 5  # I/O error
 
 
-class TestPhase4EndToEnd:
-    """End-to-end test for Phase 4 complete workflow."""
+class TestMigrationEndToEnd:
+    """End-to-end test for complete migration workflow."""
 
     def test_complete_migration_workflow(self, tmp_path):
         """Test complete migration workflow: dry-run → validate → migrate → verify."""
@@ -354,5 +349,5 @@ class TestPhase4EndToEnd:
         assert exit_code == 0, "DoD failed: validation after migration should pass"
 
 
-# Mark slow tests
 pytestmark = pytest.mark.integration
+
