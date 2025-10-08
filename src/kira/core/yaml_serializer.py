@@ -106,6 +106,9 @@ def get_canonical_key_order(keys: list[str]) -> list[str]:
 def normalize_timestamps_to_utc(data: dict[str, Any]) -> dict[str, Any]:
     """Normalize timestamp fields to ISO-8601 UTC format.
     
+    Phase 1, Point 3: Ensures all timestamps are in ISO-8601 UTC format,
+    including nested timestamps (e.g., in x-kira metadata).
+    
     Parameters
     ----------
     data
@@ -114,16 +117,18 @@ def normalize_timestamps_to_utc(data: dict[str, Any]) -> dict[str, Any]:
     Returns
     -------
     dict[str, Any]
-        Data with normalized timestamps
+        Data with normalized timestamps (deep copy)
     """
-    result = data.copy()
+    result = {}
     
+    # Timestamp fields that should be normalized (including nested ones like last_write_ts)
     timestamp_fields = {
         "created", "updated", "due_date", "start_time", "end_time",
-        "done_ts", "start_ts", "created_ts", "updated_ts", "due_ts"
+        "done_ts", "start_ts", "created_ts", "updated_ts", "due_ts",
+        "last_write_ts",  # For x-kira metadata
     }
     
-    for key, value in list(result.items()):
+    for key, value in data.items():
         if key in timestamp_fields and value is not None:
             if isinstance(value, datetime):
                 # Convert datetime to ISO-8601 UTC
@@ -146,11 +151,17 @@ def normalize_timestamps_to_utc(data: dict[str, Any]) -> dict[str, Any]:
                     result[key] = dt.isoformat()
                 except (ValueError, AttributeError):
                     # Keep as-is if can't parse
-                    pass
-        
+                    result[key] = value
+            else:
+                result[key] = value
         # Recursively handle nested dicts (like x-kira)
         elif isinstance(value, dict):
             result[key] = normalize_timestamps_to_utc(value)
+        elif isinstance(value, list):
+            # Copy lists as-is
+            result[key] = value.copy() if hasattr(value, 'copy') else list(value)
+        else:
+            result[key] = value
     
     return result
 
@@ -201,7 +212,7 @@ def serialize_frontmatter(data: dict[str, Any], *, normalize_timestamps: bool = 
                 for line in nested_yaml.rstrip().split("\n"):
                     result_lines.append(f"  {line}")
             elif isinstance(value, list):
-                # List
+                # List (Phase 1, Point 3: proper escaping for list items)
                 if not value:
                     result_lines.append(f"{key}: []")
                 else:
@@ -210,7 +221,14 @@ def serialize_frontmatter(data: dict[str, Any], *, normalize_timestamps: bool = 
                         # Proper YAML list serialization
                         if isinstance(item, str):
                             # Handle special characters in strings
-                            if any(c in item for c in [":", "#", "|", ">", "&", "*", "!", "%", "@"]) or "\n" in item:
+                            # Wiki-style links [[...]] and other special chars need quoting
+                            needs_quoting = (
+                                any(c in item for c in [":", "#", "|", ">", "&", "*", "!", "%", "@"]) or
+                                "\n" in item or
+                                item.startswith((" ", "-", "[", "{")) or
+                                item.startswith("[[")
+                            )
+                            if needs_quoting:
                                 # Use quoted string - remove document separators
                                 dumped = yaml.dump(item, default_flow_style=True).strip()
                                 # Remove document start/end markers
@@ -229,8 +247,15 @@ def serialize_frontmatter(data: dict[str, Any], *, normalize_timestamps: bool = 
             elif isinstance(value, (int, float)):
                 result_lines.append(f"{key}: {value}")
             elif isinstance(value, str):
-                # Handle special characters in strings
-                if any(c in value for c in [":", "#", "|", ">", "&", "*", "!", "%", "@"]) or "\n" in value or value.startswith((" ", "-")):
+                # Handle special characters in strings (Phase 1, Point 3: proper escaping)
+                # Strings starting with [ or { need quoting to avoid YAML flow collection parsing
+                needs_quoting = (
+                    any(c in value for c in [":", "#", "|", ">", "&", "*", "!", "%", "@"]) or
+                    "\n" in value or
+                    value.startswith((" ", "-", "[", "{")) or
+                    value.startswith("[[")  # Wiki-style links need quoting
+                )
+                if needs_quoting:
                     # Use YAML's dump for proper quoting/escaping - remove document separators
                     dumped = yaml.dump(value, default_flow_style=True, allow_unicode=True).strip()
                     dumped = dumped.replace("...", "").replace("---", "").strip()
