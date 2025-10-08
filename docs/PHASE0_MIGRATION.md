@@ -129,7 +129,50 @@ grep -r "open(.*'w" src/kira/cli/ src/kira/plugins/
 ✅ Integration with existing Vault operations  
 ✅ All 26 tests passing (vault storage + YAML serializer)
 
-## Point 3: UTC Time Discipline - STATUS: Pending
+## Point 3: UTC Time Discipline - STATUS: Complete
 
-TODO: Document after implementation
+### What's Done
+
+- ✅ Enhanced `src/kira/core/time.py` with UTC discipline helpers:
+  - `get_current_utc()` - Always get time in UTC
+  - `format_utc_iso8601()` - Format datetime as ISO-8601 UTC
+  - `parse_utc_iso8601()` - Parse ISO-8601 to UTC datetime
+  - `localize_utc_to_tz()` - Convert UTC to local timezone for display
+  - `get_day_window_utc()` - Day boundaries in UTC with DST awareness
+  - `get_week_window_utc()` - Week boundaries in UTC with DST awareness
+  - `is_dst_transition_day()` - Detect DST transitions
+
+- ✅ UTC Discipline Principles:
+  - All timestamps stored as UTC (ISO-8601 format)
+  - No local times persist in files
+  - Localization only for display (--tz flag)
+  - Format: `2025-10-08T12:30:00+00:00`
+
+- ✅ DST Awareness:
+  - `DayWindow` dataclass for day boundaries with DST flag
+  - `WeekWindow` dataclass for week boundaries with DST flag
+  - Correct handling of 23-hour days (spring forward)
+  - Correct handling of 25-hour days (fall back)
+  - Day/week windows account for DST transitions
+
+- ✅ Timezone Localization:
+  - Store: Always UTC
+  - Display: Localize with `localize_utc_to_tz()`
+  - Round-trip: format→parse→format yields identical UTC
+
+- ✅ Comprehensive tests in `tests/unit/test_time_utc_discipline.py`:
+  - 22 tests covering UTC discipline
+  - DST spring forward tests (23-hour day)
+  - DST fall back tests (25-hour day)
+  - Week windows with DST transitions
+  - Multiple timezones (Europe, US)
+  - Round-trip formatting verification
+
+### DoD Status
+
+✅ ISO-8601 UTC parse/format helpers implemented  
+✅ --tz localization for display (storage always UTC)  
+✅ Day/week window math with DST awareness  
+✅ Unit tests cover DST transitions (spring/fall)  
+✅ No local times persist in files (enforced by format_utc_iso8601)
 
