@@ -7,12 +7,12 @@ handles sync events, and provides timeboxing for tasks entering execution.
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from kira.plugin_sdk.context import PluginContext
-from kira.plugin_sdk.decorators import on_event
+if TYPE_CHECKING:
+    from kira.plugin_sdk.context import PluginContext
 
 __all__ = ["activate"]
 
@@ -29,7 +29,7 @@ class CalendarPlugin:
     - Resolve conflicts using last-writer-wins
     """
 
-    def __init__(self, context: PluginContext):
+    def __init__(self, context: PluginContext) -> None:
         """Initialize calendar plugin.
 
         Parameters
@@ -130,7 +130,7 @@ class CalendarPlugin:
             self._mappings[task_id] = {
                 "vault_id": task_id,
                 "timeboxed": True,
-                "timeboxed_at": datetime.now(timezone.utc).isoformat(),
+                "timeboxed_at": datetime.now(UTC).isoformat(),
             }
             self._save_mappings()
 
@@ -195,7 +195,7 @@ class CalendarPlugin:
                 "start": start,
                 "end": end,
                 "gcal_id": gcal_id,
-                "gcal_last_synced": datetime.now(timezone.utc).isoformat(),
+                "gcal_last_synced": datetime.now(UTC).isoformat(),
                 "source": "gcal",
             }
 
@@ -245,7 +245,7 @@ class CalendarPlugin:
                 "title": gcal_event.get("summary"),
                 "start": gcal_event.get("start"),
                 "end": gcal_event.get("end"),
-                "gcal_last_synced": datetime.now(timezone.utc).isoformat(),
+                "gcal_last_synced": datetime.now(UTC).isoformat(),
             }
 
             # Add optional fields if present
@@ -268,7 +268,7 @@ class CalendarPlugin:
 
             # Update mapping
             if vault_id in self._mappings:
-                self._mappings[vault_id]["gcal_updated"] = datetime.now(timezone.utc).isoformat()
+                self._mappings[vault_id]["gcal_updated"] = datetime.now(UTC).isoformat()
                 self._save_mappings()
 
             self.logger.info(f"Updated Vault entity {vault_id} from GCal event {gcal_id}")
@@ -400,7 +400,7 @@ def activate(context: PluginContext) -> dict[str, str]:
     context.logger.info("Activating calendar sync plugin (ADR-012)")
 
     # Initialize plugin
-    plugin = CalendarPlugin(context)
+    CalendarPlugin(context)
 
     # Publish activation event
     context.events.publish(

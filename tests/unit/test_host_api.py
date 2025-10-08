@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import sys
-from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
@@ -130,7 +129,7 @@ class TestHostAPI:
         host_api = HostAPI(tmp_path)
 
         with pytest.raises(EntityNotFoundError):
-            host_api.read_entity("nonexistent-123")
+            host_api.read_entity("task-nonexistent-123")
 
     def test_update_entity(self, tmp_path):
         host_api = HostAPI(tmp_path)
@@ -253,7 +252,7 @@ class TestHostAPI:
         event_bus = EventBus()
         events: list[tuple[str, dict]] = []
 
-        def capture_events(event):
+        def capture_events(event) -> None:
             events.append((event.name, event.payload))
 
         event_bus.subscribe("entity.created", capture_events)

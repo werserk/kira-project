@@ -3,7 +3,7 @@
 
 import sys
 from collections import Counter
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 # Добавляем src в путь
@@ -40,7 +40,7 @@ def cli(period: str, verbose: bool) -> int:
             return 1
 
         # Определить временной диапазон
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         if period == "week":
             start_date = now - timedelta(days=7)
             period_name = "за последнюю неделю"
@@ -51,7 +51,7 @@ def cli(period: str, verbose: bool) -> int:
             start_date = now - timedelta(days=365)
             period_name = "за последний год"
         else:  # all
-            start_date = datetime.min.replace(tzinfo=timezone.utc)
+            start_date = datetime.min.replace(tzinfo=UTC)
             period_name = "за всё время"
 
         # Собрать статистику
@@ -133,7 +133,7 @@ def collect_statistics(vault_path: Path, start_date: datetime, end_date: datetim
                 due = metadata.get("due")
                 if due and status not in ["done"]:
                     due_date = parse_date(due)
-                    if due_date and due_date < datetime.now(timezone.utc):
+                    if due_date and due_date < datetime.now(UTC):
                         stats["tasks"]["overdue"] += 1
 
             except Exception:
@@ -177,7 +177,7 @@ def collect_statistics(vault_path: Path, start_date: datetime, end_date: datetim
                 stats["events"]["total"] += 1
 
                 # Учитываем только прошедшие события
-                if start < datetime.now(timezone.utc):
+                if start < datetime.now(UTC):
                     stats["events"]["attended"] += 1
 
             except Exception:
@@ -193,7 +193,7 @@ def display_statistics(stats: dict, period_name: str, verbose: bool) -> None:
 
     # Задачи
     task_stats = stats["tasks"]
-    click.echo(f"\n📋 Задачи:")
+    click.echo("\n📋 Задачи:")
     click.echo(f"  Всего создано: {task_stats['total']}")
 
     if task_stats["total"] > 0:
@@ -207,28 +207,28 @@ def display_statistics(stats: dict, period_name: str, verbose: bool) -> None:
 
         # Топ-5 тегов для задач
         if task_stats["by_tag"] and verbose:
-            click.echo(f"\n  📌 Топ-5 тегов:")
+            click.echo("\n  📌 Топ-5 тегов:")
             for tag, count in task_stats["by_tag"].most_common(5):
                 click.echo(f"     #{tag}: {count}")
 
     # Заметки
     note_stats = stats["notes"]
-    click.echo(f"\n📝 Заметки:")
+    click.echo("\n📝 Заметки:")
     click.echo(f"  Всего создано: {note_stats['total']}")
 
     if note_stats["by_tag"] and verbose:
-        click.echo(f"\n  📌 Топ-5 тегов:")
+        click.echo("\n  📌 Топ-5 тегов:")
         for tag, count in note_stats["by_tag"].most_common(5):
             click.echo(f"     #{tag}: {count}")
 
     # События
     event_stats = stats["events"]
-    click.echo(f"\n📆 События:")
+    click.echo("\n📆 События:")
     click.echo(f"  Всего запланировано: {event_stats['total']}")
     click.echo(f"  Посещено: {event_stats['attended']}")
 
     # Общая продуктивность
-    click.echo(f"\n🎯 Продуктивность:")
+    click.echo("\n🎯 Продуктивность:")
 
     total_items = task_stats["total"] + note_stats["total"]
     click.echo(f"  Всего создано: {total_items} элементов")

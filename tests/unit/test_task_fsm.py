@@ -1,7 +1,7 @@
 """Tests for Task FSM (ADR-014)."""
 
-import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+from typing import Never
 from unittest.mock import MagicMock, Mock
 
 import pytest
@@ -35,7 +35,7 @@ class TestTaskTransition:
         transition = TaskTransition(
             from_state=TaskState.TODO,
             to_state=TaskState.DOING,
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             reason="Starting work",
         )
 
@@ -51,7 +51,7 @@ class TestTaskTransition:
         transition = TaskTransition(
             from_state=TaskState.DOING,
             to_state=TaskState.DONE,
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             metadata=metadata,
         )
 
@@ -283,7 +283,7 @@ class TestTaskFSMHooks:
     def test_hook_failure_logged(self):
         """Test hook failure is logged but doesn't fail transition."""
 
-        def failing_hook(context):
+        def failing_hook(context) -> Never:
             raise ValueError("Hook failed!")
 
         self.fsm.register_hook(TaskState.DOING, failing_hook)
@@ -313,7 +313,7 @@ class TestTaskFSMHooks:
         """Test timeboxing hook is called on enter_doing."""
         timebox_created = []
 
-        def create_timebox_hook(context):
+        def create_timebox_hook(context) -> None:
             """Mock timeboxing hook."""
             timebox_created.append(
                 {
@@ -490,7 +490,7 @@ class TestTimeboxingCoverage:
         self.fsm = TaskFSM(event_bus=self.event_bus)
         self.timeboxed_tasks = set()
 
-        def track_timebox(context):
+        def track_timebox(context) -> None:
             self.timeboxed_tasks.add(context["task_id"])
 
         self.fsm.register_hook(TaskState.DOING, track_timebox)

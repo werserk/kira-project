@@ -10,7 +10,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-import jsonschema  # type: ignore[import-untyped]
+import jsonschema
 
 __all__ = [
     "EntitySchema",
@@ -100,9 +100,8 @@ class EntitySchema:
 
         def extract_defaults(schema_part: dict[str, Any], path: str = "") -> None:
             if isinstance(schema_part, dict):
-                if "default" in schema_part:
-                    if path:
-                        defaults[path] = schema_part["default"]
+                if "default" in schema_part and path:
+                    defaults[path] = schema_part["default"]
 
                 if "properties" in schema_part:
                     for prop, prop_schema in schema_part["properties"].items():

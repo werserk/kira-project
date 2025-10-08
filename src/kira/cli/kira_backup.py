@@ -3,7 +3,7 @@
 
 import shutil
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 # Добавляем src в путь
@@ -39,16 +39,13 @@ def create_command(name: str | None, destination: str | None, verbose: bool) -> 
             return 1
 
         # Определить директорию бэкапов
-        if destination:
-            backup_root = Path(destination)
-        else:
-            backup_root = vault_path.parent / ".backups"
+        backup_root = Path(destination) if destination else vault_path.parent / ".backups"
 
         backup_root.mkdir(parents=True, exist_ok=True)
 
         # Создать имя бэкапа
         if not name:
-            timestamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
+            timestamp = datetime.now(UTC).strftime("%Y%m%d-%H%M%S")
             name = f"vault-backup-{timestamp}"
 
         backup_path = backup_root / name
@@ -68,7 +65,7 @@ def create_command(name: str | None, destination: str | None, verbose: bool) -> 
 
         # Создать метаинформацию
         metadata = {
-            "created": datetime.now(timezone.utc).isoformat(),
+            "created": datetime.now(UTC).isoformat(),
             "source": str(vault_path),
             "name": name,
         }
@@ -111,10 +108,7 @@ def list_command(destination: str | None, verbose: bool) -> int:
         vault_path = Path(config.get("vault", {}).get("path", "vault"))
 
         # Определить директорию бэкапов
-        if destination:
-            backup_root = Path(destination)
-        else:
-            backup_root = vault_path.parent / ".backups"
+        backup_root = Path(destination) if destination else vault_path.parent / ".backups"
 
         if not backup_root.exists():
             click.echo("💾 Бэкапов пока нет")
@@ -181,10 +175,7 @@ def restore_command(backup_name: str, destination: str | None, force: bool, verb
         vault_path = Path(config.get("vault", {}).get("path", "vault"))
 
         # Определить директорию бэкапов
-        if destination:
-            backup_root = Path(destination)
-        else:
-            backup_root = vault_path.parent / ".backups"
+        backup_root = Path(destination) if destination else vault_path.parent / ".backups"
 
         backup_path = backup_root / backup_name
 
@@ -207,7 +198,7 @@ def restore_command(backup_name: str, destination: str | None, force: bool, verb
                     return 0
 
             # Создать временный бэкап текущего Vault
-            temp_backup_name = f"vault-before-restore-{datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')}"
+            temp_backup_name = f"vault-before-restore-{datetime.now(UTC).strftime('%Y%m%d-%H%M%S')}"
             temp_backup_path = backup_root / temp_backup_name
 
             click.echo(f"💾 Создание временного бэкапа текущего Vault: {temp_backup_name}")
@@ -249,10 +240,7 @@ def delete_command(backup_name: str, destination: str | None, force: bool, verbo
         vault_path = Path(config.get("vault", {}).get("path", "vault"))
 
         # Определить директорию бэкапов
-        if destination:
-            backup_root = Path(destination)
-        else:
-            backup_root = vault_path.parent / ".backups"
+        backup_root = Path(destination) if destination else vault_path.parent / ".backups"
 
         backup_path = backup_root / backup_name
 
@@ -261,10 +249,9 @@ def delete_command(backup_name: str, destination: str | None, force: bool, verbo
             return 1
 
         # Подтверждение
-        if not force:
-            if not click.confirm(f"Удалить бэкап {backup_name}?"):
-                click.echo("Отменено")
-                return 0
+        if not force and not click.confirm(f"Удалить бэкап {backup_name}?"):
+            click.echo("Отменено")
+            return 0
 
         # Удалить
         shutil.rmtree(backup_path)
@@ -307,7 +294,7 @@ def get_backup_info(backup_path: Path) -> dict:
     # Если метаинформации нет, использовать время модификации
     if not info["created"]:
         mtime = backup_path.stat().st_mtime
-        info["created"] = datetime.fromtimestamp(mtime, tz=timezone.utc).isoformat()
+        info["created"] = datetime.fromtimestamp(mtime, tz=UTC).isoformat()
 
     # Подсчитать размер
     total_size = sum(f.stat().st_size for f in backup_path.rglob("*") if f.is_file())

@@ -13,9 +13,9 @@ from typing import Any
 __all__ = [
     "IngressResult",
     "IngressValidator",
-    "normalize_telegram_payload",
-    "normalize_gcal_payload",
     "normalize_cli_payload",
+    "normalize_gcal_payload",
+    "normalize_telegram_payload",
 ]
 
 logger = logging.getLogger(__name__)
@@ -95,13 +95,12 @@ class IngressValidator:
         # Source-specific normalization
         if source == "telegram":
             return self._normalize_telegram(payload)
-        elif source == "gcal":
+        if source == "gcal":
             return self._normalize_gcal(payload)
-        elif source == "cli":
+        if source == "cli":
             return self._normalize_cli(payload)
-        else:
-            # Generic normalization
-            return self._normalize_generic(source, payload)
+        # Generic normalization
+        return self._normalize_generic(source, payload)
 
     def _normalize_telegram(self, payload: dict[str, Any]) -> IngressResult:
         """Normalize Telegram payload."""

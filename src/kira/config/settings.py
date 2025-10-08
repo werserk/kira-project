@@ -12,13 +12,12 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
 
 __all__ = [
-    "Settings",
-    "load_settings",
-    "get_settings",
     "ConfigError",
+    "Settings",
+    "get_settings",
+    "load_settings",
 ]
 
 
@@ -153,7 +152,7 @@ class Settings:
                 raise ConfigError("KIRA_VAULT_PATH is required. " "Set it in .env or environment.")
 
             # Parse settings
-            settings = cls(
+            return cls(
                 # Phase 0, Point 1: Runtime mode (defaults to alpha)
                 mode=os.environ.get("KIRA_MODE", "alpha"),
                 vault_path=Path(vault_path),
@@ -177,8 +176,6 @@ class Settings:
                 telegram_bot_token=os.environ.get("KIRA_TELEGRAM_BOT_TOKEN"),
                 telegram_allowed_users=parse_int_list(os.environ.get("KIRA_TELEGRAM_ALLOWED_USERS", "")),
             )
-
-            return settings
 
         except (ValueError, KeyError) as exc:
             raise ConfigError(f"Invalid configuration: {exc}") from exc
@@ -207,9 +204,7 @@ def load_env_file(env_file: Path) -> None:
                 value = value.strip()
 
                 # Remove quotes
-                if value.startswith('"') and value.endswith('"'):
-                    value = value[1:-1]
-                elif value.startswith("'") and value.endswith("'"):
+                if (value.startswith('"') and value.endswith('"')) or (value.startswith("'") and value.endswith("'")):
                     value = value[1:-1]
 
                 os.environ[key] = value

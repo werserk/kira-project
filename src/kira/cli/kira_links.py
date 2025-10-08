@@ -324,9 +324,9 @@ def add_link_to_file(file_path: Path, target_id: str, target_title: str) -> None
     No direct file writes allowed.
     """
     # Read using markdown I/O
-    from ..core.md_io import read_markdown
-    from ..core.host import create_host_api
     from ..core.config import load_config
+    from ..core.host import create_host_api
+    from ..core.md_io import read_markdown
 
     doc = read_markdown(file_path)
     content = doc.content
@@ -337,7 +337,7 @@ def add_link_to_file(file_path: Path, target_id: str, target_title: str) -> None
 
     # Добавить секцию связей если её нет
     if "## Связи" not in content and "## Links" not in content:
-        content += f"\n\n## Связи\n\n"
+        content += "\n\n## Связи\n\n"
 
     # Добавить ссылку
     link_text = f"- [[{target_id}]] - {target_title}\n"

@@ -12,22 +12,23 @@ import json
 import logging
 import sys
 from dataclasses import asdict, dataclass, field
-from datetime import datetime
-from pathlib import Path
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 from ..core.time import format_utc_iso8601, get_current_utc
 
+if TYPE_CHECKING:
+    from pathlib import Path
+
 __all__ = [
-    "StructuredLogger",
     "LogLevel",
+    "StructuredLogger",
     "create_logger",
-    "log_ingress",
-    "log_validation_success",
-    "log_validation_failure",
-    "log_upsert",
     "log_conflict",
+    "log_ingress",
     "log_quarantine",
+    "log_upsert",
+    "log_validation_failure",
+    "log_validation_success",
 ]
 
 LogLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]

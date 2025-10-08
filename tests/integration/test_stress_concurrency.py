@@ -21,7 +21,6 @@ import pytest
 
 from kira.core.host import create_host_api
 from kira.core.idempotency import EventDedupeStore, generate_event_id
-from kira.core.ordering import EventBuffer
 
 
 @pytest.fixture
@@ -47,7 +46,7 @@ def test_out_of_order_events_converge(test_env):
     2. Process in wrong order: T3, T1, T2
     3. Verify dedupe handles all correctly
     """
-    host_api, dedupe_store = test_env
+    _host_api, dedupe_store = test_env
 
     # Generate events with different IDs (simulating out-of-order)
     events = [
@@ -92,7 +91,7 @@ def test_parallel_writers_no_corruption(test_env):
     errors = []
     lock = threading.Lock()
 
-    def create_entities(thread_id):
+    def create_entities(thread_id) -> None:
         """Worker function to create entities."""
         try:
             for i in range(entities_per_thread):
@@ -130,7 +129,7 @@ def test_parallel_writers_no_corruption(test_env):
     assert len(created_entities) == expected_count
 
     # Verify all entities have unique IDs
-    unique_ids = set(e.id for e in created_entities)
+    unique_ids = {e.id for e in created_entities}
     assert len(unique_ids) == expected_count, "Duplicate IDs detected!"
 
 
@@ -160,7 +159,7 @@ def test_concurrent_reads_consistent(test_env):
     read_results = []
     lock = threading.Lock()
 
-    def read_entity():
+    def read_entity() -> None:
         """Worker function to read entity."""
         try:
             result = host_api.read_entity(entity_id)
@@ -199,7 +198,7 @@ def test_no_deadlocks_under_load(test_env):
     completed_operations = []
     lock = threading.Lock()
 
-    def mixed_operations(op_id):
+    def mixed_operations(op_id) -> None:
         """Worker with mixed operations."""
         try:
             # Create
@@ -213,10 +212,10 @@ def test_no_deadlocks_under_load(test_env):
             )
 
             # Read
-            read_back = host_api.read_entity(entity.id)
+            host_api.read_entity(entity.id)
 
             # Update
-            updated = host_api.update_entity(entity.id, {"status": "doing"})
+            host_api.update_entity(entity.id, {"status": "doing"})
 
             # Delete
             host_api.delete_entity(entity.id)
@@ -270,7 +269,7 @@ def test_duplicate_detection_under_concurrency(test_env):
     created_count = []
     lock = threading.Lock()
 
-    def try_create():
+    def try_create() -> None:
         """Worker trying to create entity for same event."""
         try:
             if not dedupe_store.is_duplicate(event_id):

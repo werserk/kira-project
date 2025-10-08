@@ -9,7 +9,6 @@ from __future__ import annotations
 import re
 from collections import defaultdict
 from dataclasses import dataclass, field
-from pathlib import Path
 from typing import Any
 
 __all__ = [
@@ -462,9 +461,9 @@ def extract_links_from_frontmatter(frontmatter: dict[str, Any]) -> list[tuple[st
         "references": LinkType.REFERENCES,
     }
 
-    for field, link_type in link_fields.items():
-        if field in frontmatter:
-            value = frontmatter[field]
+    for field_name, link_type in link_fields.items():
+        if field_name in frontmatter:
+            value = frontmatter[field_name]
             if isinstance(value, str):
                 links.append((link_type, value))
             elif isinstance(value, list):
@@ -549,7 +548,7 @@ def find_broken_links(
     all_links = fm_links + content_links
 
     # Check each target
-    for link_type, target_id in all_links:
+    for _link_type, target_id in all_links:
         if target_id.startswith("tag-"):
             # Tags are always valid
             continue

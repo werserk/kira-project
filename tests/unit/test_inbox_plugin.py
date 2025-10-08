@@ -2,17 +2,14 @@
 
 from __future__ import annotations
 
-import json
 import sys
-from datetime import datetime, timezone
 from pathlib import Path
-from unittest.mock import MagicMock, patch
-
-import pytest
+from unittest.mock import MagicMock
 
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
+from kira.plugin_sdk.context import PluginContext
 from kira.plugins.inbox.src.kira_plugin_inbox.plugin import (
     ClarificationRequest,
     EntityClassification,
@@ -20,7 +17,6 @@ from kira.plugins.inbox.src.kira_plugin_inbox.plugin import (
     activate,
     get_normalizer,
 )
-from kira.plugin_sdk.context import PluginContext
 
 
 class TestEntityClassification:

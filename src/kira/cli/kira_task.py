@@ -2,7 +2,7 @@
 """CLI модуль для работы с задачами"""
 
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 # Добавляем src в путь
@@ -139,7 +139,7 @@ def add_command(title: str, due: str | None, tag: tuple[str, ...], priority: str
             "title": title,
             "status": "todo",
             "priority": priority,
-            "created": datetime.now(timezone.utc).isoformat(),
+            "created": datetime.now(UTC).isoformat(),
         }
 
         if due_date:
@@ -212,7 +212,8 @@ def block_command(task_id: str, reason: str | None, verbose: bool) -> int:
                     body = parts[2]
 
                     # Добавить блок с причиной блокировки
-                    block_note = f"\n\n## 🚫 Заблокировано\n\n{reason}\n\n*Заблокировано: {datetime.now().strftime('%Y-%m-%d %H:%M')}*\n"
+                    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
+                    block_note = f"\n\n## 🚫 Заблокировано\n\n{reason}\n\n*Заблокировано: {timestamp}*\n"
                     new_content = f"---{frontmatter}---{body.rstrip()}{block_note}"
 
                     f.seek(0)
@@ -250,10 +251,9 @@ def delete_command(task_id: str, force: bool, verbose: bool) -> int:
             return 1
 
         # Подтверждение
-        if not force:
-            if not click.confirm(f"Удалить задачу {task_id}?"):
-                click.echo("Отменено")
-                return 0
+        if not force and not click.confirm(f"Удалить задачу {task_id}?"):
+            click.echo("Отменено")
+            return 0
 
         # Удалить файл
         task_path.unlink()
@@ -331,10 +331,9 @@ def archive_command(task_id: str | None, done: bool, older_than: int | None, for
                 click.echo(f"❌ Задача не найдена: {task_id}")
                 return 1
 
-            if not force:
-                if not click.confirm(f"Архивировать задачу {task_id}?"):
-                    click.echo("Отменено")
-                    return 0
+            if not force and not click.confirm(f"Архивировать задачу {task_id}?"):
+                click.echo("Отменено")
+                return 0
 
             # Переместить в архив
             archive_path = archive_dir / task_path.name
@@ -346,7 +345,7 @@ def archive_command(task_id: str | None, done: bool, older_than: int | None, for
 
             return 0
 
-        elif done or older_than:
+        if done or older_than:
             # Массовая архивация
             tasks_dir = vault_path / "tasks"
             if not tasks_dir.exists():
@@ -354,7 +353,7 @@ def archive_command(task_id: str | None, done: bool, older_than: int | None, for
                 return 0
 
             tasks_to_archive = []
-            now = datetime.now(timezone.utc)
+            now = datetime.now(UTC)
 
             for task_file in tasks_dir.glob("task-*.md"):
                 try:
@@ -394,7 +393,7 @@ def archive_command(task_id: str | None, done: bool, older_than: int | None, for
             click.echo(f"📦 Найдено задач для архивации: {len(tasks_to_archive)}")
 
             if not force:
-                for task_file, metadata in tasks_to_archive[:5]:
+                for _task_file, metadata in tasks_to_archive[:5]:
                     click.echo(f"  • {metadata.get('title', 'Untitled')} ({metadata.get('id')})")
                 if len(tasks_to_archive) > 5:
                     click.echo(f"  ... и еще {len(tasks_to_archive) - 5}")
@@ -405,7 +404,7 @@ def archive_command(task_id: str | None, done: bool, older_than: int | None, for
 
             # Архивировать
             archived_count = 0
-            for task_file, metadata in tasks_to_archive:
+            for task_file, _metadata in tasks_to_archive:
                 try:
                     archive_path = archive_dir / task_file.name
                     task_file.rename(archive_path)
@@ -417,9 +416,8 @@ def archive_command(task_id: str | None, done: bool, older_than: int | None, for
             click.echo(f"✅ Архивировано задач: {archived_count}")
             return 0
 
-        else:
-            click.echo("❌ Укажите task_id, --done или --older-than")
-            return 1
+        click.echo("❌ Укажите task_id, --done или --older-than")
+        return 1
 
     except Exception as exc:
         click.echo(f"❌ Ошибка архивации: {exc}")
@@ -478,7 +476,7 @@ def filter_tasks(tasks: list[dict], status: str, due: str, tag: str | None) -> l
 
     # Фильтр по дедлайну
     if due != "all":
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         today = now.date()
 
         if due == "today":
@@ -533,15 +531,15 @@ def display_task_list(tasks: list[dict], verbose: bool) -> None:
         due_str = ""
         if due:
             due_date = parse_date(due)
-            today = datetime.now(timezone.utc).date()
+            today = datetime.now(UTC).date()
             days_diff = (due_date.date() - today).days
 
             if days_diff < 0:
                 due_str = click.style(f" 🔴 {due_date.strftime('%Y-%m-%d')}", fg="red", bold=True)
             elif days_diff == 0:
-                due_str = click.style(f" 🟡 сегодня", fg="yellow")
+                due_str = click.style(" 🟡 сегодня", fg="yellow")
             elif days_diff == 1:
-                due_str = click.style(f" 🟢 завтра", fg="green")
+                due_str = click.style(" 🟢 завтра", fg="green")
             else:
                 due_str = f" 📅 {due_date.strftime('%Y-%m-%d')}"
 
@@ -625,7 +623,7 @@ def change_task_status(task_id: str, new_status: str, verbose: bool) -> int:
             task_path,
             {
                 "status": new_status,
-                "updated": datetime.now(timezone.utc).isoformat(),
+                "updated": datetime.now(UTC).isoformat(),
             },
         )
 
@@ -682,21 +680,20 @@ def parse_due_date(due_str: str) -> datetime:
     from datetime import timedelta
 
     due_str = due_str.lower().strip()
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     if due_str == "today":
         return now.replace(hour=23, minute=59, second=59, microsecond=0)
-    elif due_str == "tomorrow":
+    if due_str == "tomorrow":
         tomorrow = now + timedelta(days=1)
         return tomorrow.replace(hour=23, minute=59, second=59, microsecond=0)
-    else:
-        # Попытаться распарсить как дату
-        try:
-            return datetime.fromisoformat(due_str).replace(tzinfo=timezone.utc)
-        except ValueError:
-            # Попробовать формат YYYY-MM-DD
-            date_obj = datetime.strptime(due_str, "%Y-%m-%d")
-            return date_obj.replace(hour=23, minute=59, second=59, tzinfo=timezone.utc)
+    # Попытаться распарсить как дату
+    try:
+        return datetime.fromisoformat(due_str).replace(tzinfo=UTC)
+    except ValueError:
+        # Попробовать формат YYYY-MM-DD
+        date_obj = datetime.strptime(due_str, "%Y-%m-%d")
+        return date_obj.replace(hour=23, minute=59, second=59, tzinfo=UTC)
 
 
 def main(args: list[str] | None = None) -> int:

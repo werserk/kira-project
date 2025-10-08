@@ -54,36 +54,31 @@ def find_filesystem_writes(file_path: Path) -> list[str]:
 
     for node in ast.walk(tree):
         # Check for open() calls with write mode
-        if isinstance(node, ast.Call):
-            if isinstance(node.func, ast.Name) and node.func.id == "open":
-                # Check if mode is 'w', 'a', 'wb', etc.
-                for arg in node.args[1:2]:  # Second argument is mode
-                    if isinstance(arg, ast.Constant) and isinstance(arg.value, str):
-                        if any(m in arg.value for m in ["w", "a", "x", "+"]):
-                            # Check if it's writing to Vault path
-                            if len(node.args) > 0:
-                                first_arg = node.args[0]
-                                # Conservative check: flag any write operation
-                                # Real implementation should check path
-                                violations.append(f"Line {node.lineno}: open() with write mode '{arg.value}'")
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id == "open":
+            # Check if mode is 'w', 'a', 'wb', etc.
+            for arg in node.args[1:2]:  # Second argument is mode
+                if isinstance(arg, ast.Constant) and isinstance(arg.value, str):
+                    if any(m in arg.value for m in ["w", "a", "x", "+"]):
+                        # Check if it's writing to Vault path
+                        if len(node.args) > 0:
+                            node.args[0]
+                            # Conservative check: flag any write operation
+                            # Real implementation should check path
+                            violations.append(f"Line {node.lineno}: open() with write mode '{arg.value}'")
 
         # Check for Path.write_text() or Path.write_bytes()
-        if isinstance(node, ast.Call):
-            if isinstance(node.func, ast.Attribute):
-                if node.func.attr in ("write_text", "write_bytes", "mkdir", "unlink"):
-                    violations.append(f"Line {node.lineno}: Path.{node.func.attr}() - direct file operation")
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute):
+            if node.func.attr in ("write_text", "write_bytes", "mkdir", "unlink"):
+                violations.append(f"Line {node.lineno}: Path.{node.func.attr}() - direct file operation")
 
         # Check for os.remove, os.unlink, shutil operations
-        if isinstance(node, ast.Call):
-            if isinstance(node.func, ast.Attribute):
-                forbidden_ops = {"remove", "unlink", "rmdir", "removedirs", "mkdir", "makedirs", "rename", "replace"}
-                if node.func.attr in forbidden_ops:
-                    if isinstance(node.func.value, ast.Name):
-                        if node.func.value.id in ("os", "shutil"):
-                            violations.append(
-                                f"Line {node.lineno}: {node.func.value.id}.{node.func.attr}() - "
-                                f"direct filesystem operation"
-                            )
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute):
+            forbidden_ops = {"remove", "unlink", "rmdir", "removedirs", "mkdir", "makedirs", "rename", "replace"}
+            if node.func.attr in forbidden_ops and isinstance(node.func.value, ast.Name):
+                if node.func.value.id in ("os", "shutil"):
+                    violations.append(
+                        f"Line {node.lineno}: {node.func.value.id}.{node.func.attr}() - " f"direct filesystem operation"
+                    )
 
     return violations
 

@@ -134,7 +134,7 @@ def search_command(query: str, search_type: str, limit: int, verbose: bool) -> i
         return 1
 
 
-def handle_analyze(path: str | None, output: str | None, verbose: bool, config: dict) -> int:
+def handle_analyze(path: str | None, output: str | None, verbose: bool, _config: dict) -> int:
     """Обработка команды analyze."""
 
     click.echo("🔍 Анализ кода...")
@@ -152,7 +152,7 @@ def handle_analyze(path: str | None, output: str | None, verbose: bool, config: 
     return 0
 
 
-def handle_index(rebuild: bool, verbose: bool, config: dict) -> int:
+def handle_index(rebuild: bool, verbose: bool, _config: dict) -> int:
     """Обработка команды index."""
 
     click.echo("🗂️ Индексация кода...")
@@ -170,7 +170,7 @@ def handle_search(
     search_type: str,
     limit: int,
     verbose: bool,
-    config: dict,
+    _config: dict,
 ) -> int:
     """Обработка команды search."""
 

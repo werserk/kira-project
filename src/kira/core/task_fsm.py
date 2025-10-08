@@ -11,22 +11,23 @@ Phase 1, Point 4 Guards:
 
 from __future__ import annotations
 
-import time
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from enum import Enum
-from typing import TYPE_CHECKING, Any, Callable
+from datetime import UTC, datetime
+from enum import StrEnum
+from typing import TYPE_CHECKING, Any, ClassVar
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from .events import EventBus
 
 __all__ = [
+    "FSMGuardError",
+    "FSMValidationError",
+    "TaskFSM",
     "TaskState",
     "TaskTransition",
-    "TaskFSM",
-    "FSMValidationError",
-    "FSMGuardError",
     "create_task_fsm",
 ]
 
@@ -41,7 +42,7 @@ class FSMGuardError(Exception):
     pass
 
 
-class TaskState(str, Enum):
+class TaskState(StrEnum):
     """Task states in the FSM."""
 
     TODO = "todo"
@@ -91,7 +92,7 @@ class TaskFSM:
     """
 
     # Valid transitions mapping
-    VALID_TRANSITIONS: dict[TaskState, list[TaskState]] = {
+    VALID_TRANSITIONS: ClassVar[dict[TaskState, list[TaskState]]] = {
         TaskState.TODO: [TaskState.DOING, TaskState.BLOCKED, TaskState.DONE],
         TaskState.DOING: [TaskState.REVIEW, TaskState.BLOCKED, TaskState.DONE],
         TaskState.REVIEW: [TaskState.DONE, TaskState.DOING, TaskState.BLOCKED],
@@ -244,7 +245,7 @@ class TaskFSM:
         transition = TaskTransition(
             from_state=current_state,
             to_state=to_state,
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             reason=reason,
             metadata=metadata or {},
         )
@@ -309,11 +310,11 @@ class TaskFSM:
             for next_state in self.VALID_TRANSITIONS.get(current, []):
                 if next_state == to_state:
                     # Found the target!
-                    return path + [next_state]
+                    return [*path, next_state]
 
                 if next_state not in visited:
                     visited.add(next_state)
-                    queue.append((next_state, path + [next_state]))
+                    queue.append((next_state, [*path, next_state]))
 
         # No path found
         return None
@@ -366,7 +367,7 @@ class TaskFSM:
 
             if not has_assignee and not has_start_ts:
                 # Auto-set start_ts to current time
-                from .time import get_current_utc, format_utc_iso8601
+                from .time import format_utc_iso8601, get_current_utc
 
                 task_data["start_ts"] = format_utc_iso8601(get_current_utc())
 
@@ -383,7 +384,7 @@ class TaskFSM:
         if to_state == TaskState.DONE and from_state in [TaskState.DOING, TaskState.REVIEW]:
             # Set done_ts if not already set
             if not task_data.get("done_ts"):
-                from .time import get_current_utc, format_utc_iso8601
+                from .time import format_utc_iso8601, get_current_utc
 
                 task_data["done_ts"] = format_utc_iso8601(get_current_utc())
 

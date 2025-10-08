@@ -10,15 +10,17 @@ import re
 from collections import defaultdict
 from dataclasses import dataclass
 from difflib import SequenceMatcher
-from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from .links import LinkGraph, LinkType
 
+if TYPE_CHECKING:
+    from pathlib import Path
+
 __all__ = [
+    "DuplicateCandidate",
     "GraphValidator",
     "ValidationReport",
-    "DuplicateCandidate",
     "find_duplicates",
     "normalize_title",
 ]
@@ -228,7 +230,7 @@ class GraphValidator:
         existing_ids = set(self._entities.keys())
 
         # Check all links in graph
-        for entity_id in self._entities.keys():
+        for entity_id in self._entities:
             for link in self.link_graph.get_outgoing_links(entity_id):
                 # Skip tag links
                 if link.target_id.startswith("tag-"):

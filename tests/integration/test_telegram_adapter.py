@@ -4,9 +4,7 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
-from unittest.mock import MagicMock, patch
-
-import pytest
+from unittest.mock import MagicMock
 
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
@@ -17,7 +15,6 @@ from kira.adapters.telegram.adapter import (
     TelegramAdapter,
     TelegramAdapterConfig,
     TelegramMessage,
-    TelegramUpdate,
     create_telegram_adapter,
 )
 from kira.core.events import create_event_bus
@@ -299,7 +296,7 @@ class TestTelegramAdapter:
         """Test message.received event publishing."""
         events_received = []
 
-        def handler(event):
+        def handler(event) -> None:
             events_received.append(event)
 
         self.event_bus.subscribe("message.received", handler)
@@ -322,7 +319,7 @@ class TestTelegramAdapter:
         """Test file.dropped event publishing."""
         events_received = []
 
-        def handler(event):
+        def handler(event) -> None:
             events_received.append(event)
 
         self.event_bus.subscribe("file.dropped", handler)

@@ -8,16 +8,19 @@ from __future__ import annotations
 import shutil
 import tarfile
 from dataclasses import dataclass
-from datetime import datetime, timezone
-from pathlib import Path
+from datetime import UTC, datetime
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 __all__ = [
     "BackupConfig",
     "BackupInfo",
-    "create_backup",
-    "restore_backup",
-    "list_backups",
     "cleanup_old_backups",
+    "create_backup",
+    "list_backups",
+    "restore_backup",
 ]
 
 
@@ -86,13 +89,10 @@ def create_backup(
     config.backup_dir.mkdir(parents=True, exist_ok=True)
 
     # Generate backup filename with timestamp
-    timestamp = datetime.now(timezone.utc)
+    timestamp = datetime.now(UTC)
     timestamp_str = timestamp.strftime("%Y%m%d-%H%M%S")
 
-    if config.compress:
-        backup_filename = f"vault-backup-{timestamp_str}.tar.gz"
-    else:
-        backup_filename = f"vault-backup-{timestamp_str}.tar"
+    backup_filename = f"vault-backup-{timestamp_str}.tar.gz" if config.compress else f"vault-backup-{timestamp_str}.tar"
 
     backup_path = config.backup_dir / backup_filename
 
@@ -197,7 +197,7 @@ def list_backups(backup_dir: Path) -> list[BackupInfo]:
 
             timestamp_str = name.split("-")[-2] + "-" + name.split("-")[-1]
             timestamp = datetime.strptime(timestamp_str, "%Y%m%d-%H%M%S")
-            timestamp = timestamp.replace(tzinfo=timezone.utc)
+            timestamp = timestamp.replace(tzinfo=UTC)
 
             size_bytes = backup_file.stat().st_size
 

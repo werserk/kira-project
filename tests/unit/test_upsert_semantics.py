@@ -9,8 +9,6 @@ Verifies that:
 import tempfile
 from pathlib import Path
 
-import pytest
-
 from kira.storage.vault import Vault, VaultConfig
 
 
@@ -103,7 +101,7 @@ def test_content_updates_in_place():
         assert task_file.exists()
 
         # Get initial file size
-        initial_size = task_file.stat().st_size
+        task_file.stat().st_size
 
         # Update content multiple times
         for i in range(3):

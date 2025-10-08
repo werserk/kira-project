@@ -6,7 +6,7 @@ import copy
 import json
 from typing import Any
 
-from jsonschema import Draft7Validator  # type: ignore[import-untyped]
+from jsonschema import Draft7Validator
 
 PLUGIN_MANIFEST_SCHEMA: dict[str, Any] = {
     "$schema": "http://json-schema.org/draft-07/schema#",

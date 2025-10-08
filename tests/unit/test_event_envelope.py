@@ -6,8 +6,6 @@ Tests envelope structure, validation, and at-least-once delivery semantics.
 
 from __future__ import annotations
 
-import pytest
-
 from kira.core.event_envelope import (
     EventEnvelope,
     create_event_envelope,

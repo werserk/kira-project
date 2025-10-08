@@ -6,23 +6,26 @@ and receiving briefings through Telegram Bot API.
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import hmac
 import json
 import time
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from ...core.events import EventBus
     from ...core.scheduler import Scheduler
 
 __all__ = [
-    "ConfirmationRequest",
     "BriefingScheduler",
+    "ConfirmationRequest",
     "TelegramAdapter",
     "TelegramAdapterConfig",
     "TelegramMessage",
@@ -251,8 +254,7 @@ class TelegramAdapter:
             params["reply_markup"] = json.dumps(reply_markup)
 
         try:
-            response = self._api_request("sendMessage", params)
-            return response
+            return self._api_request("sendMessage", params)
         except Exception as exc:
             self._log_event(
                 "send_message_failed",
@@ -668,10 +670,7 @@ class TelegramAdapter:
         if self.config.allowed_chat_ids and chat_id in self.config.allowed_chat_ids:
             return True
 
-        if self.config.allowed_user_ids and user_id in self.config.allowed_user_ids:
-            return True
-
-        return False
+        return bool(self.config.allowed_user_ids and user_id in self.config.allowed_user_ids)
 
     def _publish_message_received(self, message: TelegramMessage, trace_id: str) -> None:
         """Publish message.received event.
@@ -692,7 +691,7 @@ class TelegramAdapter:
             "chat_id": message.chat_id,
             "user_id": message.user_id,
             "message_id": message.message_id,
-            "timestamp": datetime.fromtimestamp(message.timestamp, tz=timezone.utc).isoformat(),
+            "timestamp": datetime.fromtimestamp(message.timestamp, tz=UTC).isoformat(),
             "trace_id": trace_id,
         }
 
@@ -748,7 +747,7 @@ class TelegramAdapter:
             "chat_id": message.chat_id,
             "user_id": message.user_id,
             "message_id": message.message_id,
-            "timestamp": datetime.fromtimestamp(message.timestamp, tz=timezone.utc).isoformat(),
+            "timestamp": datetime.fromtimestamp(message.timestamp, tz=UTC).isoformat(),
             "trace_id": trace_id,
         }
 
@@ -791,10 +790,8 @@ class TelegramAdapter:
         )
 
         # Answer callback to remove "loading" state
-        try:
+        with contextlib.suppress(Exception):
             self._api_request("answerCallbackQuery", {"callback_query_id": callback_id})
-        except Exception:
-            pass
 
         # Parse signed callback data: request_id:callback_data:signature
         parts = data.split(":", 2)
@@ -899,18 +896,18 @@ class TelegramAdapter:
                     "data": data,
                     "chat_id": chat_id,
                     "trace_id": trace_id,
-                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                    "timestamp": datetime.now(UTC).isoformat(),
                 }
                 self.event_bus.publish("telegram.callback", payload)
 
-    def _api_request(self, method: str, params: dict[str, Any]) -> dict[str, Any] | None:
+    def _api_request(self, _method: str, _params: dict[str, Any]) -> dict[str, Any] | None:
         """Make Telegram API request.
 
         Parameters
         ----------
-        method
+        _method
             API method name
-        params
+        _params
             Request parameters
 
         Returns
@@ -943,14 +940,13 @@ class TelegramAdapter:
             HMAC signature (hex)
         """
         message = f"{request_id}:{callback_data}"
-        signature = hmac.new(
+        return hmac.new(
             self.config.csrf_secret.encode("utf-8"),
             message.encode("utf-8"),
             hashlib.sha256,
         ).hexdigest()[
             :16
         ]  # Use first 16 chars to keep callback data short
-        return signature
 
     def _verify_csrf_token(self, request_id: str, callback_data: str, signature: str) -> bool:
         """Verify CSRF token.
@@ -1044,7 +1040,7 @@ class TelegramAdapter:
             Event data (must be JSON-serializable)
         """
         log_entry = {
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "component": "adapter",
             "adapter": "telegram",
             "event_type": event_type,

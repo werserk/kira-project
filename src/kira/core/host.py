@@ -9,13 +9,12 @@ Invalid entities never touch disk; errors are surfaced to callers.
 
 from __future__ import annotations
 
-import time
+import contextlib
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Iterator
+from typing import TYPE_CHECKING, Any
 
-from .events import EventBus
 from .ids import generate_entity_id, is_valid_entity_id, parse_entity_id
 from .links import LinkGraph, update_entity_links
 from .md_io import MarkdownDocument, MarkdownIOError, read_markdown, write_markdown
@@ -23,12 +22,17 @@ from .quarantine import quarantine_invalid_entity
 from .schemas import SchemaCache, get_schema_cache
 from .validation import ValidationError, validate_entity
 
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from .events import EventBus
+
 __all__ = [
     "Entity",
     "EntityNotFoundError",
     "HostAPI",
-    "VaultError",
     "ValidationError",
+    "VaultError",
     "create_host_api",
 ]
 
@@ -54,8 +58,8 @@ class Entity:
     metadata: dict[str, Any]
     content: str
     path: Path | None = None
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    updated_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
     @classmethod
     def from_markdown(cls, entity_id: str, document: MarkdownDocument, file_path: Path | None = None) -> Entity:
@@ -82,20 +86,16 @@ class Entity:
         created_str = document.get_metadata("created")
         updated_str = document.get_metadata("updated")
 
-        created_at = datetime.now(timezone.utc)
-        updated_at = datetime.now(timezone.utc)
+        created_at = datetime.now(UTC)
+        updated_at = datetime.now(UTC)
 
         if created_str:
-            try:
+            with contextlib.suppress(ValueError):
                 created_at = datetime.fromisoformat(created_str.replace("Z", "+00:00"))
-            except ValueError:
-                pass
 
         if updated_str:
-            try:
+            with contextlib.suppress(ValueError):
                 updated_at = datetime.fromisoformat(updated_str.replace("Z", "+00:00"))
-            except ValueError:
-                pass
 
         return cls(
             id=entity_id,
@@ -252,10 +252,21 @@ class HostAPI:
             raise VaultError(f"Entity already exists: {entity_id}")
 
         # Add timestamps
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         data = data.copy()
         data.setdefault("created", now.isoformat())
         data["updated"] = now.isoformat()
+
+        # Add entity-type specific defaults before validation
+        if entity_type == "task":
+            data.setdefault("status", "todo")
+            data.setdefault("priority", "medium")
+        elif entity_type == "project":
+            data.setdefault("status", "active")
+        elif entity_type == "note":
+            # Ensure notes have tags for organization if no category is provided
+            if not data.get("category") and not data.get("tags"):
+                data.setdefault("tags", [])
 
         # Phase 1, Point 5: Domain validation before write
         # Invalid entities never touch disk
@@ -364,8 +375,7 @@ class HostAPI:
 
         try:
             document = read_markdown(file_path)
-            entity = Entity.from_markdown(entity_id, document, file_path)
-            return entity
+            return Entity.from_markdown(entity_id, document, file_path)
         except MarkdownIOError as exc:
             raise VaultError(f"Failed to read entity {entity_id}: {exc}") from exc
 
@@ -399,7 +409,13 @@ class HostAPI:
         # Apply updates
         new_metadata = entity.metadata.copy()
         new_metadata.update(updates)
-        new_metadata["updated"] = datetime.now(timezone.utc).isoformat()
+        new_metadata["updated"] = datetime.now(UTC).isoformat()
+
+        # Add entity-type specific fields on status changes
+        if entity.entity_type == "task":
+            # If task is being marked as done and doesn't have done_ts, add it
+            if new_metadata.get("status") == "done" and not new_metadata.get("done_ts"):
+                new_metadata["done_ts"] = datetime.now(UTC).isoformat()
 
         new_content = content if content is not None else entity.content
 
@@ -430,7 +446,7 @@ class HostAPI:
         # Update entity
         entity.metadata = new_metadata
         entity.content = new_content
-        entity.updated_at = datetime.now(timezone.utc)
+        entity.updated_at = datetime.now(UTC)
 
         # Write to filesystem
         document = entity.to_markdown()
@@ -611,9 +627,8 @@ class HostAPI:
             # Update existing
             updates = {k: v for k, v in data.items() if k != "id"}
             return self.update_entity(entity_id, updates, content=content)
-        else:
-            # Create new
-            return self.create_entity(entity_type, data, content=content)
+        # Create new
+        return self.create_entity(entity_type, data, content=content)
 
     def get_entity_links(self, entity_id: str) -> dict[str, Any]:
         """Get entity link information.

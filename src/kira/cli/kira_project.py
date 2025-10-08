@@ -2,7 +2,7 @@
 """CLI модуль для работы с проектами"""
 
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 # Добавляем src в путь
@@ -120,7 +120,7 @@ def add_command(title: str, description: str | None, tag: tuple[str, ...], verbo
         entity_data = {
             "title": title,
             "status": "active",
-            "created": datetime.now(timezone.utc).isoformat(),
+            "created": datetime.now(UTC).isoformat(),
         }
 
         if tag:
@@ -172,7 +172,7 @@ def tasks_command(project_id: str, verbose: bool) -> int:
         tasks = find_project_tasks(vault_path, project.get("id"))
 
         if not tasks:
-            click.echo(f"📋 Задач для проекта нет")
+            click.echo("📋 Задач для проекта нет")
             return 0
 
         click.echo(f"\n📋 Задачи проекта: {project.get('title')} ({len(tasks)})\n")
@@ -303,7 +303,7 @@ def complete_command(project_id: str, verbose: bool) -> int:
             project_path,
             {
                 "status": "completed",
-                "completed": datetime.now(timezone.utc).isoformat(),
+                "completed": datetime.now(UTC).isoformat(),
             },
         )
 
@@ -465,9 +465,7 @@ def find_project_tasks(vault_path: Path, project_id: str) -> list[dict]:
 
             # Проверить, связана ли задача с проектом
             # Через поле project_id или через wikilink
-            if metadata.get("project") == project_id:
-                tasks.append(metadata)
-            elif f"[[{project_id}]]" in content:
+            if metadata.get("project") == project_id or f"[[{project_id}]]" in content:
                 tasks.append(metadata)
 
         except Exception:
@@ -483,9 +481,9 @@ def update_project_metadata(project_path: Path, updates: dict) -> None:
     No direct file writes allowed.
     """
     # Extract entity ID from file
-    from ..core.md_io import read_markdown
-    from ..core.host import create_host_api
     from ..core.config import load_config
+    from ..core.host import create_host_api
+    from ..core.md_io import read_markdown
 
     doc = read_markdown(project_path)
     entity_id = doc.get_metadata("id")

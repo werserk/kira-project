@@ -90,8 +90,7 @@ def run_migration(
                 for error in errors:
                     print(f"    - {error}")
             return 1
-        else:
-            print("✓ All migrated files validated successfully")
+        print("✓ All migrated files validated successfully")
 
     # Return exit code
     if stats.failed > 0:
@@ -100,7 +99,7 @@ def run_migration(
     return 0
 
 
-def main():
+def main() -> None:
     """Main entry point for migration CLI."""
     import argparse
 

@@ -10,8 +10,6 @@ import json
 import tempfile
 from pathlib import Path
 
-import pytest
-
 from kira.observability.logging import (
     LogEntry,
     StructuredLogger,

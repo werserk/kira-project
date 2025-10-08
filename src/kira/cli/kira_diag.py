@@ -16,7 +16,7 @@ __all__ = ["diag_command"]
 
 
 @click.group(name="diag")
-def diag_command():
+def diag_command() -> None:
     """Diagnostic tools for logs and telemetry (ADR-015)."""
     pass
 
@@ -83,7 +83,7 @@ def tail_command(
     category: str,
     entity_id: str | None,
     output_json: bool,
-):
+) -> None:
     """Tail structured logs with filtering (ADR-015).
 
     Examples:
@@ -198,10 +198,7 @@ def collect_log_files(
     """
     log_files = []
 
-    if category == "all":
-        categories = ["core", "adapters", "plugins", "pipelines"]
-    else:
-        categories = [category]
+    categories = ["core", "adapters", "plugins", "pipelines"] if category == "all" else [category]
 
     for cat in categories:
         cat_dir = log_dir / cat
@@ -256,9 +253,8 @@ def matches_filters(
             return False
 
     # Level filter
-    if level:
-        if log_entry.get("level", "").upper() != level.upper():
-            return False
+    if level and log_entry.get("level", "").upper() != level.upper():
+        return False
 
     # Since filter
     if since_timestamp:
@@ -304,18 +300,17 @@ def parse_since(since_str: str) -> datetime:
         minutes = int(since_str[:-1])
         return datetime.now() - timedelta(minutes=minutes)
 
-    elif since_str[-1] == "h":
+    if since_str[-1] == "h":
         # Hours
         hours = int(since_str[:-1])
         return datetime.now() - timedelta(hours=hours)
 
-    elif since_str[-1] == "d":
+    if since_str[-1] == "d":
         # Days
         days = int(since_str[:-1])
         return datetime.now() - timedelta(days=days)
 
-    else:
-        raise ValueError(f"Invalid 'since' format: {since_str} (use '10m', '1h', '2d')")
+    raise ValueError(f"Invalid 'since' format: {since_str} (use '10m', '1h', '2d')")
 
 
 def format_log_entry(log: dict) -> str:
@@ -400,7 +395,7 @@ def format_log_entry(log: dict) -> str:
     "-s",
     help="Analyze logs since time (e.g., '10m', '1h', '2d')",
 )
-def stats_command(category: str, since: str | None):
+def stats_command(category: str, since: str | None) -> None:
     """Show log statistics and metrics.
 
     Examples:

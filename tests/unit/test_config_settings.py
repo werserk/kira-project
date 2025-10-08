@@ -24,7 +24,7 @@ def clean_env():
     original_env = os.environ.copy()
 
     # Clean Kira-related vars
-    kira_vars = [k for k in os.environ.keys() if k.startswith("KIRA_")]
+    kira_vars = [k for k in os.environ if k.startswith("KIRA_")]
     for var in kira_vars:
         del os.environ[var]
 

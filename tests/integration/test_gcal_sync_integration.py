@@ -46,7 +46,7 @@ def test_gcal_import_event(test_env):
     2. Create local event with sync contract
     3. Verify source=gcal, version=1
     """
-    host_api, ledger = test_env
+    _host_api, ledger = test_env
 
     # Simulate GCal event import
     gcal_event_id = "gcal-event-123"
@@ -82,7 +82,7 @@ def test_local_edit_increments_version(test_env):
     2. Local edit
     3. Verify source=kira, version=2
     """
-    host_api, ledger = test_env
+    _host_api, _ledger = test_env
 
     gcal_event_id = "gcal-event-456"
 
@@ -119,7 +119,7 @@ def test_dod_echo_loop_prevention(test_env):
     4. GCal echoes back (still version 2)
     5. Ledger detects echo, ignores update
     """
-    host_api, ledger = test_env
+    _host_api, ledger = test_env
 
     gcal_event_id = "gcal-event-echo-test"
 
@@ -157,7 +157,7 @@ def test_real_change_after_echo_imported(test_env):
     2. GCal echoes back (version 2) - ignored
     3. User edits in GCal (version 3) - imported
     """
-    host_api, ledger = test_env
+    _host_api, ledger = test_env
 
     gcal_event_id = "gcal-event-real-change"
 
@@ -179,7 +179,7 @@ def test_conflict_resolution_latest_wins(test_env):
     2. Remote edit at T2 (T2 > T1)
     3. Conflict resolution: remote wins (latest)
     """
-    host_api, ledger = test_env
+    _host_api, _ledger = test_env
 
     local_ts = "2025-10-08T12:00:00+00:00"
     remote_ts = "2025-10-08T13:00:00+00:00"  # Later
@@ -198,7 +198,7 @@ def test_full_sync_cycle(test_env):
     3. Export to GCal (v3, source=gcal)
     4. Ledger tracks all versions
     """
-    host_api, ledger = test_env
+    _host_api, ledger = test_env
 
     gcal_event_id = "gcal-full-cycle"
 
@@ -228,7 +228,7 @@ def test_full_sync_cycle(test_env):
 
 def test_version_monotonic_increase(test_env):
     """Test DoD: Versions always increase monotonically."""
-    host_api, ledger = test_env
+    _host_api, _ledger = test_env
 
     metadata = {"title": "Version Test", "tags": []}
 
@@ -247,7 +247,7 @@ def test_version_monotonic_increase(test_env):
 
 def test_last_write_ts_updated(test_env):
     """Test DoD: last_write_ts updated on every write."""
-    host_api, ledger = test_env
+    _host_api, _ledger = test_env
 
     metadata = {"title": "Timestamp Test", "tags": []}
 
@@ -268,7 +268,7 @@ def test_dod_no_echo_loops(test_env):
 
     Critical test: Kira→GCal→Kira does NOT create infinite loop.
     """
-    host_api, ledger = test_env
+    _host_api, ledger = test_env
 
     gcal_event_id = "gcal-no-loop"
 

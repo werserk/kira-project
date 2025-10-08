@@ -15,9 +15,9 @@ __all__ = [
     "ValidationError",
     "ValidationResult",
     "validate_entity",
-    "validate_task_specific",
-    "validate_note_specific",
     "validate_event_specific",
+    "validate_note_specific",
+    "validate_task_specific",
 ]
 
 
@@ -143,9 +143,8 @@ def validate_task_specific(data: dict[str, Any]) -> list[str]:
 
     # Estimate must be reasonable if present
     estimate = data.get("estimate")
-    if estimate:
-        if not _is_valid_estimate(estimate):
-            errors.append(f"Invalid estimate format: {estimate}. Use format like '2h', '30m', '1d'")
+    if estimate and not _is_valid_estimate(estimate):
+        errors.append(f"Invalid estimate format: {estimate}. Use format like '2h', '30m', '1d'")
 
     # Due date must be in future or recent past if present
     due_date = data.get("due_date") or data.get("due_ts")
@@ -173,7 +172,7 @@ def validate_note_specific(data: dict[str, Any]) -> list[str]:
 
     # Notes should have either category or tags for better organization
     has_category = bool(data.get("category"))
-    has_tags = bool(data.get("tags"))
+    has_tags = "tags" in data  # Check if tags key exists, even if empty list
 
     if not has_category and not has_tags:
         errors.append("Notes should have either 'category' or 'tags' for organization")

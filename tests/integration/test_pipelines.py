@@ -7,7 +7,6 @@ retry logic, trace propagation, and logging without containing business logic.
 from __future__ import annotations
 
 import sys
-import time
 from datetime import date, timedelta
 from pathlib import Path
 
@@ -38,7 +37,7 @@ class TestInboxPipeline:
         event_bus = create_event_bus()
         events_published = []
 
-        def capture_event(event):
+        def capture_event(event) -> None:
             events_published.append((event.name, event.payload))
 
         event_bus.subscribe("message.received", capture_event)
@@ -67,7 +66,7 @@ class TestInboxPipeline:
         event_bus = create_event_bus()
         call_count = [0]
 
-        def failing_handler(event):
+        def failing_handler(event) -> None:
             call_count[0] += 1
             if call_count[0] < 3:  # Fail twice, succeed third time
                 raise RuntimeError("Simulated failure")
@@ -96,7 +95,7 @@ class TestInboxPipeline:
         event_bus = create_event_bus()
         trace_ids_seen = []
 
-        def capture_trace(event):
+        def capture_trace(event) -> None:
             if event.payload and "trace_id" in event.payload:
                 trace_ids_seen.append(event.payload["trace_id"])
 
@@ -118,7 +117,7 @@ class TestSyncPipeline:
         event_bus = create_event_bus()
         events_published = []
 
-        def capture_sync(event):
+        def capture_sync(event) -> None:
             events_published.append((event.name, event.payload))
 
         event_bus.subscribe("sync.tick", capture_sync)
@@ -165,7 +164,7 @@ class TestSyncPipeline:
         event_bus = create_event_bus()
         call_counts = {"gcal": 0}
 
-        def failing_handler(event):
+        def failing_handler(event) -> None:
             adapter = event.payload.get("adapter")
             if adapter == "gcal":
                 call_counts[adapter] += 1
@@ -241,7 +240,7 @@ class TestRollupPipeline:
         host_api = create_host_api(tmp_path)
         events_published = []
 
-        def capture_rollup_request(event):
+        def capture_rollup_request(event) -> None:
             events_published.append((event.name, event.payload))
 
         event_bus.subscribe("rollup.requested", capture_rollup_request)

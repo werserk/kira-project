@@ -6,15 +6,13 @@ Tests deterministic serialization with key ordering, ISO-8601 UTC timestamps.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
-
-import pytest
+from datetime import UTC, datetime
 
 from kira.core.yaml_serializer import (
+    get_canonical_key_order,
+    normalize_timestamps_to_utc,
     parse_frontmatter,
     serialize_frontmatter,
-    normalize_timestamps_to_utc,
-    get_canonical_key_order,
     validate_strict_schema,
 )
 
@@ -67,7 +65,7 @@ class TestTimestampNormalization:
 
     def test_datetime_to_utc_iso8601(self):
         """Test datetime objects are converted to ISO-8601 UTC."""
-        dt = datetime(2025, 10, 8, 12, 30, 0, tzinfo=timezone.utc)
+        dt = datetime(2025, 10, 8, 12, 30, 0, tzinfo=UTC)
         data = {"created": dt}
 
         normalized = normalize_timestamps_to_utc(data)
@@ -101,7 +99,7 @@ class TestTimestampNormalization:
         """Test timestamps in nested dicts are normalized."""
         data = {
             "created": "2025-10-08T12:00:00Z",
-            "x-kira": {"last_write_ts": datetime(2025, 10, 8, 14, 0, 0, tzinfo=timezone.utc)},
+            "x-kira": {"last_write_ts": datetime(2025, 10, 8, 14, 0, 0, tzinfo=UTC)},
         }
 
         normalized = normalize_timestamps_to_utc(data)

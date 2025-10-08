@@ -10,7 +10,7 @@ import json
 import time
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -248,7 +248,7 @@ class SyncPipeline:
                     "adapter": adapter_name,
                     "trace_id": trace_id,
                     "attempt": str(attempt),
-                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                    "timestamp": datetime.now(UTC).isoformat(),
                 }
 
                 self.event_bus.publish("sync.tick", payload)
@@ -305,7 +305,7 @@ class SyncPipeline:
             Event data (must be JSON-serializable)
         """
         log_entry = {
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "component": "pipeline",
             "pipeline": "sync",
             "event_type": event_type,

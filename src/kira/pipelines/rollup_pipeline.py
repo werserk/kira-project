@@ -10,7 +10,7 @@ import json
 import time
 import uuid
 from dataclasses import dataclass, field
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -325,7 +325,7 @@ class RollupPipeline:
                 "period_start": period_start.isoformat(),
                 "period_end": period_end.isoformat(),
                 "trace_id": trace_id,
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
             }
 
             # TODO: Implement event response collection mechanism
@@ -414,7 +414,7 @@ class RollupPipeline:
             Event data (must be JSON-serializable)
         """
         log_entry = {
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "component": "pipeline",
             "pipeline": "rollup",
             "event_type": event_type,

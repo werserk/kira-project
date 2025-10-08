@@ -10,7 +10,7 @@ import json
 import time
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -18,10 +18,10 @@ if TYPE_CHECKING:
     from ...core.events import EventBus
 
 __all__ = [
+    "EventMapping",
     "GCalAdapter",
     "GCalAdapterConfig",
     "GCalEvent",
-    "EventMapping",
     "SyncResult",
     "create_gcal_adapter",
 ]
@@ -92,12 +92,12 @@ class GCalEvent:
         start_str = metadata.get("start") or metadata.get("due")
         if not start_str:
             # Default to today
-            start = datetime.now(timezone.utc).replace(hour=9, minute=0, second=0, microsecond=0)
+            start = datetime.now(UTC).replace(hour=9, minute=0, second=0, microsecond=0)
         else:
             try:
                 start = datetime.fromisoformat(start_str.replace("Z", "+00:00"))
             except Exception:
-                start = datetime.now(timezone.utc)
+                start = datetime.now(UTC)
 
         # Calculate end time
         end_str = metadata.get("end")
@@ -122,10 +122,7 @@ class GCalEvent:
         # Build description with Vault link
         description = metadata.get("description", "")
         vault_link = f"\n\n[View in Vault: {entity_id}]"
-        if description:
-            description = f"{description}{vault_link}"
-        else:
-            description = f"Synced from Vault{vault_link}"
+        description = f"{description}{vault_link}" if description else f"Synced from Vault{vault_link}"
 
         # Get GCal ID if already synced
         gcal_id = metadata.get("gcal_id", f"vault-{entity_id}")
@@ -347,7 +344,9 @@ class GCalAdapter:
                     if self._should_push_entity(entity):
                         if not dry_run:
                             self._push_event(calendar_id, gcal_event)
-                        result.pushed += 1
+                            result.pushed += 1
+                        else:
+                            result.skipped += 1
                     else:
                         result.skipped += 1
 
@@ -435,7 +434,7 @@ class GCalAdapter:
 
             # Build mapping by ID
             gcal_by_id = {evt.id: evt for evt in gcal_events}
-            vault_by_id = {ent.id: ent for ent in vault_entities}
+            {ent.id: ent for ent in vault_entities}
 
             # Check for conflicts
             for entity in vault_entities:
@@ -448,7 +447,7 @@ class GCalAdapter:
 
                     # Compare timestamps
                     vault_updated = entity.updated_at
-                    gcal_updated = gcal_event.updated or datetime.now(timezone.utc)
+                    gcal_updated = gcal_event.updated or datetime.now(UTC)
 
                     if abs((vault_updated - gcal_updated).total_seconds()) > 60:
                         # Conflict detected
@@ -555,14 +554,14 @@ class GCalAdapter:
             )
             return None
 
-    def _fetch_events(self, calendar_id: str, days: int) -> list[GCalEvent]:
+    def _fetch_events(self, _calendar_id: str, _days: int) -> list[GCalEvent]:
         """Fetch events from Google Calendar API.
 
         Parameters
         ----------
-        calendar_id
+        _calendar_id
             Calendar ID
-        days
+        _days
             Number of days to fetch
 
         Returns
@@ -588,12 +587,12 @@ class GCalAdapter:
         # For now, return empty list (will be implemented with google-api-python-client)
         return []
 
-    def _push_event(self, calendar_id: str, event: GCalEvent) -> str:
+    def _push_event(self, _calendar_id: str, event: GCalEvent) -> str:
         """Push event to Google Calendar.
 
         Parameters
         ----------
-        calendar_id
+        _calendar_id
             Calendar ID
         event
             Event to push
@@ -695,7 +694,7 @@ class GCalAdapter:
             Event data
         """
         log_entry = {
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "component": "adapter",
             "adapter": "gcal",
             "event_type": event_type,

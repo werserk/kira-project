@@ -39,7 +39,7 @@ EPILOG = """
   kira task start <id>         # Начать работу над задачей
   kira task done <id>          # Завершить задачу
   kira search "отчет"          # Поиск по Vault
-  
+
   # Работа с данными
   kira inbox                   # Запустить inbox-конвейер
   kira calendar pull           # Синхронизировать календарь (pull)
@@ -47,7 +47,7 @@ EPILOG = """
   kira schedule view --today   # Показать расписание на сегодня
   kira schedule conflicts      # Найти конфликты в расписании
   kira rollup daily            # Создать дневной rollup
-  
+
   # Управление
   kira vault init              # Инициализировать Vault
   kira vault new --type task --title "My Task"  # Создать entity

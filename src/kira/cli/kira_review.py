@@ -2,7 +2,7 @@
 """CLI модуль для периодических обзоров (review)"""
 
 import sys
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 # Добавляем src в путь
@@ -38,7 +38,7 @@ def weekly_command(save: str | None, verbose: bool) -> int:
             return 1
 
         # Определить период (последняя неделя)
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         week_ago = now - timedelta(days=7)
 
         click.echo("\n📊 Недельный обзор")
@@ -81,7 +81,7 @@ def monthly_command(save: str | None, verbose: bool) -> int:
             return 1
 
         # Определить период (последний месяц)
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         month_ago = now - timedelta(days=30)
 
         click.echo("\n📊 Месячный обзор")
@@ -130,7 +130,7 @@ def pending_command(verbose: bool) -> int:
             click.echo("📋 Задач нет")
             return 0
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         # Категории задач
         overdue = []
@@ -325,20 +325,20 @@ def collect_review_data(vault_path: Path, start_date: datetime, end_date: dateti
 
 def display_weekly_review(data: dict, verbose: bool) -> None:
     """Отобразить недельный обзор."""
-    click.echo(f"\n📋 Задачи:")
+    click.echo("\n📋 Задачи:")
     click.echo(f"  Создано: {len(data['tasks']['created'])}")
     click.echo(f"  ✅ Завершено: {len(data['tasks']['completed'])}")
     click.echo(f"  🔄 В работе: {len(data['tasks']['in_progress'])}")
 
     if data["tasks"]["completed"] and verbose:
-        click.echo(f"\n  Завершенные задачи:")
+        click.echo("\n  Завершенные задачи:")
         for task in data["tasks"]["completed"][:10]:
             click.echo(f"    • {task.get('title', 'Untitled')}")
 
-    click.echo(f"\n📝 Заметки:")
+    click.echo("\n📝 Заметки:")
     click.echo(f"  Создано: {len(data['notes']['created'])}")
 
-    click.echo(f"\n📆 События:")
+    click.echo("\n📆 События:")
     click.echo(f"  Посещено: {len(data['events']['attended'])}")
 
     # Completion rate

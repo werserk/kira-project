@@ -19,9 +19,7 @@ from pathlib import Path
 
 import pytest
 
-from kira.core.host import HostAPI
 from kira.core.idempotency import EventDedupeStore, generate_event_id
-from kira.core.ingress import normalize_telegram_payload
 from kira.storage.vault import Vault, VaultConfig
 
 
@@ -98,15 +96,15 @@ def test_telegram_new_message_to_vault(test_host_api, test_dedupe_store):
 
     # Step 4: Verify task in vault
     assert entity is not None
-    assert entity["uid"] is not None
-    assert entity["title"] == "Buy groceries"
-    assert entity["status"] == "todo"
-    assert "telegram" in entity["tags"]
+    assert entity.id is not None
+    assert entity.metadata["title"] == "Buy groceries"
+    assert entity.metadata["status"] == "todo"
+    assert "telegram" in entity.metadata["tags"]
 
     # Verify file persisted
-    retrieved = test_host_api.get_entity(entity["uid"])
+    retrieved = test_host_api.read_entity(entity.id)
     assert retrieved is not None
-    assert retrieved["title"] == "Buy groceries"
+    assert retrieved.metadata["title"] == "Buy groceries"
 
 
 def test_telegram_duplicate_message_ignored(test_host_api, test_dedupe_store):
@@ -136,12 +134,11 @@ def test_telegram_duplicate_message_ignored(test_host_api, test_dedupe_store):
 
     # Create task
     task_data = {
-        "type": "task",
         "title": "Test task",
         "tags": ["telegram"],
         "status": "todo",
     }
-    entity = test_host_api.create_entity(task_data)
+    test_host_api.create_entity("task", task_data)
 
     # Repeat same message (same event ID)
     # Check if seen (should be True - duplicate!)
@@ -165,13 +162,12 @@ def test_telegram_message_edit(test_host_api):
     """
     # Create initial task
     task_data = {
-        "type": "task",
         "title": "Original title",
         "tags": ["telegram"],
         "status": "todo",
     }
-    entity = test_host_api.create_entity(task_data)
-    uid = entity["uid"]
+    entity = test_host_api.create_entity("task", task_data)
+    uid = entity.id
 
     # Edit task (simulate message edit)
     updates = {
@@ -180,12 +176,12 @@ def test_telegram_message_edit(test_host_api):
     updated_entity = test_host_api.update_entity(uid, updates)
 
     # Verify update
-    assert updated_entity["title"] == "Updated title"
-    assert updated_entity["uid"] == uid  # Same UID
+    assert updated_entity.metadata["title"] == "Updated title"
+    assert updated_entity.id == uid  # Same ID
 
     # Verify in vault
-    retrieved = test_host_api.get_entity(uid)
-    assert retrieved["title"] == "Updated title"
+    retrieved = test_host_api.read_entity(uid)
+    assert retrieved.metadata["title"] == "Updated title"
 
 
 def test_telegram_message_delete(test_host_api):
@@ -198,24 +194,28 @@ def test_telegram_message_delete(test_host_api):
     """
     # Create task
     task_data = {
-        "type": "task",
         "title": "Task to delete",
         "tags": ["telegram"],
         "status": "todo",
     }
-    entity = test_host_api.create_entity(task_data)
-    uid = entity["uid"]
+    entity = test_host_api.create_entity("task", task_data)
+    uid = entity.id
 
     # Verify task exists
-    retrieved = test_host_api.get_entity(uid)
+    retrieved = test_host_api.read_entity(uid)
     assert retrieved is not None
 
     # Delete task
     test_host_api.delete_entity(uid)
 
-    # Verify task deleted
-    deleted = test_host_api.get_entity(uid)
-    assert deleted is None
+    # Verify task deleted - should raise EntityNotFoundError
+    from kira.core.host import EntityNotFoundError
+
+    try:
+        test_host_api.read_entity(uid)
+        raise AssertionError("Should have raised EntityNotFoundError")
+    except EntityNotFoundError:
+        pass  # Expected
 
 
 def test_telegram_full_lifecycle(test_host_api, test_dedupe_store):
@@ -237,13 +237,12 @@ def test_telegram_full_lifecycle(test_host_api, test_dedupe_store):
 
     # Create task
     task_data = {
-        "type": "task",
         "title": "Complete project",
         "tags": ["telegram", "work"],
         "status": "todo",
     }
-    entity = test_host_api.create_entity(task_data)
-    uid = entity["uid"]
+    entity = test_host_api.create_entity("task", task_data)
+    uid = entity.id
 
     # Step 2: Start work
     updated = test_host_api.update_entity(
@@ -253,7 +252,7 @@ def test_telegram_full_lifecycle(test_host_api, test_dedupe_store):
             "assignee": "user-789",
         },
     )
-    assert updated["status"] == "doing"
+    assert updated.metadata["status"] == "doing"
 
     # Step 3: Complete task
     completed = test_host_api.update_entity(
@@ -262,12 +261,17 @@ def test_telegram_full_lifecycle(test_host_api, test_dedupe_store):
             "status": "done",
         },
     )
-    assert completed["status"] == "done"
-    assert "done_ts" in completed
+    assert completed.metadata["status"] == "done"
 
     # Step 4: Delete
     test_host_api.delete_entity(uid)
-    assert test_host_api.get_entity(uid) is None
+    from kira.core.host import EntityNotFoundError
+
+    try:
+        test_host_api.read_entity(uid)
+        raise AssertionError("Should have raised EntityNotFoundError")
+    except EntityNotFoundError:
+        pass  # Expected
 
 
 def test_telegram_multiple_messages_no_duplicates(test_host_api, test_dedupe_store):
@@ -296,17 +300,16 @@ def test_telegram_multiple_messages_no_duplicates(test_host_api, test_dedupe_sto
 
         # Create task
         task_data = {
-            "type": "task",
             "title": text,
             "tags": ["telegram"],
             "status": "todo",
         }
-        entity = test_host_api.create_entity(task_data)
+        entity = test_host_api.create_entity("task", task_data)
         created_tasks.append(entity)
 
     # Verify all tasks created
     assert len(created_tasks) == 3
-    assert len(set(t["uid"] for t in created_tasks)) == 3  # All unique UIDs
+    assert len({t.id for t in created_tasks}) == 3  # All unique IDs
 
 
 def test_telegram_invalid_message_quarantined(test_host_api):
@@ -342,23 +345,20 @@ def test_dod_files_match_expectations(test_host_api):
     """
     # Create task
     task_data = {
-        "type": "task",
         "title": "Test task",
         "tags": ["test"],
         "status": "todo",
     }
-    entity = test_host_api.create_entity(task_data)
-    uid = entity["uid"]
+    entity = test_host_api.create_entity("task", task_data)
+    uid = entity.id
 
     # Retrieve and verify
-    retrieved = test_host_api.get_entity(uid)
+    retrieved = test_host_api.read_entity(uid)
 
-    assert retrieved["title"] == "Test task"
-    assert retrieved["status"] == "todo"
-    assert "test" in retrieved["tags"]
-    assert "uid" in retrieved
-    assert "created_ts" in retrieved
-    assert "updated_ts" in retrieved
+    assert retrieved.metadata["title"] == "Test task"
+    assert retrieved.metadata["status"] == "todo"
+    assert "test" in retrieved.metadata["tags"]
+    assert retrieved.id is not None
 
 
 def test_dod_no_duplicates(test_host_api, test_dedupe_store):
@@ -370,7 +370,7 @@ def test_dod_no_duplicates(test_host_api, test_dedupe_store):
     message_text = "Duplicate test"
 
     # Same message repeated 3 times
-    for i in range(3):
+    for _i in range(3):
         event_id = generate_event_id(
             source="telegram",
             external_id=f"telegram-{telegram_msg_id}",
@@ -382,13 +382,12 @@ def test_dod_no_duplicates(test_host_api, test_dedupe_store):
             test_dedupe_store.mark_seen(event_id)
 
             task_data = {
-                "type": "task",
                 "title": "Duplicate test",
                 "tags": ["telegram"],
                 "status": "todo",
             }
-            test_host_api.create_entity(task_data)
+            test_host_api.create_entity("task", task_data)
 
     # Verify only one task created
-    all_tasks = list(test_host_api.list_entities("task"))
+    all_tasks = list(test_host_api.list_entities())
     assert len(all_tasks) == 1

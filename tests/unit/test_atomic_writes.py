@@ -6,10 +6,12 @@ Tests atomic write protocol: tmp → fsync(tmp) → rename → fsync(dir).
 
 from __future__ import annotations
 
+import contextlib
 import os
 import tempfile
 from pathlib import Path
-from unittest.mock import Mock, patch
+from typing import Never
+from unittest.mock import patch
 
 import pytest
 
@@ -39,7 +41,7 @@ class TestAtomicWriteProtocol:
 
             # Verify temp file was in same directory
             assert len(created_temp_files) > 0
-            temp_file = created_temp_files[0]
+            created_temp_files[0]
             # Temp file should have been in same dir (parent)
             # After write, it's renamed away but we can check the pattern
             assert file_path.exists()
@@ -98,7 +100,7 @@ class TestAtomicWriteProtocol:
 
             # Should have exactly one rename call (tmp → target)
             assert len(rename_calls) == 1
-            source, target = rename_calls[0]
+            _source, target = rename_calls[0]
             assert target == file_path
 
 
@@ -135,14 +137,12 @@ class TestAtomicWriteReplaces:
             document = MarkdownDocument(frontmatter={"title": "Test"}, content="New content")
 
             # Simulate error during write by making rename fail
-            def failing_rename(self, target):
+            def failing_rename(self, target) -> Never:
                 raise OSError("Simulated rename failure")
 
             with patch.object(Path, "rename", failing_rename):
-                try:
+                with contextlib.suppress(MarkdownIOError, OSError):
                     write_markdown(file_path, document, atomic=True)
-                except (MarkdownIOError, OSError):
-                    pass
 
             # Original file should still exist with old content
             # (or not exist if it didn't exist before)
@@ -218,7 +218,7 @@ class TestCrashSafety:
                 try:
                     if crash_point == "after_temp_write":
                         # Crash before rename
-                        def crash_before_rename(self, target):
+                        def crash_before_rename(self, target) -> Never:
                             raise KeyboardInterrupt("Simulated crash")
 
                         with patch.object(Path, "rename", crash_before_rename):
@@ -226,7 +226,7 @@ class TestCrashSafety:
 
                     elif crash_point == "after_fsync_file":
                         # Crash after file fsync but before rename
-                        def crash_on_rename(self, target):
+                        def crash_on_rename(self, target) -> Never:
                             raise KeyboardInterrupt("Simulated crash")
 
                         with patch.object(Path, "rename", crash_on_rename):
@@ -266,14 +266,12 @@ class TestTempFileCleanup:
             document = MarkdownDocument(frontmatter={"title": "Test"}, content="Test content")
 
             # Simulate error during rename
-            def failing_rename(self, target):
+            def failing_rename(self, target) -> Never:
                 raise OSError("Simulated failure")
 
             with patch.object(Path, "rename", failing_rename):
-                try:
+                with contextlib.suppress(MarkdownIOError, OSError):
                     write_markdown(file_path, document, atomic=True)
-                except (MarkdownIOError, OSError):
-                    pass
 
             # Check no temp files left behind
             temp_files = list(Path(tmpdir).glob(".*.tmp*"))

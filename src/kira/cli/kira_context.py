@@ -11,6 +11,7 @@ import click
 import yaml
 
 from ..core.config import load_config
+from ..core.host import create_host_api
 
 CONTEXT_SETTINGS = {"help_option_names": ["-h", "--help"]}
 
@@ -158,7 +159,7 @@ def add_command(task_id: str, context: str, verbose: bool) -> int:
         context_name = context if context.startswith("@") else f"@{context}"
 
         # Загрузить метаданные
-        with open(task_path, "r", encoding="utf-8") as f:
+        with open(task_path, encoding="utf-8") as f:
             content = f.read()
 
         parts = content.split("---", 2)
@@ -214,7 +215,7 @@ def remove_command(task_id: str, context: str, verbose: bool) -> int:
         context_name = context if context.startswith("@") else f"@{context}"
 
         # Загрузить метаданные
-        with open(task_path, "r", encoding="utf-8") as f:
+        with open(task_path, encoding="utf-8") as f:
             content = f.read()
 
         parts = content.split("---", 2)

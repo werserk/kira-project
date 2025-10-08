@@ -8,19 +8,20 @@ Scheduled jobs to purge old data:
 
 from __future__ import annotations
 
-import shutil
 import sqlite3
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
-from pathlib import Path
-from typing import Any
+from datetime import UTC, datetime, timedelta
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 __all__ = [
     "CleanupConfig",
     "CleanupStats",
     "cleanup_dedupe_store",
-    "cleanup_quarantine",
     "cleanup_logs",
+    "cleanup_quarantine",
     "run_cleanup_all",
 ]
 
@@ -89,7 +90,7 @@ def cleanup_dedupe_store(
     if not db_path.exists():
         return 0
 
-    cutoff = datetime.now(timezone.utc) - timedelta(days=ttl_days)
+    cutoff = datetime.now(UTC) - timedelta(days=ttl_days)
     cutoff_str = cutoff.isoformat()
 
     conn = sqlite3.connect(db_path)
@@ -137,7 +138,7 @@ def cleanup_quarantine(
     if not quarantine_dir.exists():
         return 0, 0
 
-    cutoff = datetime.now(timezone.utc) - timedelta(days=ttl_days)
+    cutoff = datetime.now(UTC) - timedelta(days=ttl_days)
 
     files_removed = 0
     bytes_freed = 0
@@ -147,7 +148,7 @@ def cleanup_quarantine(
             continue
 
         # Check file modification time
-        mtime = datetime.fromtimestamp(file_path.stat().st_mtime, tz=timezone.utc)
+        mtime = datetime.fromtimestamp(file_path.stat().st_mtime, tz=UTC)
 
         if mtime < cutoff:
             # Get size before deletion
@@ -185,7 +186,7 @@ def cleanup_logs(
     if not log_dir.exists():
         return 0, 0
 
-    cutoff = datetime.now(timezone.utc) - timedelta(days=ttl_days)
+    cutoff = datetime.now(UTC) - timedelta(days=ttl_days)
 
     files_removed = 0
     bytes_freed = 0
@@ -195,7 +196,7 @@ def cleanup_logs(
             continue
 
         # Check file modification time
-        mtime = datetime.fromtimestamp(file_path.stat().st_mtime, tz=timezone.utc)
+        mtime = datetime.fromtimestamp(file_path.stat().st_mtime, tz=UTC)
 
         if mtime < cutoff:
             # Get size before deletion

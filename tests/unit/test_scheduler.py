@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import sys
 import time
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -24,7 +24,7 @@ class TestTrigger:
 
     def test_at_trigger_datetime(self):
         """Test creating at trigger with datetime."""
-        target = datetime(2025, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
+        target = datetime(2025, 1, 1, 12, 0, 0, tzinfo=UTC)
         trigger = Trigger.at(target)
 
         assert trigger.type == TriggerType.AT
@@ -119,7 +119,7 @@ class TestJob:
 
     def test_calculate_next_run_at(self):
         """Test calculating next run for at trigger."""
-        target = datetime.now(timezone.utc) + timedelta(hours=1)
+        target = datetime.now(UTC) + timedelta(hours=1)
         job = Job(
             job_id="test",
             name="Test",
@@ -161,7 +161,7 @@ class TestScheduler:
     def test_schedule_at(self):
         """Test scheduling at job."""
         scheduler = Scheduler()
-        target = datetime.now(timezone.utc) + timedelta(seconds=5)
+        target = datetime.now(UTC) + timedelta(seconds=5)
 
         job_id = scheduler.schedule_at("test", target, lambda: None)
 
@@ -260,7 +260,7 @@ class TestScheduler:
         scheduler = Scheduler()
         calls: list[int] = []
 
-        target = datetime.now(timezone.utc) + timedelta(seconds=0.2)
+        target = datetime.now(UTC) + timedelta(seconds=0.2)
         scheduler.schedule_at("test", target, lambda: calls.append(1))
 
         scheduler.start()

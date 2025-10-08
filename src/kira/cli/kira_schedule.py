@@ -171,10 +171,7 @@ def quick_command(description: str, date: str | None, time: str | None, duration
         vault_path = Path(config.get("vault", {}).get("path", "vault"))
 
         # Parse date and time
-        if date:
-            event_date = datetime.fromisoformat(date)
-        else:
-            event_date = datetime.now()
+        event_date = datetime.fromisoformat(date) if date else datetime.now()
 
         if time:
             hour, minute = map(int, time.split(":"))

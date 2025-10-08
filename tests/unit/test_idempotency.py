@@ -9,8 +9,6 @@ from __future__ import annotations
 import tempfile
 from pathlib import Path
 
-import pytest
-
 from kira.core.idempotency import (
     EventDedupeStore,
     create_dedupe_store,

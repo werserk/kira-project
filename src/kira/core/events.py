@@ -10,11 +10,9 @@ import time
 import traceback
 import uuid
 from collections import defaultdict
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Callable
-
-if TYPE_CHECKING:
-    from collections.abc import Sequence
+from typing import Any
 
 __all__ = [
     "Event",
@@ -105,10 +103,7 @@ class SubscriptionHandle:
         if self.once and self._triggered:
             return False
 
-        if self.filter_predicate and not self.filter_predicate(event):
-            return False
-
-        return True
+        return not (self.filter_predicate and not self.filter_predicate(event))
 
     def mark_triggered(self) -> None:
         """Mark subscription as triggered (for once=True)."""
@@ -285,19 +280,21 @@ class EventBus:
         """
         subscriptions = self._subscriptions.get(handle.event_name, [])
 
-        for i, subscription in enumerate(subscriptions):
-            if subscription.subscription_id == handle.subscription_id:
-                del subscriptions[i]
+        # Find and remove the subscription (filter out matching subscription)
+        initial_count = len(subscriptions)
+        self._subscriptions[handle.event_name] = [
+            sub for sub in subscriptions if sub.subscription_id != handle.subscription_id
+        ]
 
-                if self._logger:
-                    self._logger.debug(
-                        f"Subscription removed: {handle.subscription_id}",
-                        extra={"subscription_id": handle.subscription_id},
-                    )
+        removed = len(self._subscriptions[handle.event_name]) < initial_count
 
-                return True
+        if removed and self._logger:
+            self._logger.debug(
+                f"Subscription removed: {handle.subscription_id}",
+                extra={"subscription_id": handle.subscription_id},
+            )
 
-        return False
+        return removed
 
     def unsubscribe_all(self, event_name: str) -> int:
         """Remove all subscriptions for event name.
@@ -403,7 +400,7 @@ class EventBus:
 
                 return HandlerResult(success=True, duration_ms=duration_ms, attempts=attempts)
 
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 last_error = exc
 
                 if attempt < policy.max_attempts - 1:

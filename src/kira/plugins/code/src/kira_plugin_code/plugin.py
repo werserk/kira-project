@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
-from kira.plugin_sdk.context import PluginContext
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from kira.plugin_sdk.context import PluginContext
 
 
 def activate(context: PluginContext) -> dict[str, str]:

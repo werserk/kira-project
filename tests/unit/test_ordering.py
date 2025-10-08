@@ -9,11 +9,8 @@ from __future__ import annotations
 import time
 from typing import Any
 
-import pytest
-
 from kira.core.event_envelope import EventEnvelope, create_event_envelope
 from kira.core.ordering import (
-    EventBuffer,
     EventReducer,
     ReducerRegistry,
     create_event_buffer,
@@ -264,7 +261,7 @@ class TestOutOfOrderEvents:
 
         # Flush
         state = {}
-        new_state, processed = buffer.flush_all(state)
+        _new_state, processed = buffer.flush_all(state)
 
         # Should be sorted by seq
         assert len(processed) == 2

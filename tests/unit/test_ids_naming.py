@@ -3,9 +3,8 @@
 from __future__ import annotations
 
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from zoneinfo import ZoneInfo
 
 import pytest
 
@@ -69,14 +68,14 @@ class TestGenerateEntityId:
         assert len(entity_id.split("-")) >= 3  # type-timestamp-slug
 
     def test_generate_with_timestamp(self):
-        ts = datetime(2025, 1, 15, 14, 30, 0, tzinfo=timezone.utc)
+        ts = datetime(2025, 1, 15, 14, 30, 0, tzinfo=UTC)
         entity_id = generate_entity_id("task", title="Test", timestamp=ts)
 
         # Should contain timestamp part: 20250115-1430
         assert "20250115-14" in entity_id or "20250115-15" in entity_id  # Accounting for timezone conversion
 
     def test_generate_with_timezone(self):
-        ts = datetime(2025, 1, 15, 12, 30, 0, tzinfo=timezone.utc)
+        ts = datetime(2025, 1, 15, 12, 30, 0, tzinfo=UTC)
         entity_id = generate_entity_id("task", title="Test", timestamp=ts, tz="Europe/Brussels")
 
         # UTC 12:30 = Brussels 13:30 (or 14:30 in summer)
@@ -308,7 +307,7 @@ class TestADR008Compliance:
 
     def test_determinism_same_minute(self):
         """Test given same kind/title/minute, generate_id returns same ID."""
-        ts = datetime(2025, 1, 15, 14, 30, 0, tzinfo=timezone.utc)
+        ts = datetime(2025, 1, 15, 14, 30, 0, tzinfo=UTC)
 
         id1 = generate_entity_id("task", title="Test Task", timestamp=ts)
         id2 = generate_entity_id("task", title="Test Task", timestamp=ts)
@@ -317,7 +316,7 @@ class TestADR008Compliance:
 
     def test_timezone_affects_timestamp(self):
         """Test timezone affects timestamp part of ID."""
-        ts_utc = datetime(2025, 1, 15, 23, 30, 0, tzinfo=timezone.utc)
+        ts_utc = datetime(2025, 1, 15, 23, 30, 0, tzinfo=UTC)
 
         id_utc = generate_entity_id("task", title="Test", timestamp=ts_utc, tz="UTC")
         id_brussels = generate_entity_id("task", title="Test", timestamp=ts_utc, tz="Europe/Brussels")

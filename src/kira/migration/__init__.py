@@ -12,16 +12,16 @@ from .migrator import (
 )
 
 __all__ = [
-    # Migration
-    "migrate_file",
-    "migrate_vault",
-    "validate_migration",
-    # CLI
-    "run_migration",
-    # Utilities
-    "normalize_timestamp_to_utc",
-    "infer_entity_type",
     # Data classes
     "MigrationResult",
     "MigrationStats",
+    "infer_entity_type",
+    # Migration
+    "migrate_file",
+    "migrate_vault",
+    # Utilities
+    "normalize_timestamp_to_utc",
+    # CLI
+    "run_migration",
+    "validate_migration",
 ]

@@ -7,7 +7,7 @@ Every validation failure produces a quarantined artifact with timestamp + reason
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -15,9 +15,9 @@ from .time import format_utc_iso8601, get_current_utc
 
 __all__ = [
     "QuarantineRecord",
-    "quarantine_invalid_entity",
-    "list_quarantined_items",
     "get_quarantine_stats",
+    "list_quarantined_items",
+    "quarantine_invalid_entity",
 ]
 
 
@@ -138,7 +138,7 @@ def quarantine_invalid_entity(
         json.dump(record_data, f, indent=2, ensure_ascii=False)
 
     # Create and return record
-    record = QuarantineRecord(
+    return QuarantineRecord(
         timestamp=timestamp_str,
         entity_type=entity_type,
         reason=reason,
@@ -146,8 +146,6 @@ def quarantine_invalid_entity(
         payload=payload,
         file_path=file_path,
     )
-
-    return record
 
 
 def list_quarantined_items(
@@ -278,7 +276,7 @@ def cleanup_old_quarantine(
     if not quarantine_dir.exists():
         return 0
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     deleted_count = 0
 
     for file_path in quarantine_dir.glob("*.json"):

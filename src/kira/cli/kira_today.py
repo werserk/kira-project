@@ -2,7 +2,7 @@
 """CLI модуль для просмотра задач и событий на сегодня"""
 
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 # Добавляем src в путь
@@ -37,7 +37,7 @@ def cli(tomorrow: bool, verbose: bool) -> int:
             return 1
 
         # Определить целевую дату
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         from datetime import timedelta
 
         target_date = now.date() if not tomorrow else (now + timedelta(days=1)).date()
@@ -357,8 +357,7 @@ def format_time_range(start_str: str, end_str: str | None) -> str:
         end = parse_date(end_str)
         end_time = end.strftime("%H:%M")
         return f"{start_time}-{end_time}"
-    else:
-        return start_time
+    return start_time
 
 
 def main(args: list[str] | None = None) -> int:

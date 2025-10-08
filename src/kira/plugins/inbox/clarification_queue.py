@@ -7,12 +7,13 @@ the item in a clarification queue and requests user confirmation via Telegram.
 from __future__ import annotations
 
 import json
-import time
 import uuid
 from dataclasses import asdict, dataclass, field
-from datetime import datetime, timezone
-from pathlib import Path
-from typing import Any
+from datetime import UTC, datetime
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 @dataclass
@@ -25,7 +26,7 @@ class ClarificationItem:
     extracted_data: dict[str, Any]
     confidence: float
     suggested_alternatives: list[dict[str, Any]] = field(default_factory=list)
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     status: str = "pending"  # pending, confirmed, rejected, timeout
     user_response: dict[str, Any] | None = None
 
@@ -152,7 +153,7 @@ class ClarificationQueue:
         list[ClarificationItem]
             Pending items (not expired)
         """
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         pending = []
 
         for item in self._items.values():
@@ -229,7 +230,7 @@ class ClarificationQueue:
 
         data = {
             "version": "1.0",
-            "updated_at": datetime.now(timezone.utc).isoformat(),
+            "updated_at": datetime.now(UTC).isoformat(),
             "items": [
                 {
                     **asdict(item),

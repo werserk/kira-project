@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -82,7 +82,7 @@ class TestGetCurrentTime:
         assert current_brussels.tzinfo is not None
 
         # Both should be recent (within last minute)
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         assert abs((current_utc - now).total_seconds()) < 60
 
     def test_get_current_time_with_zoneinfo(self):
@@ -103,7 +103,7 @@ class TestFormatDatetimeForId:
         assert result[9:].isdigit()
 
     def test_format_datetime_for_id_specific(self):
-        dt = datetime(2025, 1, 15, 14, 30, 0, tzinfo=timezone.utc)
+        dt = datetime(2025, 1, 15, 14, 30, 0, tzinfo=UTC)
         result = format_datetime_for_id(dt)
 
         # Format depends on system timezone conversion
@@ -111,7 +111,7 @@ class TestFormatDatetimeForId:
         assert "-" in result
 
     def test_format_datetime_for_id_with_timezone(self):
-        dt = datetime(2025, 1, 15, 12, 0, 0, tzinfo=timezone.utc)
+        dt = datetime(2025, 1, 15, 12, 0, 0, tzinfo=UTC)
         result = format_datetime_for_id(dt, tz="Europe/Brussels")
 
         # Should be formatted in Brussels time
@@ -152,14 +152,14 @@ class TestParseDatetime:
 
 class TestConvertTimezone:
     def test_convert_timezone(self):
-        dt_utc = datetime(2025, 1, 15, 12, 0, 0, tzinfo=timezone.utc)
+        dt_utc = datetime(2025, 1, 15, 12, 0, 0, tzinfo=UTC)
         dt_brussels = convert_timezone(dt_utc, "Europe/Brussels")
 
         # Brussels is UTC+1 in winter
         assert dt_brussels.hour in [13, 14]  # Account for DST
 
     def test_convert_with_zoneinfo(self):
-        dt_utc = datetime(2025, 1, 15, 12, 0, 0, tzinfo=timezone.utc)
+        dt_utc = datetime(2025, 1, 15, 12, 0, 0, tzinfo=UTC)
         tz = ZoneInfo("America/New_York")
         dt_ny = convert_timezone(dt_utc, tz)
 
@@ -168,7 +168,7 @@ class TestConvertTimezone:
 
 class TestEnsureTimezone:
     def test_ensure_timezone_aware(self):
-        dt_aware = datetime(2025, 1, 15, 12, 0, 0, tzinfo=timezone.utc)
+        dt_aware = datetime(2025, 1, 15, 12, 0, 0, tzinfo=UTC)
         result = ensure_timezone(dt_aware)
 
         assert result is dt_aware  # Should return as-is
@@ -178,7 +178,7 @@ class TestEnsureTimezone:
         result = ensure_timezone(dt_naive)
 
         assert result.tzinfo is not None
-        assert result.tzinfo == timezone.utc
+        assert result.tzinfo == UTC
 
     def test_ensure_timezone_naive_specific(self):
         dt_naive = datetime(2025, 1, 15, 12, 0, 0)
@@ -219,7 +219,7 @@ class TestLoadTimezoneFromConfig:
 
 class TestFormatDatetimeIso:
     def test_format_datetime_iso(self):
-        dt = datetime(2025, 1, 15, 14, 30, 0, tzinfo=timezone.utc)
+        dt = datetime(2025, 1, 15, 14, 30, 0, tzinfo=UTC)
         result = format_datetime_iso(dt)
 
         assert "2025-01-15" in result
@@ -235,5 +235,5 @@ class TestNowInTimezone:
         assert now_brussels.tzinfo is not None
 
         # Should be recent
-        current = datetime.now(timezone.utc)
+        current = datetime.now(UTC)
         assert abs((now_utc - current).total_seconds()) < 60

@@ -12,14 +12,13 @@ import subprocess
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
 
 from .sandbox import PluginSandbox, SandboxConfig
 
 __all__ = [
-    "HardenedSandboxConfig",
-    "HardenedPluginSandbox",
     "SAFE_MODULES",
+    "HardenedPluginSandbox",
+    "HardenedSandboxConfig",
 ]
 
 # Safe modules that plugins can import
@@ -90,7 +89,7 @@ class HardenedPluginSandbox(PluginSandbox):
     DoD: Plugins outside allow-list cannot launch.
     """
 
-    def __init__(self, plugin_dir: Path, config: HardenedSandboxConfig | None = None):
+    def __init__(self, plugin_dir: Path, config: HardenedSandboxConfig | None = None) -> None:
         if config is None:
             config = HardenedSandboxConfig()
         # PluginSandbox expects only config
@@ -167,15 +166,15 @@ BLOCKED_MODULES = {blocked_list!r}
 
 def _guarded_import(name, *args, **kwargs):
     base_module = name.split('.')[0]
-    
+
     # Block explicitly forbidden modules
     if base_module in BLOCKED_MODULES:
         raise ImportError(f"Import of '{{name}}' is blocked by sandbox policy")
-    
+
     # Check allowlist (strict mode)
     if base_module not in ALLOWED_MODULES:
         raise ImportError(f"Import of '{{name}}' not in allowlist")
-    
+
     return _original_import(name, *args, **kwargs)
 
 builtins.__import__ = _guarded_import
@@ -206,8 +205,8 @@ for name in ['eval', 'exec', 'compile', 'open']:
         # Check if bubblewrap is available
         try:
             subprocess.run(["bwrap", "--version"], capture_output=True, check=True)
-        except (subprocess.CalledProcessError, FileNotFoundError):
-            raise RuntimeError("bubblewrap not available on this system")
+        except (subprocess.CalledProcessError, FileNotFoundError) as err:
+            raise RuntimeError("bubblewrap not available on this system") from err
 
         # Build bubblewrap command
         bwrap_args = [
@@ -301,7 +300,7 @@ for name in ['eval', 'exec', 'compile', 'open']:
         if self.hardened_config.use_bubblewrap:
             try:
                 return self._run_with_bubblewrap(plugin_path, input_data)
-            except RuntimeError as e:
+            except RuntimeError:
                 # Fall back to standard sandbox
                 pass
 

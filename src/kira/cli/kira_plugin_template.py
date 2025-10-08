@@ -4,12 +4,15 @@ from __future__ import annotations
 
 import json
 import re
-from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from textwrap import dedent
+from typing import TYPE_CHECKING
 
 import click
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable, Sequence
 
 TEMPLATE_TEST_CONTENT = dedent(
     '''

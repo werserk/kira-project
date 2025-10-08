@@ -13,17 +13,18 @@ import os
 import resource
 import subprocess
 import sys
-import tempfile
 import time
 from dataclasses import dataclass
-from pathlib import Path
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 __all__ = [
-    "PluginSandbox",
-    "SandboxConfig",
     "PluginCapability",
     "PluginResult",
+    "PluginSandbox",
+    "SandboxConfig",
     "SandboxViolation",
 ]
 
@@ -164,10 +165,9 @@ class PluginSandbox:
                 )
 
         # Check network capability
-        if PluginCapability.NETWORK not in requested_caps:
-            if self.config.allow_network:
-                # Network allowed globally but not requested
-                pass
+        if PluginCapability.NETWORK not in requested_caps and self.config.allow_network:
+            # Network allowed globally but not requested
+            pass
             # else: Network denied (default)
 
         # Prepare environment
@@ -184,7 +184,7 @@ class PluginSandbox:
 
         try:
             # Set resource limits (applied to subprocess)
-            def set_limits():
+            def set_limits() -> None:
                 # CPU time limit
                 resource.setrlimit(
                     resource.RLIMIT_CPU,
@@ -218,12 +218,11 @@ class PluginSandbox:
                     output=result.stdout,
                     duration_seconds=duration,
                 )
-            else:
-                return PluginResult(
-                    success=False,
-                    error=result.stderr or f"Exit code {result.returncode}",
-                    duration_seconds=duration,
-                )
+            return PluginResult(
+                success=False,
+                error=result.stderr or f"Exit code {result.returncode}",
+                duration_seconds=duration,
+            )
 
         except subprocess.TimeoutExpired:
             duration = time.time() - start_time

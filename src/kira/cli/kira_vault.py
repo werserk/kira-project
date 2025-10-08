@@ -9,12 +9,14 @@ from typing import cast
 # Добавляем src в путь
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
+from datetime import UTC, datetime
+
 import click
 
 from ..core.config import load_config
 from ..core.host import create_host_api
 from ..core.ids import generate_entity_id, get_known_entity_types
-from ..core.schemas import create_default_schemas, get_schema_cache
+from ..core.schemas import get_schema_cache
 from ..core.vault_init import VaultInitError, get_vault_info, init_vault, verify_vault_structure
 
 CONTEXT_SETTINGS = {"help_option_names": ["-h", "--help"]}
@@ -145,7 +147,7 @@ def new_entity_cmd(entity_type: str, title: str, vault_path: str | None, templat
         entity_data = {
             "id": entity_id,
             "title": title,
-            "created": datetime.now(timezone.utc).isoformat(),
+            "created": datetime.now(UTC).isoformat(),
         }
 
         # Add schema defaults
@@ -155,14 +157,11 @@ def new_entity_cmd(entity_type: str, title: str, vault_path: str | None, templat
                 if "." not in key:  # Only root-level defaults
                     entity_data.setdefault(key, value)
 
-        # Import datetime for entity creation
-        from datetime import datetime, timezone
-
         # Create full content template
         content_template = f"""---
 id: {entity_id}
 title: {title}
-created: {datetime.now(timezone.utc).isoformat()}
+created: {datetime.now(UTC).isoformat()}
 ---
 
 # {title}
@@ -298,7 +297,7 @@ def info_cmd(vault_path: str | None, verbose: bool) -> int:
             click.echo(f"  - {entity_type}: {count}")
         click.echo(f"  📈 Всего: {total_entities}")
 
-        click.echo(f"\n📥 Обработка:")
+        click.echo("\n📥 Обработка:")
         click.echo(f"  - В inbox: {info['inbox_items']}")
         click.echo(f"  - В processed: {info['processed_items']}")
 
@@ -327,7 +326,7 @@ def main(args: list[str] | None = None) -> int:
 
     try:
         result = cli.main(args=list(args), standalone_mode=False)
-        return cast(int, result) if result is not None else 0  # noqa: ANN401
+        return cast("int", result) if result is not None else 0
     except SystemExit as exc:
         return int(exc.code) if exc.code is not None else 0
 

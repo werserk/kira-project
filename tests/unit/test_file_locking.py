@@ -87,14 +87,14 @@ class TestConcurrentLocking:
             entity_id = "task-001"
             execution_order = []
 
-            def thread1():
+            def thread1() -> None:
                 lock = EntityLock(vault, entity_id, timeout=5.0)
                 with lock:
                     execution_order.append("thread1_start")
                     time.sleep(0.1)  # Hold lock for 100ms
                     execution_order.append("thread1_end")
 
-            def thread2():
+            def thread2() -> None:
                 time.sleep(0.05)  # Start slightly after thread1
                 lock = EntityLock(vault, entity_id, timeout=5.0)
                 with lock:
@@ -124,14 +124,14 @@ class TestConcurrentLocking:
 
             execution_order = []
 
-            def thread1():
+            def thread1() -> None:
                 lock = EntityLock(vault, "task-001", timeout=5.0)
                 with lock:
                     execution_order.append("thread1_start")
                     time.sleep(0.1)
                     execution_order.append("thread1_end")
 
-            def thread2():
+            def thread2() -> None:
                 time.sleep(0.05)  # Start slightly after thread1
                 lock = EntityLock(vault, "task-002", timeout=5.0)  # Different entity
                 with lock:
@@ -167,12 +167,12 @@ class TestConcurrentLocking:
 
             entity_id = "task-001"
 
-            def thread1():
+            def thread1() -> None:
                 lock = EntityLock(vault, entity_id, timeout=5.0)
                 with lock:
                     time.sleep(2.0)  # Hold lock for 2 seconds
 
-            def thread2():
+            def thread2() -> None:
                 time.sleep(0.1)  # Let thread1 acquire lock first
                 lock = EntityLock(vault, entity_id, timeout=0.5)  # Short timeout
                 try:
@@ -345,7 +345,7 @@ class TestConcurrentDataIntegrity:
 
             errors = []
 
-            def increment_counter(thread_num: int):
+            def increment_counter(thread_num: int) -> None:
                 try:
                     # Read current entity
                     entity = vault.get(entity_id)
@@ -424,7 +424,7 @@ class TestLockPerformance:
             }
 
             start = time.time()
-            for i in range(10):
+            for _i in range(10):
                 vault_no_lock.upsert(entity_type="task", data=entity_data)
             time_no_lock = time.time() - start
 
@@ -433,7 +433,7 @@ class TestLockPerformance:
             vault_with_lock = Vault(config_with_lock)
 
             start = time.time()
-            for i in range(10):
+            for _i in range(10):
                 vault_with_lock.upsert(entity_type="task", data=entity_data)
             time_with_lock = time.time() - start
 

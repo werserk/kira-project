@@ -3,8 +3,6 @@
 import tempfile
 from pathlib import Path
 
-import pytest
-
 from kira.core.graph_validation import (
     DuplicateCandidate,
     GraphValidator,
@@ -277,7 +275,7 @@ class TestGraphValidator:
         self._create_entity("task-2", "Write tests", "task")
         self._create_entity("note-1", "Meeting notes", "note")
 
-    def _create_entity(self, entity_id: str, title: str, kind: str):
+    def _create_entity(self, entity_id: str, title: str, kind: str) -> None:
         """Helper to create entity file."""
         content = f"""---
 title: {title}
@@ -419,7 +417,7 @@ class TestGraphValidationIntegration:
         kind: str,
         content: str = "",
         **frontmatter,
-    ):
+    ) -> None:
         """Helper to create entity."""
         fm_lines = [f"title: {title}", f"kind: {kind}"]
 

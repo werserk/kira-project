@@ -18,18 +18,17 @@ Protocol:
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
 from typing import Any, Literal
 
-from ..core.time import format_utc_iso8601, get_current_utc, parse_utc_iso8601
+from ..core.time import format_utc_iso8601, get_current_utc
 
 __all__ = [
     "SyncContract",
     "SyncSource",
-    "get_sync_contract",
-    "update_sync_contract",
     "create_kira_sync_contract",
     "create_remote_sync_contract",
+    "get_sync_contract",
+    "update_sync_contract",
 ]
 
 SyncSource = Literal["kira", "gcal", "telegram", "other"]

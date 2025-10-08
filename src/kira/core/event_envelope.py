@@ -193,18 +193,15 @@ def validate_event_envelope(envelope: dict[str, Any] | EventEnvelope) -> list[st
     errors = []
 
     # Convert to dict if needed
-    if isinstance(envelope, EventEnvelope):
-        data = envelope.to_dict()
-    else:
-        data = envelope
+    data = envelope.to_dict() if isinstance(envelope, EventEnvelope) else envelope
 
     # Check required fields
     required_fields = ["event_id", "event_ts", "source", "type", "payload"]
-    for field in required_fields:
-        if field not in data:
-            errors.append(f"Missing required field: {field}")
-        elif data[field] is None:
-            errors.append(f"Field '{field}' cannot be null")
+    for field_name in required_fields:
+        if field_name not in data:
+            errors.append(f"Missing required field: {field_name}")
+        elif data[field_name] is None:
+            errors.append(f"Field '{field_name}' cannot be null")
 
     # Validate payload is dict
     if "payload" in data and not isinstance(data["payload"], dict):
@@ -213,22 +210,20 @@ def validate_event_envelope(envelope: dict[str, Any] | EventEnvelope) -> list[st
     # Validate event_ts is valid ISO-8601 UTC
     if "event_ts" in data:
         try:
-            dt = parse_utc_iso8601(data["event_ts"])
+            parse_utc_iso8601(data["event_ts"])
             # Check if it's actually UTC
             if not data["event_ts"].endswith("+00:00") and not data["event_ts"].endswith("Z"):
-                errors.append(f"event_ts must be in UTC (ISO-8601 with +00:00 or Z)")
+                errors.append("event_ts must be in UTC (ISO-8601 with +00:00 or Z)")
         except (ValueError, AttributeError) as exc:
             errors.append(f"Invalid event_ts format: {exc}")
 
     # Validate seq is int if present
-    if "seq" in data and data["seq"] is not None:
-        if not isinstance(data["seq"], int):
-            errors.append(f"Field 'seq' must be int, got {type(data['seq']).__name__}")
+    if "seq" in data and data["seq"] is not None and not isinstance(data["seq"], int):
+        errors.append(f"Field 'seq' must be int, got {type(data['seq']).__name__}")
 
     # Validate metadata is dict if present
-    if "metadata" in data and data["metadata"] is not None:
-        if not isinstance(data["metadata"], dict):
-            errors.append(f"Field 'metadata' must be dict, got {type(data['metadata']).__name__}")
+    if "metadata" in data and data["metadata"] is not None and not isinstance(data["metadata"], dict):
+        errors.append(f"Field 'metadata' must be dict, got {type(data['metadata']).__name__}")
 
     return errors
 

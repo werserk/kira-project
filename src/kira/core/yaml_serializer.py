@@ -9,17 +9,16 @@ This module provides deterministic serialization with:
 
 from __future__ import annotations
 
-from collections import OrderedDict
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 import yaml
 
 __all__ = [
-    "serialize_frontmatter",
-    "parse_frontmatter",
-    "normalize_timestamps_to_utc",
     "get_canonical_key_order",
+    "normalize_timestamps_to_utc",
+    "parse_frontmatter",
+    "serialize_frontmatter",
 ]
 
 
@@ -136,20 +135,17 @@ def normalize_timestamps_to_utc(data: dict[str, Any]) -> dict[str, Any]:
                 # Convert datetime to ISO-8601 UTC
                 if value.tzinfo is None:
                     # Naive datetime - assume UTC
-                    value = value.replace(tzinfo=timezone.utc)
+                    value = value.replace(tzinfo=UTC)
                 else:
                     # Convert to UTC
-                    value = value.astimezone(timezone.utc)
+                    value = value.astimezone(UTC)
 
                 result[key] = value.isoformat()
             elif isinstance(value, str):
                 # Ensure string timestamps are in ISO-8601 UTC format
                 try:
                     dt = datetime.fromisoformat(value.replace("Z", "+00:00"))
-                    if dt.tzinfo is None:
-                        dt = dt.replace(tzinfo=timezone.utc)
-                    else:
-                        dt = dt.astimezone(timezone.utc)
+                    dt = dt.replace(tzinfo=UTC) if dt.tzinfo is None else dt.astimezone(UTC)
                     result[key] = dt.isoformat()
                 except (ValueError, AttributeError):
                     # Keep as-is if can't parse
@@ -246,7 +242,7 @@ def serialize_frontmatter(data: dict[str, Any], *, normalize_timestamps: bool = 
                 result_lines.append(f"{key}: null")
             elif isinstance(value, bool):
                 result_lines.append(f"{key}: {str(value).lower()}")
-            elif isinstance(value, (int, float)):
+            elif isinstance(value, int | float):
                 result_lines.append(f"{key}: {value}")
             elif isinstance(value, str):
                 # Handle special characters in strings (Phase 1, Point 3: proper escaping)
@@ -339,9 +335,8 @@ def validate_strict_schema(entity_type: str, data: dict[str, Any]) -> list[str]:
             errors.append(f"Missing required field: {field_name} (tried: {', '.join(possible_keys)})")
 
     # Check status/state only for tasks and projects
-    if entity_type in ["task", "project"]:
-        if not any(key in data for key in ["state", "status"]):
-            errors.append("Missing required field: state (tried: state, status)")
+    if entity_type in ["task", "project"] and not any(key in data for key in ["state", "status"]):
+        errors.append("Missing required field: state (tried: state, status)")
 
     # Ensure tags is a list if present
     tags_key = None
@@ -350,14 +345,13 @@ def validate_strict_schema(entity_type: str, data: dict[str, Any]) -> list[str]:
             tags_key = key
             break
 
-    if tags_key and data[tags_key] is not None:
-        if not isinstance(data[tags_key], list):
-            errors.append(f"Field '{tags_key}' must be a list, got: {type(data[tags_key])}")
+    if tags_key and data[tags_key] is not None and not isinstance(data[tags_key], list):
+        errors.append(f"Field '{tags_key}' must be a list, got: {type(data[tags_key])}")
 
     # Ensure timestamps are ISO-8601 UTC if present
     timestamp_fields = ["created", "updated", "due_date", "start_time", "end_time"]
     for field in timestamp_fields:
-        if field in data and data[field]:
+        if data.get(field):
             value = data[field]
             if isinstance(value, str):
                 try:

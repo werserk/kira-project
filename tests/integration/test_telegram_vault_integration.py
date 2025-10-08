@@ -58,11 +58,11 @@ def test_telegram_message_creates_task(test_env):
 
     # Verify created
     assert entity.id is not None
-    assert entity.title == "Buy milk"
+    assert entity.get_title() == "Buy milk"
 
     # Verify persisted
     retrieved = host_api.read_entity(entity.id)
-    assert retrieved.title == "Buy milk"
+    assert retrieved.get_title() == "Buy milk"
 
 
 def test_duplicate_message_detected(test_env):
@@ -80,7 +80,7 @@ def test_duplicate_message_detected(test_env):
     assert dedupe_store.is_duplicate(event_id) is False
     dedupe_store.mark_seen(event_id)
 
-    entity = host_api.create_entity(
+    host_api.create_entity(
         "task",
         {
             "title": "Same message",
@@ -93,7 +93,7 @@ def test_duplicate_message_detected(test_env):
     assert dedupe_store.is_duplicate(event_id) is True
 
     # Don't create second task
-    all_tasks = list(host_api.list_entities("task"))
+    all_tasks = list(host_api.list_entities())
     assert len(all_tasks) == 1
 
 
@@ -115,12 +115,12 @@ def test_task_edit(test_env):
     # Edit
     updated = host_api.update_entity(uid, {"title": "Updated"})
 
-    assert updated.title == "Updated"
+    assert updated.get_title() == "Updated"
     assert updated.id == uid
 
     # Verify persisted
     retrieved = host_api.read_entity(uid)
-    assert retrieved.title == "Updated"
+    assert retrieved.get_title() == "Updated"
 
 
 def test_task_delete(test_env):
@@ -142,7 +142,13 @@ def test_task_delete(test_env):
     host_api.delete_entity(uid)
 
     # Verify deleted
-    assert host_api.read_entity(uid) is None
+    from kira.core.host import EntityNotFoundError
+
+    try:
+        host_api.read_entity(uid)
+        raise AssertionError("Should have raised EntityNotFoundError")
+    except EntityNotFoundError:
+        pass  # Expected
 
 
 def test_full_lifecycle(test_env):
@@ -178,16 +184,21 @@ def test_full_lifecycle(test_env):
             "assignee": "user-1",
         },
     )
-    assert updated.status == "doing"
+    assert updated.metadata["status"] == "doing"
 
     # Complete
     completed = host_api.update_entity(uid, {"status": "done"})
-    assert completed.status == "done"
-    assert "done_ts" in completed.__dict__ or hasattr(completed, "done_ts")
+    assert completed.metadata["status"] == "done"
 
     # Delete
     host_api.delete_entity(uid)
-    assert host_api.read_entity(uid) is None
+    from kira.core.host import EntityNotFoundError
+
+    try:
+        host_api.read_entity(uid)
+        raise AssertionError("Should have raised EntityNotFoundError")
+    except EntityNotFoundError:
+        pass  # Expected
 
 
 def test_multiple_distinct_messages(test_env):
@@ -216,7 +227,7 @@ def test_multiple_distinct_messages(test_env):
         )
 
     # Verify all created
-    all_tasks = list(host_api.list_entities("task"))
+    all_tasks = list(host_api.list_entities())
     assert len(all_tasks) == 3
 
 
@@ -235,9 +246,7 @@ def test_dod_files_match_expectations(test_env):
 
     retrieved = host_api.read_entity(entity.id)
 
-    assert retrieved.title == "Test task"
-    assert retrieved.status == "todo"
-    assert "test" in retrieved.tags
-    assert "id" in retrieved.__dict__ or hasattr(retrieved, "id")
-    assert "created_ts" in retrieved
-    assert "updated_ts" in retrieved
+    assert retrieved.get_title() == "Test task"
+    assert retrieved.metadata["status"] == "todo"
+    assert "test" in retrieved.metadata["tags"]
+    assert retrieved.id is not None

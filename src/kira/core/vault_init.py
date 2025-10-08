@@ -14,10 +14,10 @@ from .schemas import create_default_schemas
 
 __all__ = [
     "VaultInitError",
+    "get_vault_info",
     "init_vault",
     "install_schemas",
     "verify_vault_structure",
-    "get_vault_info",
 ]
 
 
@@ -45,9 +45,8 @@ def init_vault(vault_path: Path | str, *, force: bool = False) -> None:
     vault_path = Path(vault_path)
 
     # Check if Vault exists
-    if vault_path.exists() and not force:
-        if any(vault_path.iterdir()):
-            raise VaultInitError(f"Vault directory is not empty: {vault_path}. Use force=True to overwrite.")
+    if vault_path.exists() and not force and any(vault_path.iterdir()):
+        raise VaultInitError(f"Vault directory is not empty: {vault_path}. Use force=True to overwrite.")
 
     try:
         # Create directory structure

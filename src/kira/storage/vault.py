@@ -29,12 +29,10 @@ import fcntl
 import os
 import tempfile
 from dataclasses import dataclass
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from ..core.host import Entity, EntityNotFoundError, HostAPI, VaultError, create_host_api
-from ..core.md_io import MarkdownDocument, MarkdownIOError, read_markdown
+from ..core.host import Entity, VaultError, create_host_api
 
 __all__ = [
     "Vault",
@@ -148,9 +146,7 @@ class Vault:
         with self._acquire_entity_lock(entity_id) if entity_id else self._no_lock():
             # Delegate to HostAPI for validation and event emission
             # HostAPI will handle atomic writes via md_io.write_markdown(atomic=True)
-            entity = self.host_api.upsert_entity(entity_type, data, content=content)
-
-            return entity
+            return self.host_api.upsert_entity(entity_type, data, content=content)
 
     def delete(self, uid: str) -> None:
         """Delete entity by UID.
@@ -249,7 +245,7 @@ class Vault:
         except Exception as exc:
             raise VaultError(f"Atomic write failed for {file_path}: {exc}") from exc
 
-    def _acquire_entity_lock(self, entity_id: str) -> EntityLock:
+    def _acquire_entity_lock(self, entity_id: str) -> EntityLock | NoOpLock:
         """Acquire file lock for entity.
 
         Parameters
@@ -259,7 +255,7 @@ class Vault:
 
         Returns
         -------
-        EntityLock
+        EntityLock | NoOpLock
             Lock context manager
         """
         if not self.config.enable_file_locks:
@@ -322,7 +318,7 @@ class EntityLock:
                     os.close(self.lock_fd)
                     raise VaultError(
                         f"Failed to acquire lock for entity {self.entity_id} " f"after {self.timeout}s timeout"
-                    )
+                    ) from None
                 time.sleep(0.05)  # Wait 50ms before retry
 
         return self

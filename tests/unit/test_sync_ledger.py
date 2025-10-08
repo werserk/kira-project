@@ -3,8 +3,6 @@
 import tempfile
 from pathlib import Path
 
-import pytest
-
 from kira.sync.contract import create_kira_sync_contract, create_remote_sync_contract
 from kira.sync.ledger import (
     SyncLedger,

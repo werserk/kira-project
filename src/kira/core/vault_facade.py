@@ -6,7 +6,6 @@ injected into PluginContext.vault and accessed via JSON-RPC from sandboxed plugi
 
 from __future__ import annotations
 
-from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:

@@ -1,14 +1,12 @@
 """Tests for domain validation (Phase 1, Point 5)."""
 
-import pytest
-
 from kira.core.validation import (
     ValidationError,
     ValidationResult,
     validate_entity,
-    validate_task_specific,
-    validate_note_specific,
     validate_event_specific,
+    validate_note_specific,
+    validate_task_specific,
 )
 
 
@@ -160,7 +158,7 @@ def test_validate_note_valid():
         "tags": [],  # Required by schema
     }
 
-    result = validate_entity("note", note_data)
+    validate_entity("note", note_data)
     # May have warnings but note-specific validation should pass
     note_errors = validate_note_specific(note_data)
     assert len(note_errors) == 0  # Has category, so should be valid
@@ -190,7 +188,7 @@ def test_validate_event_valid():
         "end_time": "2025-10-08T15:00:00+00:00",
     }
 
-    result = validate_entity("event", event_data)
+    validate_entity("event", event_data)
     # May have schema errors for missing created/updated, but event-specific should be valid
     event_errors = validate_event_specific(event_data)
     assert len(event_errors) == 0

@@ -143,11 +143,11 @@ def test_list_backups(test_vault, backup_dir):
     config = BackupConfig(backup_dir=backup_dir)
 
     # Create multiple backups
-    backup1 = create_backup(test_vault, config)
+    create_backup(test_vault, config)
     import time
 
     time.sleep(1.1)  # Ensure different second in timestamp
-    backup2 = create_backup(test_vault, config)
+    create_backup(test_vault, config)
 
     # List backups
     backups = list_backups(backup_dir)
@@ -165,7 +165,7 @@ def test_cleanup_old_backups(test_vault, backup_dir):
     config = BackupConfig(backup_dir=backup_dir, retention_count=2)
 
     # Create 4 backups with distinct timestamps
-    for i in range(4):
+    for _i in range(4):
         create_backup(test_vault, config)
         import time
 
@@ -233,7 +233,7 @@ def test_dod_backup_restore_roundtrip(test_vault, backup_dir):
     assert original_content == restored_content
 
     # Verify all files present
-    original_files = set(f.relative_to(test_vault) for f in test_vault.rglob("*") if f.is_file())
-    restored_files = set(f.relative_to(restored_path) for f in restored_path.rglob("*") if f.is_file())
+    original_files = {f.relative_to(test_vault) for f in test_vault.rglob("*") if f.is_file()}
+    restored_files = {f.relative_to(restored_path) for f in restored_path.rglob("*") if f.is_file()}
 
     assert original_files == restored_files

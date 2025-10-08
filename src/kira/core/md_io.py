@@ -16,8 +16,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-import yaml  # type: ignore[import-untyped]
-
 from .yaml_serializer import parse_frontmatter, serialize_frontmatter
 
 __all__ = [
@@ -400,9 +398,7 @@ def validate_frontmatter(frontmatter: dict[str, Any], required_fields: list[str]
     """
     missing = []
     for field in required_fields:
-        if field not in frontmatter:
-            missing.append(field)
-        elif frontmatter[field] is None or frontmatter[field] == "":
+        if field not in frontmatter or frontmatter[field] is None or frontmatter[field] == "":
             missing.append(field)
     return missing
 
@@ -455,9 +451,7 @@ def normalize_frontmatter_dates(frontmatter: dict[str, Any]) -> dict[str, Any]:
 
     for key, value in result.items():
         if key in date_fields and value:
-            if isinstance(value, datetime.datetime):
-                result[key] = value.isoformat()
-            elif isinstance(value, datetime.date):
+            if isinstance(value, datetime.datetime | datetime.date):
                 result[key] = value.isoformat()
             elif isinstance(value, str):
                 try:

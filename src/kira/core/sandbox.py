@@ -12,10 +12,11 @@ import sys
 import threading
 import time
 from dataclasses import dataclass, field
-from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     from .policy import Policy
 
 from ..plugin_sdk.rpc import JSONRPCError, JSONRPCMessage, parse_jsonrpc_message, serialize_jsonrpc_message

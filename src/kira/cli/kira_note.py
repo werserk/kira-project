@@ -2,7 +2,7 @@
 """CLI модуль для работы с заметками"""
 
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 # Добавляем src в путь
@@ -127,7 +127,7 @@ def add_command(title: str, tag: tuple[str, ...], content: str | None, verbose: 
 
         entity_data = {
             "title": title,
-            "created": datetime.now(timezone.utc).isoformat(),
+            "created": datetime.now(UTC).isoformat(),
         }
 
         if tag:
@@ -213,7 +213,7 @@ def tag_command(note_id: str, tags: tuple[str, ...], remove: bool, verbose: bool
             return 1
 
         # Загрузить метаданные
-        with open(note_path, "r", encoding="utf-8") as f:
+        with open(note_path, encoding="utf-8") as f:
             content = f.read()
 
         parts = content.split("---", 2)
@@ -272,10 +272,9 @@ def delete_command(note_id: str, force: bool, verbose: bool) -> int:
             return 1
 
         # Подтверждение
-        if not force:
-            if not click.confirm(f"Удалить заметку {note_id}?"):
-                click.echo("Отменено")
-                return 0
+        if not force and not click.confirm(f"Удалить заметку {note_id}?"):
+            click.echo("Отменено")
+            return 0
 
         # Удалить файл
         note_path.unlink()

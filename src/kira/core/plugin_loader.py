@@ -5,7 +5,6 @@ from __future__ import annotations
 import importlib
 import json
 import sys
-from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from packaging import version
@@ -14,6 +13,9 @@ from ..plugin_sdk.context import PluginContext
 from ..plugin_sdk.manifest import PluginManifestValidator
 from .policy import Policy
 from .sandbox import Sandbox
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 class PluginLoadError(Exception):

@@ -5,7 +5,7 @@ DoD: Weeks with DST changes yield correct summaries.
 """
 
 import tempfile
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -102,14 +102,14 @@ def test_is_entity_in_window_metadata():
 
 def test_is_entity_in_window_created_at():
     """Test checking if entity is in window (using created_at)."""
-    from datetime import datetime, timezone
+    from datetime import datetime
 
     # Mock entity with created_at
     class MockEntity:
         def __init__(self, created_at):
             self.created_at = created_at
 
-    entity = MockEntity(datetime(2025, 10, 8, 12, 0, 0, tzinfo=timezone.utc))
+    entity = MockEntity(datetime(2025, 10, 8, 12, 0, 0, tzinfo=UTC))
 
     # In window
     assert (
@@ -160,10 +160,10 @@ def test_compute_rollup_empty_vault(test_env):
 def test_compute_rollup_with_entities(test_env):
     """Test DoD: Rollup aggregates entities correctly."""
     host_api = test_env
-    from datetime import datetime as dt, timezone
+    from datetime import datetime as dt
 
     # Create tasks
-    task1 = host_api.create_entity(
+    host_api.create_entity(
         "task",
         {
             "title": "Task 1",
@@ -172,7 +172,7 @@ def test_compute_rollup_with_entities(test_env):
         },
     )
 
-    task2 = host_api.create_entity(
+    host_api.create_entity(
         "task",
         {
             "title": "Task 2",
@@ -182,7 +182,7 @@ def test_compute_rollup_with_entities(test_env):
     )
 
     # Compute rollup for today
-    today = dt.now(timezone.utc)
+    today = dt.now(UTC)
     summary = compute_rollup(
         host_api,
         today,
@@ -201,10 +201,10 @@ def test_compute_rollup_with_entities(test_env):
 def test_compute_rollup_validated_only(test_env):
     """Test DoD: validated_only parameter works correctly."""
     host_api = test_env
-    from datetime import datetime as dt, timezone
+    from datetime import datetime as dt
 
     # Create valid task
-    task = host_api.create_entity(
+    host_api.create_entity(
         "task",
         {
             "title": "Valid Task",
@@ -214,7 +214,7 @@ def test_compute_rollup_validated_only(test_env):
     )
 
     # Query for today
-    today = dt.now(timezone.utc)
+    today = dt.now(UTC)
 
     # With validated_only=True (default)
     summary_validated = compute_rollup(

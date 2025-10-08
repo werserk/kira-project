@@ -10,26 +10,27 @@ Provides consistent timezone handling across the system with:
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone, tzinfo
+from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta, tzinfo
 from typing import Any
 from zoneinfo import ZoneInfo
 
 __all__ = [
-    "TimeConfig",
     "DayWindow",
+    "TimeConfig",
     "WeekWindow",
     "format_datetime_for_id",
     "format_utc_iso8601",
-    "parse_utc_iso8601",
     "get_current_time",
     "get_current_utc",
-    "get_default_timezone",
-    "parse_datetime",
-    "set_default_timezone",
-    "localize_utc_to_tz",
     "get_day_window_utc",
+    "get_default_timezone",
     "get_week_window_utc",
     "is_dst_transition_day",
+    "localize_utc_to_tz",
+    "parse_datetime",
+    "parse_utc_iso8601",
+    "set_default_timezone",
 ]
 
 
@@ -276,7 +277,7 @@ def ensure_timezone(dt: datetime, tz: str | ZoneInfo | None = None) -> datetime:
 
     # Naive datetime - assume timezone
     if tz is None:
-        tz_obj: tzinfo = timezone.utc
+        tz_obj: tzinfo = UTC
     elif isinstance(tz, str):
         tz_obj = ZoneInfo(tz)
     else:
@@ -307,8 +308,6 @@ def load_timezone_from_config(config: dict[str, Any]) -> None:
 # ============================================================================
 # Phase 0, Point 3: UTC Discipline Helpers
 # ============================================================================
-
-from dataclasses import dataclass
 
 
 @dataclass(frozen=True)
@@ -383,7 +382,7 @@ def get_current_utc() -> datetime:
     >>> now_utc.tzinfo
     datetime.timezone.utc
     """
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 def format_utc_iso8601(dt: datetime) -> str:
@@ -411,10 +410,10 @@ def format_utc_iso8601(dt: datetime) -> str:
     """
     # Ensure timezone-aware
     if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=timezone.utc)
+        dt = dt.replace(tzinfo=UTC)
     else:
         # Convert to UTC
-        dt = dt.astimezone(timezone.utc)
+        dt = dt.astimezone(UTC)
 
     return dt.isoformat()
 
@@ -452,10 +451,10 @@ def parse_utc_iso8601(iso_string: str) -> datetime:
 
     # Ensure timezone-aware
     if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=timezone.utc)
+        dt = dt.replace(tzinfo=UTC)
     else:
         # Convert to UTC
-        dt = dt.astimezone(timezone.utc)
+        dt = dt.astimezone(UTC)
 
     return dt
 
@@ -488,8 +487,8 @@ def localize_utc_to_tz(utc_dt: datetime, tz: str | ZoneInfo) -> datetime:
         tz = ZoneInfo(tz)
 
     # Ensure UTC
-    if utc_dt.tzinfo != timezone.utc:
-        utc_dt = utc_dt.astimezone(timezone.utc)
+    if utc_dt.tzinfo != UTC:
+        utc_dt = utc_dt.astimezone(UTC)
 
     return utc_dt.astimezone(tz)
 
@@ -535,8 +534,8 @@ def get_day_window_utc(date_str: str, tz: str | ZoneInfo | None = None) -> DayWi
     local_end = local_start + timedelta(days=1)
 
     # Convert to UTC
-    start_utc = local_start.astimezone(timezone.utc)
-    end_utc = local_end.astimezone(timezone.utc)
+    start_utc = local_start.astimezone(UTC)
+    end_utc = local_end.astimezone(UTC)
 
     # Check for DST transition
     has_dst = is_dst_transition_day(local_date, tz)
@@ -600,8 +599,8 @@ def get_week_window_utc(week_start_date: str, tz: str | ZoneInfo | None = None) 
     local_end = local_start + timedelta(days=7)
 
     # Convert to UTC
-    start_utc = local_start.astimezone(timezone.utc)
-    end_utc = local_end.astimezone(timezone.utc)
+    start_utc = local_start.astimezone(UTC)
+    end_utc = local_end.astimezone(UTC)
 
     # Check for DST transition during the week
     has_dst = False

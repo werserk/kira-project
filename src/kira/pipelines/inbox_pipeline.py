@@ -10,7 +10,7 @@ import json
 import time
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -163,7 +163,7 @@ class InboxPipeline:
             # Add trace context
             payload["trace_id"] = trace_id
             payload["attempt"] = str(attempt)
-            payload["timestamp"] = datetime.now(timezone.utc).isoformat()
+            payload["timestamp"] = datetime.now(UTC).isoformat()
 
             # Publish event to plugins (thin orchestration - no business logic)
             if self.event_bus:
@@ -287,7 +287,7 @@ class InboxPipeline:
             Event data (must be JSON-serializable)
         """
         log_entry = {
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "component": "pipeline",
             "pipeline": "inbox",
             "event_type": event_type,

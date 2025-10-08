@@ -1,7 +1,5 @@
 """Tests for sync contract (Phase 4, Point 14)."""
 
-import pytest
-
 from kira.sync.contract import (
     SyncContract,
     create_kira_sync_contract,

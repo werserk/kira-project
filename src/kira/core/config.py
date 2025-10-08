@@ -9,13 +9,14 @@ Supports:
 
 from __future__ import annotations
 
+import contextlib
 import os
 from pathlib import Path
 from typing import Any
 
 import yaml
 
-__all__ = ["Config", "load_config", "get_config", "save_config"]
+__all__ = ["Config", "get_config", "load_config", "save_config"]
 
 # Global config instance
 _config_instance: Config | None = None
@@ -228,10 +229,8 @@ class Config:
             if value is not None:
                 # Convert to appropriate type
                 if config_key.endswith("_ms") or config_key.endswith("timeout"):
-                    try:
+                    with contextlib.suppress(ValueError):
                         value = int(value)
-                    except ValueError:
-                        pass
 
                 # Set nested key
                 parts = config_key.split(".")

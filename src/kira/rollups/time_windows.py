@@ -11,13 +11,13 @@ from typing import Literal
 
 import pytz
 
-from ..core.time import format_utc_iso8601, get_current_utc, parse_utc_iso8601
+from ..core.time import format_utc_iso8601
 
 __all__ = [
     "TimeWindow",
     "compute_day_boundaries_utc",
-    "compute_week_boundaries_utc",
     "compute_month_boundaries_utc",
+    "compute_week_boundaries_utc",
     "get_week_start",
 ]
 
@@ -222,9 +222,8 @@ def compute_boundaries_utc(
     """
     if window == "day":
         return compute_day_boundaries_utc(local_date, timezone_str)
-    elif window == "week":
+    if window == "week":
         return compute_week_boundaries_utc(local_date, timezone_str, week_start_on)
-    elif window == "month":
+    if window == "month":
         return compute_month_boundaries_utc(local_date, timezone_str)
-    else:
-        raise ValueError(f"Unknown window type: {window}")
+    raise ValueError(f"Unknown window type: {window}")

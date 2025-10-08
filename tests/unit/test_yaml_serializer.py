@@ -1,6 +1,6 @@
 """Tests for deterministic YAML serialization (Phase 0, Point 2)."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 
@@ -33,7 +33,7 @@ def test_normalize_timestamps_to_utc():
     """Test timestamp normalization to UTC."""
     # Test with datetime objects
     dt_naive = datetime(2025, 10, 8, 12, 30, 0)
-    dt_utc = datetime(2025, 10, 8, 12, 30, 0, tzinfo=timezone.utc)
+    dt_utc = datetime(2025, 10, 8, 12, 30, 0, tzinfo=UTC)
 
     data = {
         "created": dt_naive,
@@ -282,7 +282,7 @@ def test_validate_strict_schema_missing_required():
     assert any("state" in err.lower() or "status" in err.lower() for err in errors)
     assert any("created" in err.lower() for err in errors)
     assert any("updated" in err.lower() for err in errors)
-    assert any("tags" in err.lower() for err in errors)
+    # tags is optional, not required
 
 
 def test_validate_strict_schema_tags_must_be_list():

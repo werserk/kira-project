@@ -6,14 +6,13 @@ Tests guard validation for all required transitions.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+import contextlib
 
 import pytest
 
 from kira.core.task_fsm import (
     FSMGuardError,
     FSMValidationError,
-    TaskFSM,
     TaskState,
     create_task_fsm,
 )
@@ -95,7 +94,7 @@ class TestDoingToDoneGuard:
 
         # Then transition to DONE
         task_data = {"assignee": "Bob", "estimate": "4h"}
-        transition, updated_data = fsm.transition(task_id="task-005", to_state=TaskState.DONE, task_data=task_data)
+        _transition, updated_data = fsm.transition(task_id="task-005", to_state=TaskState.DONE, task_data=task_data)
 
         assert updated_data["estimate"] == "4h"
         assert updated_data["estimate_frozen"] is True
@@ -110,7 +109,7 @@ class TestDoingToDoneGuard:
         # Transition to DONE with existing done_ts
         existing_done_ts = "2025-10-07T18:00:00+00:00"
         task_data = {"assignee": "Alice", "done_ts": existing_done_ts}
-        transition, updated_data = fsm.transition(task_id="task-006", to_state=TaskState.DONE, task_data=task_data)
+        _transition, updated_data = fsm.transition(task_id="task-006", to_state=TaskState.DONE, task_data=task_data)
 
         # Should preserve the provided done_ts
         assert updated_data["done_ts"] == existing_done_ts
@@ -168,14 +167,14 @@ class TestDoneToDoingGuard:
 
         # Set up task in DONE state
         fsm.transition("task-010", TaskState.DOING, task_data={"assignee": "Alice"})
-        transition_done, data_done = fsm.transition("task-010", TaskState.DONE, task_data={"assignee": "Alice"})
+        _transition_done, data_done = fsm.transition("task-010", TaskState.DONE, task_data={"assignee": "Alice"})
 
         # Verify done_ts was set
         assert "done_ts" in data_done
 
         # Reopen task
         task_data = {"assignee": "Alice", "done_ts": data_done["done_ts"]}
-        transition, updated_data = fsm.transition(
+        _transition, updated_data = fsm.transition(
             task_id="task-010", to_state=TaskState.DOING, reason="Reopen for fixes", task_data=task_data
         )
 
@@ -367,10 +366,8 @@ class TestGuardsDoNotModifyOnFailure:
         task_data_copy = original_data.copy()
 
         # Try invalid transition (done→doing without reopen_reason)
-        try:
+        with contextlib.suppress(FSMGuardError):
             fsm.transition(task_id="task-027", to_state=TaskState.DOING, task_data=task_data_copy)
-        except FSMGuardError:
-            pass
 
         # Original data should be unchanged
         assert task_data_copy == original_data
@@ -386,10 +383,8 @@ class TestGuardsDoNotModifyOnFailure:
         fsm.transition(task_id="task-028", to_state=TaskState.DONE, task_data={"assignee": "Bob"})
 
         # Try invalid transition (done→doing without reopen_reason)
-        try:
+        with contextlib.suppress(FSMGuardError):
             fsm.transition(task_id="task-028", to_state=TaskState.DOING, task_data={})
-        except FSMGuardError:
-            pass
 
         # State should still be DONE (not updated)
         assert fsm.get_state("task-028") == TaskState.DONE

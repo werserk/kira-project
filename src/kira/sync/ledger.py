@@ -11,12 +11,10 @@ This enables:
 
 from __future__ import annotations
 
-import json
 import sqlite3
 from dataclasses import dataclass
-from datetime import datetime
 from pathlib import Path
-from typing import Any, Literal
+from typing import Literal
 
 from ..core.time import format_utc_iso8601, get_current_utc, parse_utc_iso8601
 
@@ -24,8 +22,8 @@ __all__ = [
     "SyncLedger",
     "SyncLedgerEntry",
     "create_sync_ledger",
-    "should_import_remote_update",
     "resolve_conflict",
+    "should_import_remote_update",
 ]
 
 
@@ -359,10 +357,9 @@ def resolve_conflict(
 
         if local_dt > remote_dt:
             return "local"
-        elif remote_dt > local_dt:
+        if remote_dt > local_dt:
             return "remote"
-        else:
-            return "tie"
+        return "tie"
     except (ValueError, AttributeError):
         # If timestamps can't be parsed, treat as tie
         return "tie"

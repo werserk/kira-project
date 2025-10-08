@@ -1,9 +1,9 @@
 """Tests for UTC time discipline (Phase 0, Point 3)."""
 
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
+from zoneinfo import ZoneInfo
 
 import pytest
-from zoneinfo import ZoneInfo
 
 from kira.core.time import (
     DayWindow,
@@ -22,13 +22,13 @@ def test_get_current_utc():
     """Test getting current UTC time."""
     now = get_current_utc()
 
-    assert now.tzinfo == timezone.utc
+    assert now.tzinfo == UTC
     assert isinstance(now, datetime)
 
 
 def test_format_utc_iso8601_with_utc():
     """Test formatting UTC datetime to ISO-8601."""
-    dt = datetime(2025, 10, 8, 12, 30, 0, tzinfo=timezone.utc)
+    dt = datetime(2025, 10, 8, 12, 30, 0, tzinfo=UTC)
     result = format_utc_iso8601(dt)
 
     assert result == "2025-10-08T12:30:00+00:00"
@@ -62,7 +62,7 @@ def test_parse_utc_iso8601_with_utc():
     assert result.day == 8
     assert result.hour == 12
     assert result.minute == 30
-    assert result.tzinfo == timezone.utc
+    assert result.tzinfo == UTC
 
 
 def test_parse_utc_iso8601_with_z_suffix():
@@ -70,7 +70,7 @@ def test_parse_utc_iso8601_with_z_suffix():
     result = parse_utc_iso8601("2025-10-08T12:30:00Z")
 
     assert result.hour == 12
-    assert result.tzinfo == timezone.utc
+    assert result.tzinfo == UTC
 
 
 def test_parse_utc_iso8601_with_offset():
@@ -79,12 +79,12 @@ def test_parse_utc_iso8601_with_offset():
 
     # Should convert to UTC (14:30+02:00 = 12:30 UTC)
     assert result.hour == 12
-    assert result.tzinfo == timezone.utc
+    assert result.tzinfo == UTC
 
 
 def test_localize_utc_to_tz():
     """Test localizing UTC to specific timezone."""
-    utc_dt = datetime(2025, 10, 8, 12, 0, 0, tzinfo=timezone.utc)
+    utc_dt = datetime(2025, 10, 8, 12, 0, 0, tzinfo=UTC)
 
     # Localize to Brussels (UTC+2 in summer)
     local_dt = localize_utc_to_tz(utc_dt, "Europe/Brussels")
@@ -95,7 +95,7 @@ def test_localize_utc_to_tz():
 
 def test_localize_utc_to_tz_with_zoneinfo():
     """Test localization with ZoneInfo object."""
-    utc_dt = datetime(2025, 10, 8, 12, 0, 0, tzinfo=timezone.utc)
+    utc_dt = datetime(2025, 10, 8, 12, 0, 0, tzinfo=UTC)
     tz = ZoneInfo("America/New_York")
 
     local_dt = localize_utc_to_tz(utc_dt, tz)
@@ -259,7 +259,7 @@ def test_is_dst_transition_day_different_tz():
 
 def test_round_trip_utc_formatting():
     """Test format→parse→format yields identical result."""
-    original_dt = datetime(2025, 10, 8, 12, 30, 45, tzinfo=timezone.utc)
+    original_dt = datetime(2025, 10, 8, 12, 30, 45, tzinfo=UTC)
 
     # Format
     iso_str = format_utc_iso8601(original_dt)
@@ -287,7 +287,7 @@ def test_utc_discipline_no_local_times_in_storage():
 
     # Parse back
     retrieved = parse_utc_iso8601(stored)
-    assert retrieved.tzinfo == timezone.utc
+    assert retrieved.tzinfo == UTC
 
     # UTC hour should be 12:30 (14:30 Brussels - 2 hours)
     assert retrieved.hour == 12
@@ -296,7 +296,7 @@ def test_utc_discipline_no_local_times_in_storage():
 def test_localization_for_display_only():
     """Test that localization is for display, not storage."""
     # Storage: always UTC
-    utc_dt = datetime(2025, 10, 8, 12, 0, 0, tzinfo=timezone.utc)
+    utc_dt = datetime(2025, 10, 8, 12, 0, 0, tzinfo=UTC)
     stored = format_utc_iso8601(utc_dt)
     assert "+00:00" in stored
 

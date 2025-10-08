@@ -10,12 +10,12 @@ import threading
 import time
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Callable
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    pass
+    from collections.abc import Callable
 
 __all__ = [
     "Job",
@@ -63,7 +63,7 @@ class Trigger:
 
         # Ensure timezone aware
         if target.tzinfo is None:
-            target = target.replace(tzinfo=timezone.utc)
+            target = target.replace(tzinfo=UTC)
 
         return cls(type=TriggerType.AT, target_datetime=target)
 
@@ -129,7 +129,7 @@ class Job:
                 return time.time()
             return self.last_run_at + (self.trigger.interval_seconds or 0)
 
-        elif self.trigger.type == TriggerType.AT:
+        if self.trigger.type == TriggerType.AT:
             # One-time job
             if self.last_run_at is not None:
                 return None
@@ -138,9 +138,9 @@ class Job:
                 return None
             return target_dt.timestamp()
 
-        else:  # TriggerType.CRON
-            # Cron scheduling (simplified)
-            return self._calculate_cron_next_run()
+        # TriggerType.CRON
+        # Cron scheduling (simplified)
+        return self._calculate_cron_next_run()
 
     def _calculate_cron_next_run(self) -> float | None:
         """Calculate next run for cron trigger.
@@ -155,7 +155,7 @@ class Job:
         try:
             from croniter import croniter  # type: ignore[import-untyped]
 
-            base_time = datetime.fromtimestamp(self.last_run_at or time.time(), tz=timezone.utc)
+            base_time = datetime.fromtimestamp(self.last_run_at or time.time(), tz=UTC)
             cron = croniter(self.trigger.cron_expression, base_time)
             return float(cron.get_next())
         except ImportError:
@@ -206,7 +206,7 @@ class Scheduler:
         self,
         name: str,
         interval_seconds: float,
-        callable: Callable[[], Any],  # noqa: A002
+        callable: Callable[[], Any],
         *,
         job_id: str | None = None,
         metadata: dict[str, Any] | None = None,
@@ -243,7 +243,7 @@ class Scheduler:
         self,
         name: str,
         target: datetime | str,
-        callable: Callable[[], Any],  # noqa: A002
+        callable: Callable[[], Any],
         *,
         job_id: str | None = None,
         metadata: dict[str, Any] | None = None,
@@ -277,7 +277,7 @@ class Scheduler:
         self,
         name: str,
         cron_expression: str,
-        callable: Callable[[], Any],  # noqa: A002
+        callable: Callable[[], Any],
         *,
         job_id: str | None = None,
         metadata: dict[str, Any] | None = None,
@@ -312,7 +312,7 @@ class Scheduler:
         job_id: str,
         name: str,
         trigger: Trigger,
-        callable: Callable[[], Any],  # noqa: A002
+        callable: Callable[[], Any],
         metadata: dict[str, Any] | None,
     ) -> str:
         """Add or update job (idempotent).
@@ -465,7 +465,7 @@ class Scheduler:
         while self._running:
             try:
                 self._tick()
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 if self._logger:
                     self._logger.error(f"Scheduler tick error: {exc}")
 
@@ -474,7 +474,7 @@ class Scheduler:
 
     def _tick(self) -> None:
         """Process one scheduler tick."""
-        now = time.time()
+        time.time()
 
         # Find jobs ready to run
         jobs_to_run: list[Job] = []

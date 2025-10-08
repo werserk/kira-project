@@ -12,7 +12,6 @@ from kira.plugins.hardened_sandbox import (
     SAFE_MODULES,
     HardenedPluginSandbox,
     HardenedSandboxConfig,
-    SecurityError,
     check_module_safety,
 )
 
@@ -45,7 +44,7 @@ def test_safe_module_check():
 
 def test_check_imports_safe(sandbox_env):
     """Test import checking with safe imports."""
-    sandbox, plugin_dir = sandbox_env
+    sandbox, _plugin_dir = sandbox_env
 
     # Plugin with safe imports
     safe_code = """
@@ -63,7 +62,7 @@ def process(data):
 
 def test_check_imports_unsafe(sandbox_env):
     """Test DoD: Detect unsafe imports."""
-    sandbox, plugin_dir = sandbox_env
+    sandbox, _plugin_dir = sandbox_env
 
     # Plugin with unsafe imports
     unsafe_code = """
@@ -82,7 +81,7 @@ def process(data):
 
 def test_dod_blocked_module_cannot_launch(sandbox_env):
     """Test DoD: Plugins outside allow-list cannot launch."""
-    sandbox, plugin_dir = sandbox_env
+    sandbox, _plugin_dir = sandbox_env
 
     # Plugin with blocked import
     evil_code = """
@@ -100,7 +99,7 @@ def main(input_data):
 
 def test_allowed_module_can_launch(sandbox_env):
     """Test plugins with allowed modules can run."""
-    sandbox, plugin_dir = sandbox_env
+    sandbox, _plugin_dir = sandbox_env
 
     # Plugin with safe imports
     safe_code = """
@@ -119,7 +118,7 @@ def main(input_data):
 
 def test_import_guard_creation(sandbox_env):
     """Test import guard code generation."""
-    sandbox, plugin_dir = sandbox_env
+    sandbox, _plugin_dir = sandbox_env
 
     guard_code = sandbox._create_import_guard()
 
@@ -132,7 +131,7 @@ def test_import_guard_creation(sandbox_env):
 
 def test_multiple_blocked_imports(sandbox_env):
     """Test detection of multiple blocked imports."""
-    sandbox, plugin_dir = sandbox_env
+    sandbox, _plugin_dir = sandbox_env
 
     bad_code = """
 import os
@@ -152,7 +151,7 @@ def evil():
 
 def test_nested_module_import(sandbox_env):
     """Test detection of nested module imports."""
-    sandbox, plugin_dir = sandbox_env
+    sandbox, _plugin_dir = sandbox_env
 
     # os.path should still trigger os block
     code = """
@@ -167,7 +166,7 @@ from os.path import join
 
 def test_import_call_detection(sandbox_env):
     """Test detection of __import__() calls."""
-    sandbox, plugin_dir = sandbox_env
+    sandbox, _plugin_dir = sandbox_env
 
     code = """
 # Try to bypass with __import__
@@ -219,7 +218,7 @@ def test_custom_allowlist(plugin_dir=None):
 
 def test_syntax_error_in_plugin(sandbox_env):
     """Test handling of syntax errors in plugin code."""
-    sandbox, plugin_dir = sandbox_env
+    sandbox, _plugin_dir = sandbox_env
 
     # Invalid Python syntax
     bad_code = """

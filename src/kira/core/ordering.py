@@ -8,11 +8,13 @@ from __future__ import annotations
 
 import time
 from collections import defaultdict, deque
-from dataclasses import dataclass, field
-from typing import Any, Callable
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Any
 
-from .event_envelope import EventEnvelope
 from .time import parse_utc_iso8601
+
+if TYPE_CHECKING:
+    from .event_envelope import EventEnvelope
 
 __all__ = [
     "EventBuffer",
@@ -363,9 +365,8 @@ class EventBuffer:
 
         if reducer:
             return reducer.apply(state, envelope)
-        else:
-            # No reducer: just track that we processed it
-            return state
+        # No reducer: just track that we processed it
+        return state
 
     def _sort_events(self, events: list[BufferedEvent] | deque[BufferedEvent]) -> list[BufferedEvent]:
         """Sort events for deterministic processing.

@@ -7,8 +7,8 @@ from pathlib import Path
 
 import pytest
 
+from kira.core.host import EntityNotFoundError
 from kira.storage.vault import Vault, VaultConfig
-from kira.core.host import EntityNotFoundError, VaultError
 
 
 def test_vault_get_nonexistent_entity():

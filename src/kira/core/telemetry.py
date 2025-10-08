@@ -11,16 +11,16 @@ import logging
 import time
 import traceback
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 __all__ = [
-    "create_logger",
-    "create_trace_id",
-    "create_span_id",
-    "TelemetryLogger",
     "StructuredFormatter",
+    "TelemetryLogger",
+    "create_logger",
+    "create_span_id",
+    "create_trace_id",
 ]
 
 
@@ -78,7 +78,7 @@ class StructuredFormatter(logging.Formatter):
         """
         # Base fields
         log_entry = {
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "level": record.levelname,
             "component": getattr(record, "component", "unknown"),
             "message": record.getMessage(),
@@ -127,10 +127,7 @@ class StructuredFormatter(logging.Formatter):
             # exc_info can be True or a tuple (type, value, traceback)
             import sys
 
-            if record.exc_info is True:
-                exc_info = sys.exc_info()
-            else:
-                exc_info = record.exc_info
+            exc_info = sys.exc_info() if record.exc_info is True else record.exc_info
 
             exc_type, exc_value, exc_tb = exc_info
             log_entry["error"] = {
@@ -230,12 +227,11 @@ class TelemetryLogger:
         """
         if "adapter" in self.component.lower():
             return "adapters"
-        elif "plugin" in self.component.lower():
+        if "plugin" in self.component.lower():
             return "plugins"
-        elif "pipeline" in self.component.lower():
+        if "pipeline" in self.component.lower():
             return "pipelines"
-        else:
-            return "core"
+        return "core"
 
     def _log(
         self,

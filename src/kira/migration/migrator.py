@@ -10,13 +10,15 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from datetime import datetime, timezone
-from pathlib import Path
-from typing import Any
+from datetime import UTC, datetime
+from typing import TYPE_CHECKING, Any
 
 from ..core.ids import generate_entity_id
 from ..core.md_io import MarkdownDocument, read_markdown, write_markdown
 from ..core.time import format_utc_iso8601, parse_utc_iso8601
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 __all__ = [
     "MigrationResult",
@@ -48,11 +50,11 @@ class MigrationResult:
     changes: list[str]
     errors: list[str]
 
-    def add_change(self, change: str):
+    def add_change(self, change: str) -> None:
         """Add a change description."""
         self.changes.append(change)
 
-    def add_error(self, error: str):
+    def add_error(self, error: str) -> None:
         """Add an error."""
         self.errors.append(error)
         self.success = False
@@ -79,7 +81,7 @@ class MigrationStats:
     failed: int = 0
     skipped: int = 0
 
-    def add_result(self, result: MigrationResult):
+    def add_result(self, result: MigrationResult) -> None:
         """Add a migration result to stats."""
         self.total_files += 1
         if result.success:
@@ -124,7 +126,7 @@ def normalize_timestamp_to_utc(timestamp_str: str) -> str | None:
     try:
         # Unix timestamp
         if timestamp_str.isdigit():
-            dt = datetime.fromtimestamp(int(timestamp_str), tz=timezone.utc)
+            dt = datetime.fromtimestamp(int(timestamp_str), tz=UTC)
             return format_utc_iso8601(dt)
     except (ValueError, OSError):
         pass
@@ -133,7 +135,7 @@ def normalize_timestamp_to_utc(timestamp_str: str) -> str | None:
         # Date-only (YYYY-MM-DD)
         if re.match(r"^\d{4}-\d{2}-\d{2}$", timestamp_str):
             dt = datetime.strptime(timestamp_str, "%Y-%m-%d")
-            dt = dt.replace(tzinfo=timezone.utc)
+            dt = dt.replace(tzinfo=UTC)
             return format_utc_iso8601(dt)
     except ValueError:
         pass
@@ -167,10 +169,9 @@ def infer_entity_type(file_path: Path, metadata: dict[str, Any]) -> str:
 
     if "task" in path_str or "todo" in path_str:
         return "task"
-    elif "event" in path_str or "calendar" in path_str:
+    if "event" in path_str or "calendar" in path_str:
         return "event"
-    else:
-        return "note"  # Default
+    return "note"  # Default
 
 
 def migrate_file(
@@ -242,7 +243,7 @@ def migrate_file(
                     result.add_change(f"Normalized {field}: {original} → {normalized}")
 
         # 3. Ensure required fields
-        now_utc = format_utc_iso8601(datetime.now(timezone.utc))
+        now_utc = format_utc_iso8601(datetime.now(UTC))
 
         if "created" not in metadata:
             metadata["created"] = now_utc
@@ -282,7 +283,7 @@ def migrate_file(
             write_markdown(file_path, migrated_doc, fsync=True)
 
     except Exception as e:
-        result.add_error(f"Migration failed: {str(e)}")
+        result.add_error(f"Migration failed: {e!s}")
 
     return result
 
@@ -314,10 +315,7 @@ def migrate_vault(
     results: list[MigrationResult] = []
 
     # Find all .md files
-    if recursive:
-        md_files = list(vault_path.rglob("*.md"))
-    else:
-        md_files = list(vault_path.glob("*.md"))
+    md_files = list(vault_path.rglob("*.md")) if recursive else list(vault_path.glob("*.md"))
 
     # Migrate each file
     for md_file in md_files:
@@ -368,6 +366,7 @@ def validate_migration(file_path: Path) -> tuple[bool, list[str]]:
 
         # Round-trip test: serialize → parse → equal
         from io import StringIO
+
         import yaml
 
         serialized = yaml.dump(doc.frontmatter, default_flow_style=False, allow_unicode=True)
@@ -377,6 +376,6 @@ def validate_migration(file_path: Path) -> tuple[bool, list[str]]:
             errors.append("Round-trip test failed: metadata changed after serialize/parse")
 
     except Exception as e:
-        errors.append(f"Validation failed: {str(e)}")
+        errors.append(f"Validation failed: {e!s}")
 
     return len(errors) == 0, errors

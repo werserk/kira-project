@@ -6,11 +6,10 @@ and manages timebox lifecycle through task transitions.
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from kira.core.events import Event
     from kira.plugin_sdk.context import PluginContext
 
 
@@ -64,7 +63,7 @@ class TimeboxingManager:
         )
 
         # Determine duration
-        if time_hint and isinstance(time_hint, (int, float)):
+        if time_hint and isinstance(time_hint, int | float):
             duration_minutes = int(time_hint)
         else:
             # Default: 25 minutes (Pomodoro)
@@ -76,7 +75,7 @@ class TimeboxingManager:
 
         # Calculate start and end times
         # Start: now or next available slot
-        start_time = datetime.now(timezone.utc)
+        start_time = datetime.now(UTC)
         end_time = start_time + timedelta(minutes=duration_minutes)
 
         # Emit calendar event creation intent
@@ -121,7 +120,7 @@ class TimeboxingManager:
             "calendar.close_timebox",
             {
                 "task_id": task_id,
-                "completed_at": datetime.now(timezone.utc).isoformat(),
+                "completed_at": datetime.now(UTC).isoformat(),
                 "update_duration": True,  # Adjust to actual time spent
             },
         )
@@ -152,7 +151,7 @@ class TimeboxingManager:
             {
                 "task_id": task_id,
                 "blocked_reason": blocked_reason,
-                "paused_at": datetime.now(timezone.utc).isoformat(),
+                "paused_at": datetime.now(UTC).isoformat(),
             },
         )
 
@@ -182,7 +181,7 @@ class TimeboxingManager:
             {
                 "task_id": task_id,
                 "reviewer": reviewer,
-                "review_requested_at": datetime.now(timezone.utc).isoformat(),
+                "review_requested_at": datetime.now(UTC).isoformat(),
             },
         )
 

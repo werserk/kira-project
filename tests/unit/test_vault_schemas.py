@@ -13,10 +13,8 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 from kira.core.schemas import (
     EntitySchema,
     SchemaCache,
-    SchemaValidationError,
     ValidationResult,
     create_default_schemas,
-    get_schema_cache,
     validate_entity,
     validate_vault_structure,
 )
@@ -44,7 +42,7 @@ class TestDefaultSchemas:
         """Test schemas include folder contract information."""
         schemas = create_default_schemas()
 
-        for entity_type, schema in schemas.items():
+        for _entity_type, schema in schemas.items():
             assert "folder_contracts" in schema
             contracts = schema["folder_contracts"]
             assert "allowed_locations" in contracts
@@ -339,7 +337,7 @@ class TestADR007Compliance:
         """Test all schemas use JSON Schema Draft-07."""
         schemas = create_default_schemas()
 
-        for entity_type, schema in schemas.items():
+        for _entity_type, schema in schemas.items():
             assert schema["$schema"] == "http://json-schema.org/draft-07/schema#"
 
     def test_schemas_have_version_and_id(self):

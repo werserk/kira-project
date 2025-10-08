@@ -9,13 +9,15 @@ from __future__ import annotations
 import json
 import re
 import uuid
-from collections.abc import Iterable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from kira.plugin_sdk.context import PluginContext
+if TYPE_CHECKING:
+    from collections.abc import Iterable
+
+    from kira.plugin_sdk.context import PluginContext
 
 __all__ = ["InboxNormalizer", "activate", "get_normalizer"]
 
@@ -118,7 +120,7 @@ class InboxNormalizer:
             Classification with confidence and extracted fields
         """
         content_lower = content.lower()
-        words = content_lower.split()
+        content_lower.split()
 
         # Score for each entity type
         scores = {
@@ -134,12 +136,19 @@ class InboxNormalizer:
 
         # Task indicators
         task_verbs = ["сделать", "нужно", "создать", "написать", "исправить", "добавить", "убрать"]
-        task_indicators = ["todo", "задача", "task", "fix", "bug", "implement"]
+        task_indicators = [
+            "todo",
+            "задач",
+            "task",
+            "fix",
+            "bug",
+            "implement",
+        ]  # "задач" matches "задача", "задачу", etc.
 
         if any(verb in content_lower for verb in task_verbs):
-            scores["task"] += 0.3
+            scores["task"] += 0.4
         if any(ind in content_lower for ind in task_indicators):
-            scores["task"] += 0.2
+            scores["task"] += 0.3
 
         # Event indicators
         event_indicators = ["событие", "мероприятие", "конференция", "event"]
@@ -160,7 +169,7 @@ class InboxNormalizer:
         # Meeting indicators
         meeting_indicators = ["встреча", "созвон", "звонок", "meeting", "call", "sync"]
         if any(ind in content_lower for ind in meeting_indicators):
-            scores["meeting"] += 0.4
+            scores["meeting"] += 0.6
             scores["event"] += 0.1  # Meetings are also events
 
         # Email draft indicators
@@ -333,9 +342,8 @@ class InboxNormalizer:
                     "confidence": confidence,
                 }
 
-            else:
-                # Fallback to file creation
-                return self._create_file_fallback(content, metadata)
+            # Fallback to file creation
+            return self._create_file_fallback(content, metadata)
 
         except Exception as exc:
             self.context.logger.error(f"Failed to create entity: {exc}")
@@ -410,11 +418,11 @@ class InboxNormalizer:
             Clarification request
         """
         # Build confirmation message
-        message = f"📥 *Inbox Normalization*\n\n"
+        message = "📥 *Inbox Normalization*\n\n"
         message += f"Content: {request.content[:100]}...\n\n"
         message += f"Detected as: *{request.classification.entity_type}*\n"
         message += f"Confidence: {request.classification.confidence:.0%}\n\n"
-        message += f"Is this correct?"
+        message += "Is this correct?"
 
         # Build options
         options = [
@@ -546,9 +554,7 @@ class InboxNormalizer:
         metadata = self.extract_metadata(normalized, source, classification)
 
         # Create entity
-        result = self.create_entity(normalized, metadata)
-
-        return result
+        return self.create_entity(normalized, metadata)
 
     def process_file(self, file_path: Path) -> dict[str, Any]:
         """Normalize an incoming file.
@@ -714,7 +720,6 @@ def normalize_command(context: PluginContext, args: Iterable[str]) -> str:
 
     if result.get("success"):
         return f"Normalized {len(message)} chars -> entity: {result.get('entity_id', 'file created')}"
-    elif result.get("requires_clarification"):
+    if result.get("requires_clarification"):
         return f"Requires clarification (ID: {result.get('request_id')})"
-    else:
-        return f"Error: {result.get('error', 'unknown')}"
+    return f"Error: {result.get('error', 'unknown')}"

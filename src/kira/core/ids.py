@@ -11,10 +11,12 @@ from __future__ import annotations
 
 import re
 import uuid
-from datetime import datetime, timezone
-from pathlib import Path
-from typing import Any
+from datetime import UTC, datetime
+from typing import TYPE_CHECKING
 from zoneinfo import ZoneInfo
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 __all__ = [
     "AliasTracker",
@@ -23,8 +25,8 @@ __all__ = [
     "generate_entity_id",
     "is_valid_entity_id",
     "parse_entity_id",
-    "validate_entity_id",
     "sanitize_filename",
+    "validate_entity_id",
 ]
 
 
@@ -304,9 +306,7 @@ def _slugify(text: str) -> str:
     slug = slug.strip("-")
 
     # Collapse multiple hyphens
-    slug = re.sub(r"-+", "-", slug)
-
-    return slug
+    return re.sub(r"-+", "-", slug)
 
 
 def generate_short_id(length: int = 8) -> str:
@@ -333,7 +333,7 @@ def generate_timestamp_id() -> str:
     str
         Timestamp ID (YYYYMMDDTHHMMSSZ format)
     """
-    return datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    return datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
 
 
 # Registry of known entity types

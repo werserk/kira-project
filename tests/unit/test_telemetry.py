@@ -4,12 +4,8 @@ import json
 import logging
 import tempfile
 from pathlib import Path
-from unittest.mock import MagicMock, patch
-
-import pytest
 
 from kira.core.telemetry import (
-    SpanContext,
     StructuredFormatter,
     TelemetryLogger,
     create_logger,

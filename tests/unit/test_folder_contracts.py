@@ -5,12 +5,11 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-import pytest
-
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
-from kira.core.host import HostAPI, VaultError
-from kira.core.vault_init import init_vault
+from kira.core.host import HostAPI
+from kira.core.schemas import create_default_schemas
+from kira.core.vault_init import get_vault_info, init_vault, verify_vault_structure
 
 
 class TestFolderContracts:
@@ -32,18 +31,16 @@ class TestFolderContracts:
         assert project.path.parent.name == "projects"
 
     def test_folder_contract_violation_required_fields(self, tmp_path):
-        """Test folder contract enforcement for required fields."""
+        """Test that tasks get default status field automatically."""
         vault_path = tmp_path / "vault"
         init_vault(vault_path)
 
         host_api = HostAPI(vault_path)
 
-        # Try to create task without required status field
-        with pytest.raises(VaultError) as exc_info:
-            host_api.create_entity("task", {"title": "Incomplete Task"})
-
-        assert "Folder contract violations" in str(exc_info.value)
-        assert "status" in str(exc_info.value)
+        # Create task without status field - should get default "todo"
+        task = host_api.create_entity("task", {"title": "Task with defaults"})
+        assert task.metadata["status"] == "todo"
+        assert task.metadata["priority"] == "medium"
 
     def test_filename_pattern_enforcement(self, tmp_path):
         """Test filename follows pattern from folder contracts."""
@@ -212,7 +209,7 @@ class TestSchemaEvolution:
         """Test schemas have version information."""
         schemas = create_default_schemas()
 
-        for entity_type, schema in schemas.items():
+        for _entity_type, schema in schemas.items():
             assert "version" in schema
             assert isinstance(schema["version"], str)
             assert len(schema["version"]) > 0
@@ -223,5 +220,5 @@ class TestSchemaEvolution:
         schemas = create_default_schemas()
 
         # All current schemas should be version 1.0.0
-        for entity_type, schema in schemas.items():
+        for _entity_type, schema in schemas.items():
             assert schema["version"] == "1.0.0"

@@ -6,7 +6,7 @@ DoD: Storage usage stays bounded.
 import sqlite3
 import tempfile
 import time
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -42,7 +42,7 @@ def test_cleanup_dedupe_store_empty():
 
 def test_cleanup_dedupe_store_removes_old(test_env):
     """Test DoD: Old dedupe records removed."""
-    vault_path, artifacts_dir = test_env
+    _vault_path, artifacts_dir = test_env
 
     db_path = artifacts_dir / "dedupe.db"
 
@@ -59,7 +59,7 @@ def test_cleanup_dedupe_store_removes_old(test_env):
     )
 
     # Insert old and new records
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     old_ts = (now - timedelta(days=60)).isoformat()
     recent_ts = (now - timedelta(days=1)).isoformat()
 
@@ -86,7 +86,7 @@ def test_cleanup_dedupe_store_removes_old(test_env):
 
 def test_cleanup_quarantine_empty(test_env):
     """Test cleanup of empty quarantine."""
-    vault_path, artifacts_dir = test_env
+    _vault_path, artifacts_dir = test_env
 
     quarantine_dir = artifacts_dir / "quarantine"
 
@@ -98,7 +98,7 @@ def test_cleanup_quarantine_empty(test_env):
 
 def test_cleanup_quarantine_removes_old(test_env):
     """Test DoD: Old quarantine files removed."""
-    vault_path, artifacts_dir = test_env
+    _vault_path, artifacts_dir = test_env
 
     quarantine_dir = artifacts_dir / "quarantine"
     quarantine_dir.mkdir()
@@ -131,7 +131,7 @@ def test_cleanup_quarantine_removes_old(test_env):
 
 def test_cleanup_logs_empty(test_env):
     """Test cleanup of empty log directory."""
-    vault_path, artifacts_dir = test_env
+    _vault_path, artifacts_dir = test_env
 
     log_dir = artifacts_dir / "logs"
 
@@ -143,7 +143,7 @@ def test_cleanup_logs_empty(test_env):
 
 def test_cleanup_logs_removes_old(test_env):
     """Test DoD: Old log files removed."""
-    vault_path, artifacts_dir = test_env
+    _vault_path, artifacts_dir = test_env
 
     log_dir = artifacts_dir / "logs"
     log_dir.mkdir()
@@ -192,7 +192,7 @@ def test_run_cleanup_all(test_env):
         )
     """
     )
-    old_ts = (datetime.now(timezone.utc) - timedelta(days=60)).isoformat()
+    old_ts = (datetime.now(UTC) - timedelta(days=60)).isoformat()
     conn.execute("INSERT INTO seen_events VALUES (?, ?, ?)", ("old", old_ts, old_ts))
     conn.commit()
     conn.close()
@@ -260,7 +260,7 @@ def test_dod_storage_stays_bounded(test_env):
 
     Critical test: Cleanup prevents unbounded growth.
     """
-    vault_path, artifacts_dir = test_env
+    _vault_path, artifacts_dir = test_env
 
     # Create dedupe database with many old records
     db_path = artifacts_dir / "dedupe.db"
@@ -276,7 +276,7 @@ def test_dod_storage_stays_bounded(test_env):
     )
 
     # Insert 1000 old records
-    old_ts = (datetime.now(timezone.utc) - timedelta(days=60)).isoformat()
+    old_ts = (datetime.now(UTC) - timedelta(days=60)).isoformat()
     for i in range(1000):
         conn.execute("INSERT INTO seen_events VALUES (?, ?, ?)", (f"event-{i}", old_ts, old_ts))
     conn.commit()

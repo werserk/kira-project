@@ -8,19 +8,19 @@ Provides commands for validating knowledge graph consistency:
 """
 
 import sys
+from datetime import UTC
 from pathlib import Path
 
 import click
 
 from kira.core.config import load_config
 from kira.core.graph_validation import GraphValidator, ValidationReport
-from kira.core.links import LinkGraph
 
 __all__ = ["validate_command"]
 
 
 @click.group(name="validate")
-def validate_command():
+def validate_command() -> None:
     """Validate knowledge graph consistency (ADR-016)."""
     pass
 
@@ -60,7 +60,7 @@ def validate_all(
     ignore_orphans: bool,
     fail_on_issues: bool,
     similarity_threshold: float,
-):
+) -> None:
     """Run all validation checks on knowledge graph.
 
     Examples:
@@ -117,7 +117,7 @@ def validate_all(
     type=click.Path(exists=True, path_type=Path),
     help="Path to vault root directory",
 )
-def check_orphans(vault_root: Path | None):
+def check_orphans(vault_root: Path | None) -> None:
     """Find orphaned entities with no links.
 
     Examples:
@@ -146,7 +146,7 @@ def check_orphans(vault_root: Path | None):
     type=click.Path(exists=True, path_type=Path),
     help="Path to vault root directory",
 )
-def check_cycles(vault_root: Path | None):
+def check_cycles(vault_root: Path | None) -> None:
     """Find cycles in dependency graph.
 
     Examples:
@@ -176,7 +176,7 @@ def check_cycles(vault_root: Path | None):
     type=click.Path(exists=True, path_type=Path),
     help="Path to vault root directory",
 )
-def check_broken_links(vault_root: Path | None):
+def check_broken_links(vault_root: Path | None) -> None:
     """Find broken wikilinks and references.
 
     Examples:
@@ -212,7 +212,7 @@ def check_broken_links(vault_root: Path | None):
     default=0.85,
     help="Similarity threshold (0.0-1.0, default: 0.85)",
 )
-def check_duplicates(vault_root: Path | None, threshold: float):
+def check_duplicates(vault_root: Path | None, threshold: float) -> None:
     """Find potential duplicate entities.
 
     Examples:
@@ -236,7 +236,7 @@ def check_duplicates(vault_root: Path | None, threshold: float):
         click.echo("✅ No duplicates found")
 
 
-def display_report(report: ValidationReport, ignore_orphans: bool = False):
+def display_report(report: ValidationReport, ignore_orphans: bool = False) -> None:
     """Display validation report to console.
 
     Parameters
@@ -250,7 +250,7 @@ def display_report(report: ValidationReport, ignore_orphans: bool = False):
     click.echo("📊 KNOWLEDGE GRAPH VALIDATION REPORT")
     click.echo("=" * 70)
 
-    click.echo(f"\n📈 Statistics:")
+    click.echo("\n📈 Statistics:")
     click.echo(f"  Total entities: {report.total_entities}")
     click.echo(f"  Total links: {report.total_links}")
     click.echo(f"  Total issues: {report.issue_count()}")
@@ -310,7 +310,7 @@ def save_report(
     report: ValidationReport,
     output_path: Path,
     ignore_orphans: bool = False,
-):
+) -> None:
     """Save validation report to Markdown file.
 
     Parameters
@@ -322,14 +322,14 @@ def save_report(
     ignore_orphans
         Skip orphans in report
     """
-    from datetime import datetime, timezone
+    from datetime import datetime
 
     lines = []
 
     # Header
     lines.append("# Knowledge Graph Validation Report")
     lines.append("")
-    lines.append(f"Generated: {datetime.now(timezone.utc).isoformat()}")
+    lines.append(f"Generated: {datetime.now(UTC).isoformat()}")
     lines.append("")
 
     # Statistics

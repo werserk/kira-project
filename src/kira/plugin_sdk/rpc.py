@@ -11,7 +11,7 @@ import json
 import sys
 import uuid
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any
 
 from .types import RPCRequest, RPCResponse

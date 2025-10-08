@@ -11,17 +11,17 @@ from __future__ import annotations
 import hashlib
 import json
 import sqlite3
-from datetime import datetime, timedelta, timezone
+from datetime import timedelta
 from pathlib import Path
 from typing import Any
 
-from .time import format_utc_iso8601, get_current_utc, parse_utc_iso8601
+from .time import format_utc_iso8601, get_current_utc
 
 __all__ = [
     "EventDedupeStore",
+    "create_dedupe_store",
     "generate_event_id",
     "normalize_payload_for_hashing",
-    "create_dedupe_store",
 ]
 
 
@@ -97,9 +97,7 @@ def generate_event_id(
 
     # Hash
     hash_obj = hashlib.sha256(combined.encode("utf-8"))
-    event_id = hash_obj.hexdigest()
-
-    return event_id
+    return hash_obj.hexdigest()
 
 
 class EventDedupeStore:
@@ -234,18 +232,17 @@ class EventDedupeStore:
             )
             conn.commit()
             return False  # Duplicate
-        else:
-            # Insert new
-            cursor.execute(
-                """
+        # Insert new
+        cursor.execute(
+            """
                 INSERT INTO seen_events
                 (event_id, first_seen_ts, last_seen_ts, seen_count, source, external_id, metadata)
                 VALUES (?, ?, ?, 1, ?, ?, ?)
             """,
-                (event_id, now, now, source, external_id, metadata_json),
-            )
-            conn.commit()
-            return True  # First time
+            (event_id, now, now, source, external_id, metadata_json),
+        )
+        conn.commit()
+        return True  # First time
 
     def get_event_info(self, event_id: str) -> dict[str, Any] | None:
         """Get information about a seen event.

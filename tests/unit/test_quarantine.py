@@ -4,8 +4,6 @@ import json
 import tempfile
 from pathlib import Path
 
-import pytest
-
 from kira.core.quarantine import (
     QuarantineRecord,
     cleanup_old_quarantine,
@@ -70,7 +68,7 @@ def test_quarantine_file_contains_correct_data():
         payload = {"id": "task-123", "title": "", "status": "invalid"}
         errors = ["Title cannot be empty", "Invalid status: invalid"]
 
-        record = quarantine_invalid_entity(
+        quarantine_invalid_entity(
             entity_type="task",
             payload=payload,
             errors=errors,
@@ -294,7 +292,7 @@ def test_quarantine_preserves_payload_intact():
             "special_chars": "unicode: ñ, emoji: 😊",
         }
 
-        record = quarantine_invalid_entity(
+        quarantine_invalid_entity(
             entity_type="task",
             payload=payload,
             errors=["error"],

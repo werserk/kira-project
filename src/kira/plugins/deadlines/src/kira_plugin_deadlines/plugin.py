@@ -7,7 +7,6 @@ for automated state transitions and timeboxing.
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -177,7 +176,7 @@ class DeadlinesManager:
         lines = content.split("\n")
 
         # Find frontmatter boundaries
-        if not lines[0].strip() == "---":
+        if lines[0].strip() != "---":
             self.logger.warning(f"No frontmatter in {task_file}")
             return
 
@@ -192,7 +191,7 @@ class DeadlinesManager:
 
         # Parse frontmatter
         frontmatter_lines = lines[1:end_idx]
-        frontmatter_text = "\n".join(frontmatter_lines)
+        "\n".join(frontmatter_lines)
 
         # Simple YAML-like update (just append new fields)
         for key, value in metadata.items():

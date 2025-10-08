@@ -4,15 +4,12 @@ DoD: Post-migration, every file parses and passes round-trip tests.
 """
 
 import tempfile
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-
-import pytest
 
 from kira.core.md_io import MarkdownDocument, read_markdown, write_markdown
 from kira.core.time import format_utc_iso8601
 from kira.migration.migrator import (
-    MigrationStats,
     infer_entity_type,
     migrate_file,
     migrate_vault,
@@ -286,7 +283,7 @@ def test_migrate_vault_multiple_files():
             write_markdown(file_path, doc)
 
         # Migrate vault
-        stats, results = migrate_vault(vault_path)
+        stats, _results = migrate_vault(vault_path)
 
         # Should have migrated all files
         assert stats.total_files == 3
@@ -318,7 +315,7 @@ def test_migrate_vault_recursive():
             write_markdown(file_path, doc)
 
         # Migrate recursively
-        stats, results = migrate_vault(vault_path, recursive=True)
+        stats, _results = migrate_vault(vault_path, recursive=True)
 
         # Should have migrated all nested files
         assert stats.total_files == 4
@@ -343,8 +340,8 @@ def test_migrate_vault_stats():
             frontmatter={
                 "id": "note-123",
                 "title": "Migrated",
-                "created": format_utc_iso8601(datetime.now(timezone.utc)),
-                "updated": format_utc_iso8601(datetime.now(timezone.utc)),
+                "created": format_utc_iso8601(datetime.now(UTC)),
+                "updated": format_utc_iso8601(datetime.now(UTC)),
                 "tags": [],
             },
             content="Content",
@@ -352,7 +349,7 @@ def test_migrate_vault_stats():
         write_markdown(file2, doc2)
 
         # Migrate
-        stats, results = migrate_vault(vault_path)
+        stats, _results = migrate_vault(vault_path)
 
         # Verify stats
         assert stats.total_files == 2
@@ -370,8 +367,8 @@ def test_validate_migration_success():
             frontmatter={
                 "id": "task-123",
                 "title": "Test Task",
-                "created": format_utc_iso8601(datetime.now(timezone.utc)),
-                "updated": format_utc_iso8601(datetime.now(timezone.utc)),
+                "created": format_utc_iso8601(datetime.now(UTC)),
+                "updated": format_utc_iso8601(datetime.now(UTC)),
                 "tags": [],
                 "status": "todo",
             },
@@ -419,7 +416,7 @@ def test_validate_migration_invalid_timestamp():
                 "id": "task-123",
                 "title": "Test",
                 "created": "invalid-timestamp",
-                "updated": format_utc_iso8601(datetime.now(timezone.utc)),
+                "updated": format_utc_iso8601(datetime.now(UTC)),
                 "tags": [],
             },
             content="Content",

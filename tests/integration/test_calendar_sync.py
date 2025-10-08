@@ -3,20 +3,18 @@
 from __future__ import annotations
 
 import sys
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from unittest.mock import MagicMock
-
-import pytest
 
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
 from kira.adapters.gcal.adapter import (
+    EventMapping,
     GCalAdapter,
     GCalAdapterConfig,
     GCalEvent,
-    EventMapping,
     SyncResult,
     create_gcal_adapter,
 )
@@ -28,7 +26,7 @@ class TestGCalEvent:
 
     def test_event_creation(self) -> None:
         """Test creating a GCal event."""
-        start = datetime.now(timezone.utc)
+        start = datetime.now(UTC)
         end = start + timedelta(hours=1)
 
         event = GCalEvent(
@@ -46,7 +44,7 @@ class TestGCalEvent:
 
     def test_event_to_dict(self) -> None:
         """Test converting event to dictionary."""
-        start = datetime.now(timezone.utc)
+        start = datetime.now(UTC)
         end = start + timedelta(hours=1)
 
         event = GCalEvent(
@@ -70,7 +68,7 @@ class TestGCalEvent:
 
     def test_all_day_event(self) -> None:
         """Test all-day event format."""
-        start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0)
+        start = datetime.now(UTC).replace(hour=0, minute=0, second=0)
         end = start + timedelta(days=1)
 
         event = GCalEvent(
@@ -205,7 +203,7 @@ class TestGCalAdapter:
             "start": "2025-10-07T10:00:00+00:00",
             "time_hint": 60,
         }
-        entity1.updated_at = datetime.now(timezone.utc)
+        entity1.updated_at = datetime.now(UTC)
 
         entities = [entity1]
         result = self.adapter.push(entities)
@@ -222,7 +220,7 @@ class TestGCalAdapter:
             "id": "task-1",
             "start": "2025-10-07T10:00:00+00:00",
         }
-        entity.updated_at = datetime.now(timezone.utc)
+        entity.updated_at = datetime.now(UTC)
 
         result = self.adapter.push([entity], dry_run=True)
 
@@ -241,7 +239,7 @@ class TestGCalAdapter:
             "gcal_id": "gcal-123",
             "start": "2025-10-07T10:00:00+00:00",
         }
-        entity.updated_at = datetime.now(timezone.utc)
+        entity.updated_at = datetime.now(UTC)
 
         result = self.adapter.reconcile([entity])
 
@@ -255,7 +253,7 @@ class TestGCalAdapter:
         task.get_title.return_value = "Important Task"
         task.metadata = {
             "id": "task-123",
-            "start": datetime.now(timezone.utc).isoformat(),
+            "start": datetime.now(UTC).isoformat(),
             "time_hint": 120,  # 2 hours
         }
 
@@ -270,7 +268,7 @@ class TestGCalAdapter:
         entity.metadata = {
             "start": "2025-10-07T10:00:00+00:00",
         }
-        entity.updated_at = datetime.now(timezone.utc)
+        entity.updated_at = datetime.now(UTC)
 
         should_push = self.adapter._should_push_entity(entity)
         assert should_push
@@ -279,14 +277,14 @@ class TestGCalAdapter:
         """Test should_push_entity without start/due."""
         entity = MagicMock()
         entity.metadata = {}
-        entity.updated_at = datetime.now(timezone.utc)
+        entity.updated_at = datetime.now(UTC)
 
         should_push = self.adapter._should_push_entity(entity)
         assert not should_push
 
     def test_should_push_entity_recently_synced(self) -> None:
         """Test should_push_entity for recently synced entity."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         entity = MagicMock()
         entity.metadata = {
             "start": "2025-10-07T10:00:00+00:00",
@@ -302,7 +300,7 @@ class TestGCalAdapter:
         """Test event.received is published."""
         events_received = []
 
-        def handler(event):
+        def handler(event) -> None:
             events_received.append(event)
 
         self.event_bus.subscribe("event.received", handler)
@@ -310,8 +308,8 @@ class TestGCalAdapter:
         gcal_event = GCalEvent(
             id="test-123",
             summary="Test Event",
-            start=datetime.now(timezone.utc),
-            end=datetime.now(timezone.utc) + timedelta(hours=1),
+            start=datetime.now(UTC),
+            end=datetime.now(UTC) + timedelta(hours=1),
         )
 
         self.adapter._publish_event_received(gcal_event, "trace-123")
@@ -378,8 +376,8 @@ class TestCalendarPlugin:
 
     def test_plugin_activation(self) -> None:
         """Test plugin activation."""
-        from kira.plugins.calendar.src.kira_plugin_calendar.plugin import activate
         from kira.plugin_sdk.context import PluginContext
+        from kira.plugins.calendar.src.kira_plugin_calendar.plugin import activate
 
         # Mock context
         context = MagicMock(spec=PluginContext)
@@ -393,14 +391,14 @@ class TestCalendarPlugin:
 
     def test_event_handlers_registered(self) -> None:
         """Test event handlers are registered."""
-        from kira.plugins.calendar.src.kira_plugin_calendar.plugin import CalendarPlugin
         from kira.plugin_sdk.context import PluginContext
+        from kira.plugins.calendar.src.kira_plugin_calendar.plugin import CalendarPlugin
 
         context = MagicMock(spec=PluginContext)
         context.logger = MagicMock()
         context.events = create_event_bus()
 
-        plugin = CalendarPlugin(context)
+        CalendarPlugin(context)
 
         # Check that handlers are registered
         subscriptions = context.events.get_subscriptions()
@@ -408,8 +406,8 @@ class TestCalendarPlugin:
 
     def test_handle_task_enter_doing(self) -> None:
         """Test handling task.enter_doing event."""
-        from kira.plugins.calendar.src.kira_plugin_calendar.plugin import CalendarPlugin
         from kira.plugin_sdk.context import PluginContext
+        from kira.plugins.calendar.src.kira_plugin_calendar.plugin import CalendarPlugin
 
         context = MagicMock(spec=PluginContext)
         context.logger = MagicMock()
@@ -435,7 +433,7 @@ class TestEventMapping:
 
     def test_mapping_creation(self) -> None:
         """Test creating event mapping."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         mapping = EventMapping(
             vault_id="event-123",
@@ -465,7 +463,7 @@ class TestTimeboxing:
         task.get_title.return_value = "Important Task"
         task.metadata = {
             "id": "task-123",
-            "start": datetime.now(timezone.utc).isoformat(),
+            "start": datetime.now(UTC).isoformat(),
             "time_hint": "2h",
         }
 
@@ -484,7 +482,7 @@ class TestTimeboxing:
         task.get_title.return_value = "Task without time_hint"
         task.metadata = {
             "id": "task-456",
-            "start": datetime.now(timezone.utc).isoformat(),
+            "start": datetime.now(UTC).isoformat(),
             # No time_hint - should use default
         }
 
@@ -501,7 +499,7 @@ class TestConflictResolution:
         adapter = create_gcal_adapter()
 
         # Mock entities with different timestamps
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         vault_entity = MagicMock()
         vault_entity.id = "event-123"
@@ -534,7 +532,7 @@ class TestRateLimiting:
             "id": "task-1",
             "start": "2025-10-07T10:00:00+00:00",
         }
-        entity.updated_at = datetime.now(timezone.utc)
+        entity.updated_at = datetime.now(UTC)
 
         start_time = time.time()
         adapter.push([entity, entity])

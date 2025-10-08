@@ -6,18 +6,21 @@ Aggregate entities by time windows with validation filtering.
 from __future__ import annotations
 
 from collections import defaultdict
-from datetime import datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from ..core.host import HostAPI
 from ..core.time import parse_utc_iso8601
 from ..core.validation import validate_entity
 from .time_windows import TimeWindow, compute_boundaries_utc
 
+if TYPE_CHECKING:
+    from datetime import datetime
+
+    from ..core.host import HostAPI
+
 __all__ = [
     "RollupSummary",
-    "compute_rollup",
     "aggregate_entities",
+    "compute_rollup",
 ]
 
 
@@ -53,7 +56,7 @@ class RollupSummary:
         end_utc: str,
         local_date: str,
         timezone: str,
-    ):
+    ) -> None:
         self.window_type = window_type
         self.start_utc = start_utc
         self.end_utc = end_utc
@@ -65,7 +68,7 @@ class RollupSummary:
         self.total_count = 0
         self.entities: list[str] = []
 
-    def add_entity(self, entity_id: str, entity_type: str, is_valid: bool):
+    def add_entity(self, entity_id: str, entity_type: str, is_valid: bool) -> None:
         """Add entity to summary."""
         self.entities.append(entity_id)
         self.entity_counts[entity_type] += 1
@@ -203,7 +206,7 @@ def compute_rollup(
                 if validated_only:
                     try:
                         validation_result = validate_entity(entity_type, entity.metadata)
-                        is_valid = validation_result.is_valid
+                        is_valid = validation_result.valid
                     except Exception:
                         is_valid = False
 
