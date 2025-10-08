@@ -100,6 +100,40 @@ class Settings:
     # Telegram (optional)
     telegram_bot_token: str | None = None
     telegram_allowed_users: list[int] = field(default_factory=list)
+    telegram_webhook_url: str | None = None
+    enable_telegram_webhook: bool = False
+
+    # LLM Providers (for AI Agent)
+    anthropic_api_key: str = ""
+    anthropic_default_model: str = "claude-3-5-sonnet-20241022"
+    openai_api_key: str = ""
+    openai_default_model: str = "gpt-4-turbo-preview"
+    openrouter_api_key: str = ""
+    openrouter_default_model: str = "anthropic/claude-3.5-sonnet"
+    ollama_base_url: str = "http://localhost:11434"
+    ollama_default_model: str = "llama3"
+
+    # LLM Router Configuration
+    planning_provider: str = "anthropic"
+    structuring_provider: str = "openai"
+    default_provider: str = "openrouter"
+    enable_ollama_fallback: bool = True
+    llm_provider: str = "openrouter"  # Legacy field
+
+    # RAG and Memory
+    enable_rag: bool = False
+    rag_index_path: str | None = None
+    memory_max_exchanges: int = 3
+
+    # Agent Behavior
+    agent_max_tool_calls: int = 10
+    agent_max_tokens: int = 4000
+    agent_timeout: float = 60.0
+    agent_temperature: float = 0.7
+
+    # Agent Service
+    agent_host: str = "0.0.0.0"
+    agent_port: int = 8000
 
     def __post_init__(self):
         """Validate settings after initialization."""
@@ -133,7 +167,7 @@ class Settings:
         if self.telegram_enabled:
             if not self.telegram_bot_token:
                 raise ConfigError(
-                    "KIRA_TELEGRAM_BOT_TOKEN is required when KIRA_TELEGRAM_ENABLED=true. "
+                    "TELEGRAM_BOT_TOKEN is required when KIRA_TELEGRAM_ENABLED=true. "
                     "Get a bot token from @BotFather and set it in .env"
                 )
 
@@ -202,9 +236,42 @@ class Settings:
                 # Logging
                 log_level=os.environ.get("KIRA_LOG_LEVEL", "INFO"),
                 log_file=Path(os.environ["KIRA_LOG_FILE"]) if "KIRA_LOG_FILE" in os.environ else None,
-                # Telegram
-                telegram_bot_token=os.environ.get("KIRA_TELEGRAM_BOT_TOKEN"),
-                telegram_allowed_users=parse_int_list(os.environ.get("KIRA_TELEGRAM_ALLOWED_USERS", "")),
+                # Telegram (with fallback to old KIRA_ prefixed names for compatibility)
+                telegram_bot_token=os.environ.get("TELEGRAM_BOT_TOKEN")
+                    or os.environ.get("KIRA_TELEGRAM_BOT_TOKEN"),
+                telegram_allowed_users=parse_int_list(
+                    os.environ.get("TELEGRAM_ALLOWED_CHAT_IDS", "")
+                    or os.environ.get("KIRA_TELEGRAM_ALLOWED_USERS", "")
+                ),
+                telegram_webhook_url=os.environ.get("TELEGRAM_WEBHOOK_URL"),
+                enable_telegram_webhook=os.environ.get("ENABLE_TELEGRAM_WEBHOOK", "false").lower() == "true",
+                # LLM Providers
+                anthropic_api_key=os.environ.get("ANTHROPIC_API_KEY", ""),
+                anthropic_default_model=os.environ.get("ANTHROPIC_DEFAULT_MODEL", "claude-3-5-sonnet-20241022"),
+                openai_api_key=os.environ.get("OPENAI_API_KEY", ""),
+                openai_default_model=os.environ.get("OPENAI_DEFAULT_MODEL", "gpt-4-turbo-preview"),
+                openrouter_api_key=os.environ.get("OPENROUTER_API_KEY", ""),
+                openrouter_default_model=os.environ.get("OPENROUTER_DEFAULT_MODEL", "anthropic/claude-3.5-sonnet"),
+                ollama_base_url=os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434"),
+                ollama_default_model=os.environ.get("OLLAMA_DEFAULT_MODEL", "llama3"),
+                # LLM Router
+                planning_provider=os.environ.get("LLM_PLANNING_PROVIDER") or os.environ.get("ROUTER_PLANNING_PROVIDER", "anthropic"),
+                structuring_provider=os.environ.get("LLM_STRUCTURING_PROVIDER") or os.environ.get("ROUTER_STRUCTURING_PROVIDER", "openai"),
+                default_provider=os.environ.get("LLM_DEFAULT_PROVIDER") or os.environ.get("ROUTER_DEFAULT_PROVIDER", "openrouter"),
+                enable_ollama_fallback=os.environ.get("ENABLE_OLLAMA_FALLBACK", "true").lower() == "true",
+                llm_provider=os.environ.get("LLM_PROVIDER", "openrouter"),
+                # RAG and Memory
+                enable_rag=os.environ.get("ENABLE_RAG", "false").lower() == "true",
+                rag_index_path=os.environ.get("RAG_INDEX_PATH"),
+                memory_max_exchanges=int(os.environ.get("MEMORY_MAX_EXCHANGES", "3")),
+                # Agent Behavior
+                agent_max_tool_calls=int(os.environ.get("KIRA_AGENT_MAX_TOOL_CALLS", "10")),
+                agent_max_tokens=int(os.environ.get("KIRA_AGENT_MAX_TOKENS", "4000")),
+                agent_timeout=float(os.environ.get("KIRA_AGENT_TIMEOUT", "60.0")),
+                agent_temperature=float(os.environ.get("KIRA_AGENT_TEMPERATURE", "0.7")),
+                # Agent Service
+                agent_host=os.environ.get("KIRA_AGENT_HOST", "0.0.0.0"),
+                agent_port=int(os.environ.get("KIRA_AGENT_PORT", "8000")),
             )
 
         except (ValueError, KeyError) as exc:
@@ -403,10 +470,10 @@ KIRA_LOG_LEVEL=INFO
 # ====================
 
 # Telegram bot token (required if TELEGRAM_ENABLED=true)
-# KIRA_TELEGRAM_BOT_TOKEN=your-bot-token
+# TELEGRAM_BOT_TOKEN=your-bot-token
 
-# Comma-separated list of allowed user IDs (optional)
-# KIRA_TELEGRAM_ALLOWED_USERS=123456789,987654321
+# Comma-separated list of allowed chat IDs (optional)
+# TELEGRAM_ALLOWED_CHAT_IDS=123456789,987654321
 """
 
     if output_path:

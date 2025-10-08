@@ -56,10 +56,13 @@ def start_command(token: str | None, verbose: bool) -> int:
             click.echo("🔧 Загружена конфигурация")
             click.echo(f"   Vault: {config.get('vault', {}).get('path', 'не указан')}")
 
-        # Get token from parameter or environment
-        bot_token = token or os.getenv("TELEGRAM_BOT_TOKEN")
+        # Get token from parameter or settings
+        from ..config.settings import load_settings
+        settings = load_settings()
+
+        bot_token = token or settings.telegram_bot_token
         if not bot_token:
-            click.echo("❌ Bot token не указан. Используйте --token или установите TELEGRAM_BOT_TOKEN")
+            click.echo("❌ Bot token не указан. Используйте --token или установите TELEGRAM_BOT_TOKEN в .env")
             return 1
 
         return handle_telegram_start(config, bot_token, verbose)
@@ -82,10 +85,13 @@ def test_command(token: str | None, chat_id: int) -> int:
     """Отправить тестовое сообщение в Telegram."""
 
     try:
-        # Get token from parameter or environment
-        bot_token = token or os.getenv("TELEGRAM_BOT_TOKEN")
+        # Get token from parameter or settings
+        from ..config.settings import load_settings
+        settings = load_settings()
+
+        bot_token = token or settings.telegram_bot_token
         if not bot_token:
-            click.echo("❌ Bot token не указан. Используйте --token или установите TELEGRAM_BOT_TOKEN")
+            click.echo("❌ Bot token не указан. Используйте --token или установите TELEGRAM_BOT_TOKEN в .env")
             return 1
 
         click.echo(f"📤 Отправка тестового сообщения в chat {chat_id}...")
@@ -149,18 +155,8 @@ def handle_telegram_start(
     # === Setup Agent Components ===
     vault_path = Path(vault_config.get("path", "vault"))
 
-    # Create AgentConfig
-    agent_config = AgentConfig(
-        vault_path=vault_path,
-        anthropic_api_key=os.getenv("ANTHROPIC_API_KEY", ""),
-        openai_api_key=os.getenv("OPENAI_API_KEY", ""),
-        openrouter_api_key=os.getenv("OPENROUTER_API_KEY", ""),
-        enable_rag=agent_config_dict.get("enable_rag", False),
-        rag_index_path=agent_config_dict.get("rag_index_path", ".rag/index.json"),
-        memory_max_exchanges=agent_config_dict.get("memory_max_exchanges", 10),
-        default_dry_run=agent_config_dict.get("default_dry_run", True),
-        enable_ollama_fallback=agent_config_dict.get("enable_ollama_fallback", True),
-    )
+    # Create AgentConfig from settings
+    agent_config = AgentConfig.from_settings(settings)
 
     # Initialize LLM adapters
     anthropic_adapter = AnthropicAdapter(api_key=agent_config.anthropic_api_key)

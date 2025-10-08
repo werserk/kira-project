@@ -54,42 +54,62 @@ class AgentConfig:
 
     @classmethod
     def from_env(cls) -> AgentConfig:
-        """Load configuration from environment variables."""
-        vault_path_str = os.getenv("KIRA_VAULT_PATH", "vault")
-        vault_path = Path(vault_path_str) if vault_path_str else None
+        """Load configuration from environment variables.
 
+        DEPRECATED: Use from_settings() instead.
+        This method is kept for backward compatibility.
+        """
+        from ..config.settings import load_settings
+
+        settings = load_settings()
+        return cls.from_settings(settings)
+
+    @classmethod
+    def from_settings(cls, settings: Any) -> AgentConfig:
+        """Create AgentConfig from Settings object.
+
+        Parameters
+        ----------
+        settings
+            Settings object from kira.config.settings
+
+        Returns
+        -------
+        AgentConfig
+            Configured agent config
+        """
         return cls(
             # LLM providers
-            anthropic_api_key=os.getenv("ANTHROPIC_API_KEY", ""),
-            anthropic_default_model=os.getenv("ANTHROPIC_DEFAULT_MODEL", "claude-3-5-sonnet-20241022"),
-            openai_api_key=os.getenv("OPENAI_API_KEY", ""),
-            openai_default_model=os.getenv("OPENAI_DEFAULT_MODEL", "gpt-4-turbo-preview"),
-            openrouter_api_key=os.getenv("OPENROUTER_API_KEY", ""),
-            openrouter_default_model=os.getenv("OPENROUTER_DEFAULT_MODEL", "anthropic/claude-3.5-sonnet"),
-            ollama_base_url=os.getenv("OLLAMA_BASE_URL", "http://localhost:11434"),
-            ollama_default_model=os.getenv("OLLAMA_DEFAULT_MODEL", "llama3"),
+            anthropic_api_key=settings.anthropic_api_key,
+            anthropic_default_model=settings.anthropic_default_model,
+            openai_api_key=settings.openai_api_key,
+            openai_default_model=settings.openai_default_model,
+            openrouter_api_key=settings.openrouter_api_key,
+            openrouter_default_model=settings.openrouter_default_model,
+            ollama_base_url=settings.ollama_base_url,
+            ollama_default_model=settings.ollama_default_model,
             # Router config
-            planning_provider=os.getenv("LLM_PLANNING_PROVIDER", "anthropic"),
-            structuring_provider=os.getenv("LLM_STRUCTURING_PROVIDER", "openai"),
-            default_provider=os.getenv("LLM_DEFAULT_PROVIDER", "openrouter"),
-            enable_ollama_fallback=os.getenv("ENABLE_OLLAMA_FALLBACK", "true").lower() == "true",
+            planning_provider=settings.planning_provider,
+            structuring_provider=settings.structuring_provider,
+            default_provider=settings.default_provider,
+            enable_ollama_fallback=settings.enable_ollama_fallback,
             # Legacy
-            llm_provider=os.getenv("LLM_PROVIDER", "openrouter"),
+            llm_provider=settings.llm_provider,
             # RAG and Memory
-            enable_rag=os.getenv("ENABLE_RAG", "false").lower() == "true",
-            rag_index_path=os.getenv("RAG_INDEX_PATH"),
-            memory_max_exchanges=int(os.getenv("MEMORY_MAX_EXCHANGES", "3")),
+            enable_rag=settings.enable_rag,
+            rag_index_path=settings.rag_index_path,
+            memory_max_exchanges=settings.memory_max_exchanges,
             # Agent behavior
-            max_tool_calls=int(os.getenv("KIRA_AGENT_MAX_TOOL_CALLS", "10")),
-            max_tokens=int(os.getenv("KIRA_AGENT_MAX_TOKENS", "4000")),
-            timeout=float(os.getenv("KIRA_AGENT_TIMEOUT", "60.0")),
-            temperature=float(os.getenv("KIRA_AGENT_TEMPERATURE", "0.7")),
+            max_tool_calls=settings.agent_max_tool_calls,
+            max_tokens=settings.agent_max_tokens,
+            timeout=settings.agent_timeout,
+            temperature=settings.agent_temperature,
             # Service
-            host=os.getenv("KIRA_AGENT_HOST", "0.0.0.0"),
-            port=int(os.getenv("KIRA_AGENT_PORT", "8000")),
+            host=settings.agent_host,
+            port=settings.agent_port,
             # Telegram
-            telegram_bot_token=os.getenv("TELEGRAM_BOT_TOKEN", ""),
-            enable_telegram_webhook=os.getenv("ENABLE_TELEGRAM_WEBHOOK", "false").lower() == "true",
+            telegram_bot_token=settings.telegram_bot_token or "",
+            enable_telegram_webhook=settings.enable_telegram_webhook,
             # Vault
-            vault_path=vault_path,
+            vault_path=settings.vault_path,
         )
