@@ -306,6 +306,127 @@ def edit_command(task_id: str, verbose: bool) -> int:
         return 1
 
 
+@cli.command("archive")
+@click.argument("task_id", required=False)
+@click.option("--done", is_flag=True, help="Архивировать все завершенные задачи")
+@click.option("--older-than", type=int, help="Архивировать задачи старше N дней")
+@click.option("--force", is_flag=True, help="Не запрашивать подтверждение")
+@click.option("--verbose", "-v", is_flag=True, help="Подробный вывод")
+def archive_command(task_id: str | None, done: bool, older_than: int | None, force: bool, verbose: bool) -> int:
+    """Архивировать задачи."""
+    try:
+        config = load_config()
+        vault_path = Path(config.get("vault", {}).get("path", "vault"))
+
+        # Создать директорию архива
+        archive_dir = vault_path / ".archive" / "tasks"
+        archive_dir.mkdir(parents=True, exist_ok=True)
+
+        if task_id:
+            # Архивировать одну задачу
+            task_path = find_task_path(vault_path, task_id)
+            if not task_path:
+                click.echo(f"❌ Задача не найдена: {task_id}")
+                return 1
+
+            if not force:
+                if not click.confirm(f"Архивировать задачу {task_id}?"):
+                    click.echo("Отменено")
+                    return 0
+
+            # Переместить в архив
+            archive_path = archive_dir / task_path.name
+            task_path.rename(archive_path)
+
+            click.echo(f"✅ Задача архивирована: {task_id}")
+            if verbose:
+                click.echo(f"📁 Архив: {archive_path}")
+
+            return 0
+
+        elif done or older_than:
+            # Массовая архивация
+            tasks_dir = vault_path / "tasks"
+            if not tasks_dir.exists():
+                click.echo("📋 Задач нет")
+                return 0
+
+            tasks_to_archive = []
+            now = datetime.now(timezone.utc)
+
+            for task_file in tasks_dir.glob("task-*.md"):
+                try:
+                    with open(task_file, encoding="utf-8") as f:
+                        content = f.read()
+
+                    parts = content.split("---", 2)
+                    if len(parts) < 3:
+                        continue
+
+                    metadata = yaml.safe_load(parts[1])
+                    
+                    # Проверить условия архивации
+                    should_archive = False
+
+                    if done and metadata.get("status") == "done":
+                        should_archive = True
+
+                    if older_than:
+                        updated = metadata.get("updated", metadata.get("created"))
+                        if updated:
+                            updated_date = datetime.fromisoformat(updated.replace("Z", "+00:00"))
+                            days_old = (now - updated_date).days
+                            if days_old > older_than and metadata.get("status") == "done":
+                                should_archive = True
+
+                    if should_archive:
+                        tasks_to_archive.append((task_file, metadata))
+
+                except Exception:
+                    continue
+
+            if not tasks_to_archive:
+                click.echo("📋 Нет задач для архивации")
+                return 0
+
+            click.echo(f"📦 Найдено задач для архивации: {len(tasks_to_archive)}")
+
+            if not force:
+                for task_file, metadata in tasks_to_archive[:5]:
+                    click.echo(f"  • {metadata.get('title', 'Untitled')} ({metadata.get('id')})")
+                if len(tasks_to_archive) > 5:
+                    click.echo(f"  ... и еще {len(tasks_to_archive) - 5}")
+
+                if not click.confirm("Архивировать все эти задачи?"):
+                    click.echo("Отменено")
+                    return 0
+
+            # Архивировать
+            archived_count = 0
+            for task_file, metadata in tasks_to_archive:
+                try:
+                    archive_path = archive_dir / task_file.name
+                    task_file.rename(archive_path)
+                    archived_count += 1
+                except Exception as exc:
+                    if verbose:
+                        click.echo(f"⚠️  Ошибка архивации {task_file.name}: {exc}")
+
+            click.echo(f"✅ Архивировано задач: {archived_count}")
+            return 0
+
+        else:
+            click.echo("❌ Укажите task_id, --done или --older-than")
+            return 1
+
+    except Exception as exc:
+        click.echo(f"❌ Ошибка архивации: {exc}")
+        if verbose:
+            import traceback
+            traceback.print_exc()
+        return 1
+
+
 # Helper functions
 
 def load_tasks(tasks_dir: Path) -> list[dict]:
