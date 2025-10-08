@@ -5,6 +5,126 @@
 [![Tests](https://img.shields.io/badge/tests-744%2F821%20passing-brightgreen)]()
 [![Python](https://img.shields.io/badge/python-3.12%2B-blue)]()
 [![License](https://img.shields.io/badge/license-MIT-green)]()
+[![Version](https://img.shields.io/badge/version-0.1.0--alpha-orange)]()
+
+---
+
+## 🚀 Getting Started (Alpha)
+
+**Welcome to Kira v0.1.0-alpha!** Get up and running in **< 15 minutes**.
+
+### Quick Install
+
+```bash
+# 1. Clone repository
+git clone https://github.com/your-org/kira-project.git
+cd kira-project
+
+# 2. Initialize everything (creates vault, installs dependencies, sets up config)
+make init
+
+# 3. Run smoke test to verify installation
+make smoke
+```
+
+**Done!** You now have a working Kira installation.
+
+### First Steps
+
+```bash
+# Create your first task
+poetry run python -m kira.cli task add "Setup my PKM system" --status todo
+
+# List all tasks
+poetry run python -m kira.cli task list
+
+# Create a note
+poetry run python -m kira.cli note add "Project Ideas" --tags ideas,brainstorm
+
+# Initialize your vault (if not done by make init)
+poetry run python -m kira.cli vault init
+```
+
+### What Works in Alpha
+
+✅ **Core Features:**
+- Task management with FSM (todo → doing → done)
+- Note capture and organization
+- Event tracking
+- Vault migration from existing markdown
+- Atomic, crash-safe file operations
+- Full CLI with `--json` output for automation
+- Structured logging and audit trail
+
+✅ **Available Commands:**
+```bash
+make init           # Full initialization
+make smoke          # Quick smoke test
+make rollup:daily   # Daily rollup
+make rollup:weekly  # Weekly rollup
+```
+
+### What's NOT Available (Behind Flags)
+
+⚠️ **Integrations disabled by default in alpha:**
+- Google Calendar sync (`KIRA_GCAL_ENABLED=false`)
+- Telegram adapter (`KIRA_TELEGRAM_ENABLED=false`)
+- Plugin system (`KIRA_ENABLE_PLUGINS=false`)
+
+To enable integrations, edit `.env` file and set flags to `true`.
+
+### Quick Reference
+
+```bash
+# Task operations
+poetry run python -m kira.cli task add "Task title"
+poetry run python -m kira.cli task list
+poetry run python -m kira.cli task start <id>
+poetry run python -m kira.cli task done <id>
+
+# Vault operations
+poetry run python -m kira.cli vault info
+poetry run python -m kira.cli vault validate
+
+# Migration (if you have existing vault)
+poetry run python -m kira.cli migrate run --dry-run
+poetry run python -m kira.cli migrate run
+
+# Get help
+poetry run python -m kira.cli --help
+poetry run python -m kira.cli task --help
+```
+
+### Troubleshooting
+
+**Issue: "No module named 'kira'"**
+```bash
+# Solution: Install dependencies
+poetry install
+```
+
+**Issue: "Vault not initialized"**
+```bash
+# Solution: Initialize vault
+poetry run python -m kira.cli vault init
+```
+
+**Issue: "Poetry not found"**
+```bash
+# Solution: Install Poetry
+pip install poetry
+# or
+curl -sSL https://install.python-poetry.org | python3 -
+```
+
+### Need Help?
+
+- 📚 See [Documentation](#architecture-overview) below
+- 🐛 Report issues on GitHub
+- 💡 Read [ADRs](docs/adr/) for architecture details
+- 🧪 Run tests: `poetry run pytest tests/ -v`
+
+---
 
 ## Quick Start (< 30 minutes)
 
