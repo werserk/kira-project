@@ -32,3 +32,6 @@ logs/**/*.jsonl
 
 # Temporary/test scripts
 is_everything_ok.sh
+
+
+logs/

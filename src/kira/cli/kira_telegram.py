@@ -50,11 +50,27 @@ def start_command(token: str | None, verbose: bool) -> int:
             )
             return 1
 
+        # Configure logging
+        import logging
+        log_level = logging.DEBUG if verbose else logging.INFO
+        logging.basicConfig(
+            level=log_level,
+            format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+            handlers=[
+                logging.StreamHandler(),
+                logging.FileHandler('logs/telegram_bot.log', mode='a', encoding='utf-8')
+            ]
+        )
+
+        # Ensure logs directory exists
+        Path('logs').mkdir(parents=True, exist_ok=True)
+
         config = load_config()
 
         if verbose:
             click.echo("🔧 Загружена конфигурация")
             click.echo(f"   Vault: {config.get('vault', {}).get('path', 'не указан')}")
+            click.echo(f"   Логирование: logs/telegram_bot.log (уровень: {'DEBUG' if verbose else 'INFO'})")
 
         # Get token from parameter or settings
         from ..config.settings import load_settings
