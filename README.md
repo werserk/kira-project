@@ -413,7 +413,7 @@ Bidirectional links automatically updated:
 - ✅ Hackable system with clean architecture
 - ✅ Plugin system for custom workflows
 - ✅ Production patterns (atomic writes, validation, logging)
-- ✅ Test coverage (744+ tests, 91% pass rate)
+- ✅ Test coverage (1156+ tests, 99.8% pass rate)
 - ✅ Clear ADRs explaining design decisions
 
 **Kira provides:**
@@ -600,7 +600,7 @@ Kira: ✓ Created proj-team-workshop
 - Uvicorn (ASGI server)
 
 **Development:**
-- Pytest (744+ tests, 91% coverage)
+- Pytest (1156+ tests, 99.8% pass rate)
 - Black + Ruff (Formatting & linting)
 - Mypy (Type checking)
 - Pre-commit hooks (Quality gates)
@@ -619,9 +619,9 @@ Kira: ✓ Created proj-team-workshop
 - ⚠️ Plugin system under active development
 
 **Test Coverage:**
-- 744/821 tests passing (91%)
-- 700+ unit tests
-- 24 integration tests
+- 1156/1158 tests passing (99.8%)
+- 1000+ unit tests
+- 150+ integration tests
 - CI/CD green status
 
 **Known Limitations:**
