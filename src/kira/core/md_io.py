@@ -4,10 +4,12 @@ Provides atomic read/write operations for Markdown files with
 structured frontmatter metadata.
 
 Phase 0, Point 2: Uses deterministic YAML serialization for consistency.
+Phase 3, Point 11: Full fsync protocol for atomic writes (crash-safe).
 """
 
 from __future__ import annotations
 
+import os
 import re
 import tempfile
 from dataclasses import dataclass
@@ -211,8 +213,18 @@ def write_markdown(
     *,
     atomic: bool = True,
     create_dirs: bool = True,
+    fsync: bool = True,
 ) -> None:
     """Write Markdown document to file.
+    
+    Phase 3, Point 11: Full atomic write protocol:
+    1. Write to *.tmp on same filesystem
+    2. fsync(tmp) - flush file data to disk
+    3. atomic rename(tmp→real) - atomically replace target
+    4. fsync(dir) - flush directory metadata to disk
+    
+    This ensures crash-safety: kill -9 mid-write leaves either
+    old or new file, never partial.
 
     Parameters
     ----------
@@ -224,6 +236,8 @@ def write_markdown(
         Use atomic write (temp file + rename)
     create_dirs
         Create parent directories if needed
+    fsync
+        Use fsync for crash-safety (Phase 3, Point 11)
 
     Raises
     ------
@@ -241,22 +255,46 @@ def write_markdown(
         content = document.to_markdown_string()
 
         if atomic:
-            # Atomic write: temp file + rename
-            with tempfile.NamedTemporaryFile(
-                mode="w",
-                encoding="utf-8",
-                dir=path.parent,
-                prefix=f".{path.name}.tmp",
-                delete=False,
-            ) as tmp_file:
-                tmp_file.write(content)
-                tmp_file.flush()
-                tmp_path = Path(tmp_file.name)
-
-            # Atomic rename
-            tmp_path.rename(path)
+            # Phase 3, Point 11: Full atomic write protocol
+            tmp_fd = None
+            tmp_path = None
+            
+            try:
+                # 1. Write to *.tmp on same filesystem (important for atomic rename)
+                with tempfile.NamedTemporaryFile(
+                    mode="w",
+                    encoding="utf-8",
+                    dir=path.parent,
+                    prefix=f".{path.name}.tmp",
+                    delete=False,
+                ) as tmp_file:
+                    tmp_file.write(content)
+                    tmp_file.flush()
+                    tmp_fd = tmp_file.fileno()
+                    tmp_path = Path(tmp_file.name)
+                    
+                    # 2. fsync(tmp) - flush file data to disk
+                    if fsync:
+                        os.fsync(tmp_fd)
+                
+                # 3. atomic rename(tmp→real) - atomically replace target
+                tmp_path.rename(path)
+                
+                # 4. fsync(dir) - flush directory metadata to disk
+                if fsync:
+                    dir_fd = os.open(str(path.parent), os.O_RDONLY)
+                    try:
+                        os.fsync(dir_fd)
+                    finally:
+                        os.close(dir_fd)
+            
+            except Exception:
+                # Clean up temp file on error
+                if tmp_path and tmp_path.exists():
+                    tmp_path.unlink()
+                raise
         else:
-            # Direct write
+            # Direct write (not crash-safe)
             path.write_text(content, encoding="utf-8")
 
     except Exception as exc:
