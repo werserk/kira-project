@@ -1177,28 +1177,26 @@ class BriefingScheduler:
         return "\n".join(sections)
 
     def _is_due_today(self, entity: Any) -> bool:
-        """Check if entity is due today."""
+        """Check if entity is due today (UTC)."""
         due = entity.metadata.get("due")
         if not due:
             return False
         try:
-            from datetime import date
-
             due_date = datetime.fromisoformat(due.replace("Z", "+00:00")).date()
-            return due_date == date.today()
+            today_utc = datetime.now(UTC).date()
+            return due_date == today_utc
         except Exception:
             return False
 
     def _is_today(self, entity: Any) -> bool:
-        """Check if entity is scheduled for today."""
+        """Check if entity is scheduled for today (UTC)."""
         start = entity.metadata.get("start")
         if not start:
             return False
         try:
-            from datetime import date
-
             start_date = datetime.fromisoformat(start.replace("Z", "+00:00")).date()
-            return start_date == date.today()
+            today_utc = datetime.now(UTC).date()
+            return start_date == today_utc
         except Exception:
             return False
 

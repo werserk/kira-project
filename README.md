@@ -4,11 +4,13 @@
 
 Kira is an AI assistant that makes your Obsidian vault intelligent and self-managing. While Obsidian excels at viewing and editing, **Kira automates the hard parts**: task management, GTD workflows, Zettelkasten linking, and calendar sync.
 
-**Primary Interface:** 📱 Telegram (+ CLI & Web UI)
+**Primary Interface:** 💻 CLI (Telegram & Web UI available with configuration)
 **Data Storage:** 📝 Standard Markdown (100% Obsidian-compatible)
 **Intelligence:** 🤖 Multi-LLM AI (Anthropic, OpenAI, OpenRouter, Ollama)
 
 Think of it as: **Obsidian for viewing, Kira for doing.**
+
+> ⚠️ **Alpha Release:** Telegram and Google Calendar integrations require manual configuration. See [Quick Start Guide](QUICKSTART.md) for setup instructions.
 
 ---
 
@@ -168,6 +170,59 @@ Related: [[proj-q4-planning]], [[note-financial-model]]
 | Manual refinement | Obsidian | Full control |
 
 **The synergy:** Kira maintains structure and automation. Obsidian provides the perfect viewing and editing experience.
+
+---
+
+## Getting Started
+
+### 🚀 Quick Start (< 15 minutes)
+
+**Step 1: Installation**
+
+```bash
+git clone https://github.com/your-org/kira-project.git
+cd kira-project
+poetry install
+make init
+```
+
+**Step 2: Start using Kira**
+
+```bash
+# Create your first task (works immediately!)
+poetry run kira task add "My first task"
+poetry run kira task list
+poetry run kira today
+```
+
+That's it! Kira CLI is ready to use. ✅
+
+**Step 3: Optional - Configure Advanced Features**
+
+For AI Agent, Telegram, or Google Calendar:
+
+1. Copy configuration: `cp config/env.example .env`
+2. Edit `.env` with your API keys
+3. See [QUICKSTART.md](QUICKSTART.md) for detailed setup
+
+**What's Available Out of the Box:**
+
+| Feature | Status | Setup Required |
+|---------|--------|----------------|
+| **CLI Commands** | ✅ Ready | None |
+| **Task Management** | ✅ Ready | None |
+| **Vault Storage** | ✅ Ready | None |
+| **Validation & FSM** | ✅ Ready | None |
+| **Obsidian Compatibility** | ✅ Ready | None |
+| **AI Agent (HTTP)** | ⚙️ Optional | API key in `.env` |
+| **Telegram Bot** | ⚙️ Optional | Bot token + configuration |
+| **Google Calendar** | ⚙️ Optional | OAuth credentials |
+| **Plugin System** | ⚙️ Optional | Enable in config |
+
+**Next Steps:**
+- 📖 Full setup instructions: [QUICKSTART.md](QUICKSTART.md)
+- 💡 Usage examples: [examples/demo_commands.md](examples/demo_commands.md)
+- 🔧 Advanced configuration: [config/README.md](config/README.md)
 
 ---
 
@@ -600,7 +655,7 @@ Kira: ✓ Created proj-team-workshop
 - Uvicorn (ASGI server)
 
 **Development:**
-- Pytest (1156+ tests, 99.8% pass rate)
+- Pytest (1169+ tests, 99.8% pass rate)
 - Black + Ruff (Formatting & linting)
 - Mypy (Type checking)
 - Pre-commit hooks (Quality gates)
@@ -613,20 +668,33 @@ Kira: ✓ Created proj-team-workshop
 
 **Maturity:**
 - ✅ Core features stable (Vault, FSM, validation)
-- ✅ CLI ready for daily use
+- ✅ CLI ready for daily use (no setup required)
 - ✅ AI agent functional (multi-provider support)
-- ⚠️ Integrations in alpha (Telegram, GCal behind flags)
-- ⚠️ Plugin system under active development
+- ⚙️ Telegram integration (requires bot token & configuration)
+- ⚙️ Google Calendar sync (requires OAuth setup)
+- ⚙️ Plugin system (disabled by default, enable in config)
 
 **Test Coverage:**
-- 1156/1158 tests passing (99.8%)
+- 1169/1171 tests passing (99.8%)
 - 1000+ unit tests
 - 150+ integration tests
 - CI/CD green status
 
+**What Works Out of the Box:**
+- ✅ All CLI commands (`kira task`, `kira note`, `kira today`, etc.)
+- ✅ Vault operations (create, read, update, validate)
+- ✅ Task FSM and validation
+- ✅ Obsidian compatibility (100%)
+- ✅ Docker deployment
+
+**What Requires Configuration:**
+- ⚙️ **AI Agent**: Needs API key for LLM provider (Anthropic, OpenAI, or OpenRouter)
+- ⚙️ **Telegram Bot**: Needs bot token from @BotFather + whitelist configuration
+- ⚙️ **Google Calendar**: Needs OAuth credentials from Google Cloud Console
+- ⚙️ **Plugins**: Disabled by default (`KIRA_ENABLE_PLUGINS=true` to enable)
+
 **Known Limitations:**
-- Google Calendar sync is import-only (two-way sync planned)
-- Telegram adapter requires manual setup
+- Telegram and GCal integrations disabled by default (feature flags)
 - Performance optimization pending for large vaults (>10k entities)
 - Some DST edge cases under investigation
 
