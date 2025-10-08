@@ -54,11 +54,11 @@ def test_telegram_message_creates_task(test_env):
     })
     
     # Verify created
-    assert entity.uid is not None
+    assert entity.id is not None
     assert entity.title == "Buy milk"
     
     # Verify persisted
-    retrieved = host_api.read_entity(entity.uid)
+    retrieved = host_api.read_entity(entity.id)
     assert retrieved.title == "Buy milk"
 
 
@@ -101,13 +101,13 @@ def test_task_edit(test_env):
         "status": "todo",
         "tags": [],
     })
-    uid = entity.uid
+    uid = entity.id
     
     # Edit
     updated = host_api.update_entity(uid, {"title": "Updated"})
     
     assert updated.title == "Updated"
-    assert updated.uid == uid
+    assert updated.id == uid
     
     # Verify persisted
     retrieved = host_api.read_entity(uid)
@@ -124,7 +124,7 @@ def test_task_delete(test_env):
         "status": "todo",
         "tags": [],
     })
-    uid = entity.uid
+    uid = entity.id
     
     # Delete
     host_api.delete_entity(uid)
@@ -153,7 +153,7 @@ def test_full_lifecycle(test_env):
         "status": "todo",
         "tags": ["work"],
     })
-    uid = entity.uid
+    uid = entity.id
     
     # Start work
     updated = host_api.update_entity(uid, {
@@ -209,12 +209,12 @@ def test_dod_files_match_expectations(test_env):
         "tags": ["test"],
     })
     
-    retrieved = host_api.read_entity(entity.uid)
+    retrieved = host_api.read_entity(entity.id)
     
     assert retrieved.title == "Test task"
     assert retrieved.status == "todo"
     assert "test" in retrieved.tags
-    assert "uid" in retrieved
+    assert "id" in retrieved.__dict__ or hasattr(retrieved, "id")
     assert "created_ts" in retrieved
     assert "updated_ts" in retrieved
 
