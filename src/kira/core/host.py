@@ -19,6 +19,7 @@ from .events import EventBus
 from .ids import generate_entity_id, is_valid_entity_id, parse_entity_id
 from .links import LinkGraph, update_entity_links
 from .md_io import MarkdownDocument, MarkdownIOError, read_markdown, write_markdown
+from .quarantine import quarantine_invalid_entity
 from .schemas import SchemaCache, get_schema_cache
 from .validation import ValidationError, validate_entity
 
@@ -260,6 +261,16 @@ class HostAPI:
         # Invalid entities never touch disk
         validation_result = validate_entity(entity_type, data)
         if not validation_result.valid:
+            # Phase 1, Point 6: Quarantine invalid entities
+            quarantine_dir = self.vault_path / "artifacts" / "quarantine"
+            quarantine_invalid_entity(
+                entity_type=entity_type,
+                payload=data,
+                errors=validation_result.errors,
+                reason=f"Validation failed for {entity_type}",
+                quarantine_dir=quarantine_dir,
+            )
+            
             raise ValidationError(
                 f"Entity validation failed for {entity_type} '{entity_id}'",
                 errors=validation_result.errors,
@@ -395,6 +406,16 @@ class HostAPI:
         # Phase 1, Point 5: Domain validation before write
         validation_result = validate_entity(entity.entity_type, new_metadata)
         if not validation_result.valid:
+            # Phase 1, Point 6: Quarantine invalid updates
+            quarantine_dir = self.vault_path / "artifacts" / "quarantine"
+            quarantine_invalid_entity(
+                entity_type=entity.entity_type,
+                payload=new_metadata,
+                errors=validation_result.errors,
+                reason=f"Update validation failed for {entity.entity_type}",
+                quarantine_dir=quarantine_dir,
+            )
+            
             raise ValidationError(
                 f"Entity validation failed for {entity.entity_type} '{entity_id}'",
                 errors=validation_result.errors,
