@@ -1,6 +1,17 @@
 """Telegram bot gateway for Kira agent.
 
-Provides webhook-based integration for Telegram messages.
+⚠️ WEBHOOK MODE ONLY - For FastAPI/HTTP webhook integration.
+
+This module provides direct HTTP webhook integration for Telegram.
+For long-polling mode, use TelegramAdapter + MessageHandler (event-driven).
+
+Architecture:
+    - Webhook mode (this file): Telegram → HTTP POST → TelegramGateway → AgentExecutor
+    - Polling mode (kira_telegram CLI): Telegram → TelegramAdapter → EventBus → MessageHandler → AgentExecutor
+
+Use Cases:
+    - Webhook: Production deployments with public HTTPS endpoint
+    - Polling: Development and environments without public URL
 """
 
 from __future__ import annotations

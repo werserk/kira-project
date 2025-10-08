@@ -3,15 +3,33 @@
 import os
 import sys
 from pathlib import Path
+from typing import cast
 
 # Добавляем src в путь
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
 import click
 
+from ..adapters.llm import (
+    AnthropicAdapter,
+    LLMAdapter,
+    LLMRouter,
+    OllamaAdapter,
+    OpenAIAdapter,
+    OpenRouterAdapter,
+    RouterConfig,
+)
 from ..adapters.telegram.adapter import TelegramAdapter, TelegramAdapterConfig, create_telegram_adapter
+from ..agent.config import AgentConfig
+from ..agent.executor import AgentExecutor
+from ..agent.kira_tools import RollupDailyTool, TaskCreateTool, TaskGetTool, TaskListTool, TaskUpdateTool
+from ..agent.memory import ConversationMemory
+from ..agent.message_handler import create_message_handler
+from ..agent.rag import RAGStore, build_rag_index
+from ..agent.tools import ToolRegistry
 from ..core.config import load_config
 from ..core.events import create_event_bus
+from ..core.host import create_host_api
 from ..core.scheduler import create_scheduler
 
 CONTEXT_SETTINGS = {"help_option_names": ["-h", "--help"]}
@@ -106,12 +124,14 @@ def handle_telegram_start(
     bot_token: str,
     verbose: bool,
 ) -> int:
-    """Обработка запуска Telegram бота."""
+    """Обработка запуска Telegram бота с интеграцией Agent."""
 
-    click.echo("🤖 Запуск Telegram бота...")
+    click.echo("🤖 Запуск Telegram бота с AI агентом...")
 
     # Get telegram config
     telegram_config = config.get("adapters", {}).get("telegram", {})
+    agent_config_dict = config.get("agent", {})
+    vault_config = config.get("vault", {})
 
     # Parse allowed chats and users
     allowed_chat_ids = []
@@ -125,6 +145,86 @@ def handle_telegram_start(
             click.echo(f"   Разрешенные чаты: {allowed_chat_ids}")
         else:
             click.echo("   Разрешенные чаты: все")
+
+    # === Setup Agent Components ===
+    vault_path = Path(vault_config.get("path", "vault"))
+
+    # Create AgentConfig
+    agent_config = AgentConfig(
+        vault_path=vault_path,
+        anthropic_api_key=os.getenv("ANTHROPIC_API_KEY", ""),
+        openai_api_key=os.getenv("OPENAI_API_KEY", ""),
+        openrouter_api_key=os.getenv("OPENROUTER_API_KEY", ""),
+        enable_rag=agent_config_dict.get("enable_rag", False),
+        rag_index_path=agent_config_dict.get("rag_index_path", ".rag/index.json"),
+        memory_max_exchanges=agent_config_dict.get("memory_max_exchanges", 10),
+        default_dry_run=agent_config_dict.get("default_dry_run", True),
+        enable_ollama_fallback=agent_config_dict.get("enable_ollama_fallback", True),
+    )
+
+    # Initialize LLM adapters
+    anthropic_adapter = AnthropicAdapter(api_key=agent_config.anthropic_api_key)
+    openai_adapter = OpenAIAdapter(api_key=agent_config.openai_api_key)
+    openrouter_adapter = OpenRouterAdapter(api_key=agent_config.openrouter_api_key)
+    ollama_adapter = OllamaAdapter()
+
+    router_config = RouterConfig(
+        primary_provider="anthropic",
+        planning_provider="anthropic",
+        fallback_provider="openai",
+        enable_ollama_fallback=agent_config.enable_ollama_fallback,
+    )
+
+    llm_adapter = LLMRouter(
+        router_config,
+        anthropic_adapter=anthropic_adapter,
+        openai_adapter=openai_adapter,
+        openrouter_adapter=openrouter_adapter,
+        ollama_adapter=ollama_adapter,
+    )
+
+    # Initialize tool registry
+    tool_registry = ToolRegistry()
+    host_api = create_host_api(vault_path)
+
+    # Register tools
+    tool_registry.register(TaskCreateTool(host_api=host_api))
+    tool_registry.register(TaskUpdateTool(host_api=host_api))
+    tool_registry.register(TaskGetTool(host_api=host_api))
+    tool_registry.register(TaskListTool(host_api=host_api))
+    tool_registry.register(RollupDailyTool(vault_path=vault_path))
+
+    if verbose:
+        click.echo(f"   Зарегистрировано инструментов: {len(tool_registry.list_tools())}")
+
+    # Initialize RAG store if enabled
+    rag_store = None
+    if agent_config.enable_rag:
+        rag_index_path = Path(agent_config.rag_index_path)
+        if rag_index_path.exists():
+            rag_store = RAGStore(rag_index_path)
+        else:
+            # Build index from vault
+            rag_store = build_rag_index(vault_path, rag_index_path)
+        if verbose:
+            click.echo(f"   RAG индекс загружен: {len(rag_store.documents)} документов")
+
+    # Initialize conversation memory
+    memory = ConversationMemory(max_exchanges=agent_config.memory_max_exchanges)
+
+    # Create executor
+    executor = AgentExecutor(
+        cast(LLMAdapter, llm_adapter),
+        tool_registry,
+        agent_config,
+        rag_store=rag_store,
+        memory=memory,
+    )
+
+    if verbose:
+        click.echo("   ✅ AI Agent инициализирован")
+
+    # === Setup Telegram Components ===
 
     # Create event bus and scheduler
     event_bus = create_event_bus()
@@ -147,12 +247,27 @@ def handle_telegram_start(
         scheduler=scheduler,
     )
 
+    # === Connect Agent to Telegram via Event Bus ===
+
+    def send_response(source: str, chat_id: str, text: str) -> None:
+        """Callback to send response back to Telegram."""
+        if source == "telegram":
+            adapter.send_message(int(chat_id), text)
+
+    # Create message handler and subscribe to events
+    message_handler = create_message_handler(executor, response_callback=send_response)
+    event_bus.subscribe("message.received", message_handler.handle_message_received)
+
+    if verbose:
+        click.echo("   ✅ Agent подключен к Telegram через Event Bus")
+
     try:
-        click.echo("✅ Telegram бот запущен")
+        click.echo("✅ Telegram бот с AI агентом запущен")
+        click.echo("   Отправьте сообщение боту для начала работы")
         click.echo("   Нажмите Ctrl+C для остановки")
 
         if verbose:
-            click.echo("   Режим: long polling")
+            click.echo("   Режим: long polling + event-driven agent")
             click.echo(f"   Timeout: {adapter_config.polling_timeout}s")
 
         # Start polling (blocks until interrupted)
