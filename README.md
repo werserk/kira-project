@@ -765,19 +765,42 @@ Validation errors surface immediately. Malformed data quarantined, never corrupt
 
 ---
 
-## Development Team
+## Contributing
 
-Kira is developed by a dedicated team focused on delivering enterprise-grade personal knowledge management.
+Kira welcomes contributions from developers! Before contributing, please review:
+
+- **[CONTRIBUTING.md](CONTRIBUTING.md)** - Complete contribution guide
+  - Code organization and architecture
+  - Naming conventions and coding standards
+  - Testing requirements (95% coverage minimum)
+  - Pull request process and CI requirements
 
 **Architecture Decision Records (ADRs):**
-Kira documents every major design decision. Read `/docs/adr/` to understand the technical rationale behind architectural choices.
+Kira documents every major design decision in `docs/architecture/`. Understanding ADRs is required before making architectural changes.
+
+**Quick Start for Contributors:**
+```bash
+# Clone and setup
+git clone https://github.com/your-org/kira-project.git
+cd kira-project
+poetry install
+make init
+
+# Run tests
+poetry run pytest tests/
+
+# Check code quality
+poetry run black .
+poetry run ruff check .
+poetry run mypy src/
+```
 
 **Team Onboarding:**
-New team members should review:
-- Architecture documentation in `/docs`
-- Test suite for understanding system behavior
-- ADRs for context on design decisions
-- Plugin SDK for extensibility patterns
+New contributors should review:
+1. [CONTRIBUTING.md](CONTRIBUTING.md) - **Required reading**
+2. Architecture documentation in `docs/architecture/`
+3. Test suite to understand system behavior
+4. ADRs for design rationale
 
 ---
 
