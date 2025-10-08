@@ -12,7 +12,7 @@ from pathlib import Path
 
 import pytest
 
-from kira.adapters.gcal.adapter import GCalAdapter, GCalAdapterConfig, GCalEvent
+from kira.adapters.gcal.adapter import GCalAdapter, GCalAdapterConfig
 from kira.adapters.telegram.adapter import (
     BriefingScheduler,
     TelegramAdapter,
@@ -95,8 +95,8 @@ def test_gcal_import_only_mode_no_duplicates(test_gcal_env):
     # Step 1: First import from GCal
     metadata = {
         "title": "Team Standup",
-        "start": datetime.now(UTC).isoformat(),
-        "end": (datetime.now(UTC) + timedelta(hours=1)).isoformat(),
+        "start_time": datetime.now(UTC).isoformat(),
+        "end_time": (datetime.now(UTC) + timedelta(hours=1)).isoformat(),
         "tags": ["work"],
     }
 
@@ -128,7 +128,7 @@ def test_gcal_import_only_mode_no_duplicates(test_gcal_env):
     )
 
     # Step 3: Attempt re-import (same version)
-    should_import = ledger.should_import(gcal_event_id, remote_version=1, etag="etag-v1")
+    should_import = ledger.should_import(gcal_event_id, remote_version=1, remote_etag="etag-v1")
 
     # Step 4: Verify no duplicate import
     assert should_import is False, "Ledger should prevent duplicate import"
@@ -154,8 +154,8 @@ def test_gcal_import_timezone_correctness(test_gcal_env):
 
     metadata = {
         "title": "Timezone Test Event",
-        "start": start_utc.isoformat(),
-        "end": end_utc.isoformat(),
+        "start_time": start_utc.isoformat(),
+        "end_time": end_utc.isoformat(),
         "tags": ["test"],
     }
 
@@ -170,8 +170,8 @@ def test_gcal_import_timezone_correctness(test_gcal_env):
     entity = host_api.create_entity("event", metadata_synced)
 
     # Verify timestamps are preserved in UTC
-    assert entity.metadata["start"] == start_utc.isoformat()
-    assert entity.metadata["end"] == end_utc.isoformat()
+    assert entity.metadata["start_time"] == start_utc.isoformat()
+    assert entity.metadata["end_time"] == end_utc.isoformat()
 
     # Verify x-kira metadata includes correct last_write_ts
     last_write_ts_str = entity.metadata["x-kira"]["last_write_ts"]
@@ -208,7 +208,7 @@ def test_gcal_import_ledger_tracking(test_gcal_env):
     assert entry.etag_seen == "etag-v1"
 
     # Step 3: Check if version 2 should be imported (actual change)
-    should_import_v2 = ledger.should_import(gcal_event_id, remote_version=2, etag="etag-v2")
+    should_import_v2 = ledger.should_import(gcal_event_id, remote_version=2, remote_etag="etag-v2")
 
     # Step 4: Verify import allowed for new version
     assert should_import_v2 is True, "Ledger should allow import of new version"
@@ -244,8 +244,8 @@ def test_gcal_twoway_echo_break(test_gcal_env):
     # Step 1: Kira creates event
     metadata = {
         "title": "My Meeting",
-        "start": datetime.now(UTC).isoformat(),
-        "end": (datetime.now(UTC) + timedelta(hours=1)).isoformat(),
+        "start_time": datetime.now(UTC).isoformat(),
+        "end_time": (datetime.now(UTC) + timedelta(hours=1)).isoformat(),
         "tags": ["personal"],
     }
 
@@ -275,7 +275,7 @@ def test_gcal_twoway_echo_break(test_gcal_env):
 
     # Step 4: GCal echoes back (same version, no actual change)
     is_echo = ledger.is_echo(gcal_event_id, remote_version=2)
-    should_import = ledger.should_import(gcal_event_id, remote_version=2, etag="etag-export-v2")
+    should_import = ledger.should_import(gcal_event_id, remote_version=2, remote_etag="etag-export-v2")
 
     # Step 5: Verify echo detected
     assert is_echo is True, "Echo loop not detected!"
@@ -301,7 +301,7 @@ def test_gcal_conflict_resolution_latest_wins(test_gcal_env):
     t1 = datetime.now(UTC) - timedelta(minutes=10)
     vault_metadata = {
         "title": "Vault Version",
-        "start": datetime.now(UTC).isoformat(),
+        "start_time": datetime.now(UTC).isoformat(),
         "tags": ["vault"],
         "x-kira": {
             "source": "kira",
@@ -311,11 +311,11 @@ def test_gcal_conflict_resolution_latest_wins(test_gcal_env):
     }
     vault_entity = host_api.create_entity("event", vault_metadata)
 
-    # Simulate GCal version with later timestamp
-    t2 = datetime.now(UTC)
+    # Simulate GCal version with later timestamp (ensure later than t1)
+    t2 = datetime.now(UTC) + timedelta(seconds=1)
     gcal_metadata = {
         "title": "GCal Version (Newer)",
-        "start": datetime.now(UTC).isoformat(),
+        "start_time": datetime.now(UTC).isoformat(),
         "tags": ["gcal"],
         "x-kira": {
             "source": "gcal",
@@ -326,7 +326,10 @@ def test_gcal_conflict_resolution_latest_wins(test_gcal_env):
     }
 
     # Resolve conflict
-    resolution = resolve_conflict(vault_entity.metadata, gcal_metadata)
+    resolution = resolve_conflict(
+        local_last_write_ts=vault_metadata["x-kira"]["last_write_ts"],
+        remote_last_write_ts=gcal_metadata["x-kira"]["last_write_ts"],
+    )
 
     # Verify GCal version wins (latest timestamp)
     assert resolution == "remote", f"Expected 'remote' to win, got '{resolution}'"
@@ -350,7 +353,7 @@ def test_gcal_kira_writes_increment_version(test_gcal_env):
     # Step 1: Import from GCal (version 1)
     metadata = {
         "title": "Original",
-        "start": datetime.now(UTC).isoformat(),
+        "start_time": datetime.now(UTC).isoformat(),
         "tags": [],
     }
     metadata_v1 = create_remote_sync_contract(
@@ -411,8 +414,8 @@ def test_gcal_round_trip_yields_authoritative_state(test_gcal_env):
     # Step 1: Kira creates event
     metadata = {
         "title": "Round Trip Event",
-        "start": datetime.now(UTC).isoformat(),
-        "end": (datetime.now(UTC) + timedelta(hours=1)).isoformat(),
+        "start_time": datetime.now(UTC).isoformat(),
+        "end_time": (datetime.now(UTC) + timedelta(hours=1)).isoformat(),
         "tags": ["test"],
     }
     metadata_v1 = create_kira_sync_contract(metadata)
@@ -431,7 +434,6 @@ def test_gcal_round_trip_yields_authoritative_state(test_gcal_env):
         ledger=ledger,
         remote_id=gcal_event_id,
         remote_version=2,
-        remote_metadata={"x-kira": {"version": 2, "last_write_ts": metadata_v2["x-kira"]["last_write_ts"]}},
     )
 
     # Step 4: Verify no import (echo detected)
@@ -458,7 +460,7 @@ def test_telegram_confirmation_flow(test_telegram_env):
     4. Callback handler executed
     5. Verify idempotency (duplicate message ignored)
     """
-    host_api, event_bus, adapter = test_telegram_env
+    host_api, _event_bus, adapter = test_telegram_env
 
     # Step 1: Simulate message received
     message = TelegramMessage(
@@ -510,7 +512,7 @@ def test_telegram_confirmation_flow(test_telegram_env):
     # Parse signed callback
     parts = signed_callback.split(":", 2)
     assert len(parts) == 3
-    req_id, choice, signature = parts
+    _req_id, _choice, _signature = parts
 
     # Simulate callback query
     callback_data = {
@@ -575,7 +577,7 @@ def test_telegram_message_idempotency(test_telegram_env):
 
     # Step 2: Verify event published
     assert len(events_received) == 1
-    assert events_received[0]["message"] == "Test message"
+    assert events_received[0].payload["message"] == "Test message"
 
     # Step 3: Process duplicate message
     adapter._handle_message(message, trace_id="trace-2")
@@ -637,7 +639,7 @@ def test_phase7_acceptance_gcal_import_mode(test_gcal_env):
         gcal_id = f"gcal-event-{i}"
         metadata = {
             "title": f"Event {i}",
-            "start": (datetime.now(UTC) + timedelta(hours=i)).isoformat(),
+            "start_time": (datetime.now(UTC) + timedelta(hours=i)).isoformat(),
             "tags": ["imported"],
         }
 
@@ -716,4 +718,3 @@ def test_phase7_acceptance_telegram_e2e(test_telegram_env):
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
-

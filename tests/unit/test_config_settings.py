@@ -127,7 +127,7 @@ def test_settings_from_env():
         # Create dummy credentials file for test
         creds_file = Path(tmpdir) / "gcal-creds.json"
         creds_file.write_text("{}")
-        
+
         env_file.write_text(
             f"""
 KIRA_VAULT_PATH=/test/vault
@@ -369,7 +369,7 @@ def test_boolean_parsing():
         # Create dummy credentials file for test
         creds_file = Path(tmpdir) / "gcal-creds.json"
         creds_file.write_text("{}")
-        
+
         env_file.write_text(
             f"""
 KIRA_VAULT_PATH=/test
