@@ -11,6 +11,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 import click
 
 # Core CLI imports (always available)
+from .kira_agent import agent as agent_cli
 from .kira_backup import cli as backup_cli
 from .kira_calendar import cli as calendar_cli
 from .kira_code import cli as code_cli
@@ -31,11 +32,12 @@ from .kira_search import cli as search_cli
 from .kira_stats import cli as stats_cli
 from .kira_sync import cli as sync_cli
 from .kira_task import cli as task_cli
+from .kira_telegram import cli as telegram_cli
 from .kira_today import cli as today_cli
 from .kira_vault import cli as vault_cli
 
-# Optional CLI imports (lazy loaded)
-# These require extra dependencies and will be imported only when invoked
+# Note: agent and telegram commands have lazy loading of dependencies
+# within their own modules (requires: poetry install --extras agent)
 
 CONTEXT_SETTINGS = {"help_option_names": ["-h", "--help"]}
 EPILOG = """
@@ -75,55 +77,6 @@ def cli() -> None:
     """Корневая команда CLI."""
 
 
-# Lazy loading wrappers for optional commands
-@click.group("agent", help="AI agent commands (requires: poetry install --extras agent)")
-def agent_cli_wrapper() -> None:
-    """Lazy-loaded agent commands."""
-
-
-@agent_cli_wrapper.result_callback()
-def load_agent_cli(result: Any, **kwargs: Any) -> Any:
-    """Load agent CLI when invoked."""
-    try:
-        from .kira_agent import agent as agent_cli
-
-        # Transfer subcommands from actual CLI
-        agent_cli_wrapper.commands = agent_cli.commands
-    except ImportError as e:
-        click.echo(
-            f"❌ Agent commands require additional dependencies.\n"
-            f"   Install with: poetry install --extras agent\n"
-            f"   Error: {e}",
-            err=True,
-        )
-        sys.exit(1)
-    return result
-
-
-@click.group("telegram", help="Telegram bot commands (requires: poetry install --extras agent)")
-def telegram_cli_wrapper() -> None:
-    """Lazy-loaded telegram commands."""
-
-
-@telegram_cli_wrapper.result_callback()
-def load_telegram_cli(result: Any, **kwargs: Any) -> Any:
-    """Load telegram CLI when invoked."""
-    try:
-        from .kira_telegram import cli as telegram_cli
-
-        # Transfer subcommands from actual CLI
-        telegram_cli_wrapper.commands = telegram_cli.commands
-    except ImportError as e:
-        click.echo(
-            f"❌ Telegram commands require additional dependencies.\n"
-            f"   Install with: poetry install --extras agent\n"
-            f"   Error: {e}",
-            err=True,
-        )
-        sys.exit(1)
-    return result
-
-
 @cli.command("validate")
 def validate_vault() -> int:
     """Валидация Vault против схем."""
@@ -157,7 +110,7 @@ def validate_vault() -> int:
 
 
 # Подключаем подкоманды
-# Core commands (always available)
+cli.add_command(agent_cli, "agent")
 cli.add_command(today_cli, "today")
 cli.add_command(task_cli, "task")
 cli.add_command(note_cli, "note")
@@ -167,6 +120,7 @@ cli.add_command(inbox_cli, "inbox")
 cli.add_command(calendar_cli, "calendar")
 cli.add_command(schedule_cli, "schedule")
 cli.add_command(sync_cli, "sync")
+cli.add_command(telegram_cli, "telegram")
 cli.add_command(rollup_cli, "rollup")
 cli.add_command(review_cli, "review")
 cli.add_command(stats_cli, "stats")
@@ -180,10 +134,6 @@ cli.add_command(backup_cli, "backup")
 cli.add_command(migrate_cli, "migrate")
 cli.add_command(diag_command, "diag")
 cli.add_command(doctor_command, "doctor")
-
-# Optional commands (lazy loaded)
-cli.add_command(agent_cli_wrapper, "agent")
-cli.add_command(telegram_cli_wrapper, "telegram")
 
 
 def main(args: list[str] | None = None) -> int:

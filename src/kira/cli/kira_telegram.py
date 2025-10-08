@@ -3,34 +3,20 @@
 import os
 import sys
 from pathlib import Path
-from typing import cast
+from typing import Any, cast
 
 # Добавляем src в путь
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
 import click
 
-from ..adapters.llm import (
-    AnthropicAdapter,
-    LLMAdapter,
-    LLMRouter,
-    OllamaAdapter,
-    OpenAIAdapter,
-    OpenRouterAdapter,
-    RouterConfig,
-)
-from ..adapters.telegram.adapter import TelegramAdapter, TelegramAdapterConfig, create_telegram_adapter
-from ..agent.config import AgentConfig
-from ..agent.executor import AgentExecutor
-from ..agent.kira_tools import RollupDailyTool, TaskCreateTool, TaskGetTool, TaskListTool, TaskUpdateTool
-from ..agent.memory import ConversationMemory
-from ..agent.message_handler import create_message_handler
-from ..agent.rag import RAGStore, build_rag_index
-from ..agent.tools import ToolRegistry
+# Core imports (always available)
 from ..core.config import load_config
 from ..core.events import create_event_bus
 from ..core.host import create_host_api
 from ..core.scheduler import create_scheduler
+
+# Agent and adapter imports moved to command function (lazy loaded)
 
 CONTEXT_SETTINGS = {"help_option_names": ["-h", "--help"]}
 
@@ -50,6 +36,20 @@ def start_command(token: str | None, verbose: bool) -> int:
     """Запустить Telegram бота в режиме polling."""
 
     try:
+        # Check if required dependencies are installed
+        try:
+            import telegram  # python-telegram-bot
+
+            from ..agent.config import AgentConfig  # requires FastAPI
+        except ImportError as e:
+            click.echo(
+                f"❌ Telegram commands require additional dependencies.\n"
+                f"   Install with: poetry install --extras agent\n"
+                f"   Error: {e}",
+                err=True,
+            )
+            return 1
+
         config = load_config()
 
         if verbose:
@@ -65,7 +65,7 @@ def start_command(token: str | None, verbose: bool) -> int:
             click.echo("❌ Bot token не указан. Используйте --token или установите TELEGRAM_BOT_TOKEN в .env")
             return 1
 
-        return handle_telegram_start(config, bot_token, verbose)
+        return handle_telegram_start(config, bot_token, verbose, settings)
     except FileNotFoundError as exc:
         click.echo(f"❌ Файл не найден: {exc}")
         return 1
@@ -85,6 +85,18 @@ def test_command(token: str | None, chat_id: int) -> int:
     """Отправить тестовое сообщение в Telegram."""
 
     try:
+        # Check if required dependencies are installed
+        try:
+            from ..adapters.telegram.adapter import TelegramAdapter, TelegramAdapterConfig
+        except ImportError as e:
+            click.echo(
+                f"❌ Telegram commands require additional dependencies.\n"
+                f"   Install with: poetry install --extras agent\n"
+                f"   Error: {e}",
+                err=True,
+            )
+            return 1
+
         # Get token from parameter or settings
         from ..config.settings import load_settings
         settings = load_settings()
@@ -129,8 +141,28 @@ def handle_telegram_start(
     config: dict,
     bot_token: str,
     verbose: bool,
+    settings: Any,
 ) -> int:
     """Обработка запуска Telegram бота с интеграцией Agent."""
+
+    # Import all required agent and adapter modules
+    from ..adapters.llm import (
+        AnthropicAdapter,
+        LLMAdapter,
+        LLMRouter,
+        OllamaAdapter,
+        OpenAIAdapter,
+        OpenRouterAdapter,
+        RouterConfig,
+    )
+    from ..adapters.telegram.adapter import TelegramAdapter, TelegramAdapterConfig, create_telegram_adapter
+    from ..agent.config import AgentConfig
+    from ..agent.executor import AgentExecutor
+    from ..agent.kira_tools import RollupDailyTool, TaskCreateTool, TaskGetTool, TaskListTool, TaskUpdateTool
+    from ..agent.memory import ConversationMemory
+    from ..agent.message_handler import create_message_handler
+    from ..agent.rag import RAGStore, build_rag_index
+    from ..agent.tools import ToolRegistry
 
     click.echo("🤖 Запуск Telegram бота с AI агентом...")
 
