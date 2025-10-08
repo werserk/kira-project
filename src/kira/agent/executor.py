@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import uuid
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -14,6 +15,8 @@ from .memory import ConversationMemory
 from .prompts import get_system_prompt
 from .rag import RAGStore
 from .tools import ToolRegistry, ToolResult
+
+logger = logging.getLogger(__name__)
 
 __all__ = [
     "AgentExecutor",
@@ -115,21 +118,27 @@ class AgentExecutor:
         ValueError
             If response cannot be parsed
         """
+        logger.debug(f"Parsing LLM response: {llm_response[:500]}...")
         try:
             data = json.loads(llm_response)
+            logger.debug(f"Parsed JSON data: {data}")
         except json.JSONDecodeError as e:
+            logger.error(f"Failed to parse LLM response as JSON: {e}")
             raise ValueError(f"Failed to parse LLM response as JSON: {e}") from e
 
         steps = []
         for step_data in data.get("tool_calls", []):
+            tool_name = step_data["tool"]
+            logger.debug(f"Parsing tool call: {tool_name} with args {step_data.get('args', {})}")
             steps.append(
                 ExecutionStep(
-                    tool=step_data["tool"],
+                    tool=tool_name,
                     args=step_data.get("args", {}),
                     dry_run=step_data.get("dry_run", False),
                 )
             )
 
+        logger.info(f"Parsed {len(steps)} steps from LLM response")
         return ExecutionPlan(
             steps=steps,
             reasoning=data.get("reasoning", ""),
@@ -151,7 +160,9 @@ class AgentExecutor:
         ExecutionPlan
             Generated execution plan
         """
+        logger.info(f"Planning for user request: {user_request}")
         tools_desc = self.tool_registry.get_tools_description()
+        logger.debug(f"Available tools description:\n{tools_desc}")
 
         # Enhance with RAG context if available
         context_snippets = []
@@ -163,6 +174,7 @@ class AgentExecutor:
         rag_context = "\n".join(context_snippets) if context_snippets else ""
         if rag_context:
             tools_desc += f"\n\nRelevant context:\n{rag_context}"
+            logger.debug(f"RAG context added: {len(context_snippets)} snippets")
 
         system_prompt = get_system_prompt(
             max_tool_calls=self.config.max_tool_calls,
@@ -175,15 +187,18 @@ class AgentExecutor:
         if trace_id and self.memory.has_context(trace_id):
             context_messages = self.memory.get_context_messages(trace_id)
             messages.extend(context_messages)
+            logger.debug(f"Added {len(context_messages)} messages from conversation history")
 
         messages.append(Message(role="user", content=user_request))
 
+        logger.debug("Calling LLM for plan generation...")
         response = self.llm_adapter.chat(
             messages,
             temperature=self.config.temperature,
             max_tokens=self.config.max_tokens,
             timeout=self.config.timeout,
         )
+        logger.debug(f"LLM response received: {response.content[:500]}...")
 
         return self._parse_plan(response.content)
 
@@ -202,17 +217,23 @@ class AgentExecutor:
         ToolResult
             Step result
         """
+        logger.debug(f"Executing step: tool={step.tool}, args={step.args}, dry_run={step.dry_run}")
         tool = self.tool_registry.get(step.tool)
         if not tool:
+            available_tools = [t.name for t in self.tool_registry.list_tools()]
+            logger.error(f"Tool '{step.tool}' not found. Available tools: {available_tools}")
             return ToolResult.error(f"Tool not found: {step.tool}")
 
         try:
+            logger.debug(f"Calling tool {step.tool}")
             result = tool.execute(step.args, dry_run=step.dry_run)
             result.meta["trace_id"] = trace_id
             result.meta["tool"] = step.tool
             result.meta["dry_run"] = step.dry_run
+            logger.debug(f"Tool {step.tool} executed successfully: {result.status}")
             return result
         except Exception as e:
+            logger.error(f"Tool {step.tool} execution failed: {e}", exc_info=True)
             return ToolResult.error(str(e), meta={"trace_id": trace_id, "tool": step.tool})
 
     def execute_plan(self, plan: ExecutionPlan, *, trace_id: str | None = None) -> ExecutionResult:
