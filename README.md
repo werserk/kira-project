@@ -1,30 +1,173 @@
 # Kira
 
-**Your AI-powered Personal Knowledge Management System**
+**Your Personal "Jarvis" for Obsidian**
 
-Kira is a production-ready Personal Knowledge Management (PKM) system that combines the flexibility of local markdown files with the power of enterprise-grade data management. Think of it as your personal operating system for thoughts, tasks, and knowledge—backed by battle-tested engineering principles.
+Kira is an AI assistant that makes your Obsidian vault intelligent and self-managing. While Obsidian excels at viewing and editing, **Kira automates the hard parts**: task management, GTD workflows, Zettelkasten linking, and calendar sync.
+
+**Primary Interface:** 📱 Telegram (+ CLI & Web UI)
+**Data Storage:** 📝 Standard Markdown (100% Obsidian-compatible)
+**Intelligence:** 🤖 Multi-LLM AI (Anthropic, OpenAI, OpenRouter, Ollama)
+
+Think of it as: **Obsidian for viewing, Kira for doing.**
 
 ---
 
 ## What is Kira?
 
-Kira transforms how you manage personal knowledge by treating your notes, tasks, and events as **first-class data entities** with:
+**Kira = AI Assistant + Obsidian Compatibility**
 
-- **Integrity**: Every change is validated, logged, and atomic
-- **Intelligence**: Natural language interface powered by LLMs (Anthropic, OpenAI, OpenRouter, Ollama)
-- **Flexibility**: Your data lives in plain markdown files you own forever
-- **Extensibility**: Rich plugin system for custom workflows
-- **Reliability**: Built on principles from distributed systems and production engineering
+Managing a personal knowledge system manually is exhausting. Zettelkasten requires discipline. GTD needs constant maintenance. Task management demands structure.
+
+**Kira automates all of this.**
+
+You interact with Kira through **Telegram** (or CLI/Web UI), and it:
+- ✅ Creates and updates tasks with proper state management
+- ✅ Maintains your Zettelkasten with bidirectional links
+- ✅ Enforces GTD workflows automatically
+- ✅ Syncs with your calendar
+- ✅ Generates daily/weekly summaries
+- ✅ Validates data integrity (so your vault never breaks)
+
+Meanwhile, your notes live in **standard markdown format**, fully compatible with **Obsidian** for viewing and manual editing.
 
 ### The Problem Kira Solves
 
-Modern knowledge workers face a dilemma:
-- 📝 **Note-taking apps** are simple but lack structure and automation
-- 🗄️ **Database tools** are powerful but complex and lock your data
-- 🤖 **AI assistants** are smart but don't maintain state or validate actions
-- 🔗 **Sync services** connect tools but lose data integrity guarantees
+You love Obsidian's flexibility, but:
+- 📝 **Manual maintenance is tedious** - Creating tasks, linking notes, updating states
+- 🎯 **GTD requires discipline** - Easy to fall behind without automation
+- 🔗 **Zettelkasten is hard** - Bidirectional linking and graph maintenance is mental overhead
+- 🤖 **No intelligent assistant** - You do all the work manually
+- ⏰ **Calendar sync is painful** - Keeping tasks and events in sync across tools
 
-**Kira bridges all four.** It's a local-first system with database reliability, AI intelligence, and an open plugin ecosystem—all while your data stays in readable markdown files.
+**Kira solves this.** It's the AI layer that makes your Obsidian vault **intelligent and self-maintaining**, while you interact through simple Telegram messages.
+
+### How It Works
+
+```
+┌───────────────────────────────────────────────────────────────┐
+│                           YOU                                 │
+└──────────────┬─────────────────────────────┬──────────────────┘
+               │                             │
+               │ Natural Language            │ Visual Interface
+               │ (Telegram/CLI/Web)          │ (Manual Editing)
+               ↓                             ↓
+    ┌──────────────────────┐      ┌──────────────────────┐
+    │   KIRA (AI Layer)    │      │   OBSIDIAN (UI)      │
+    │                      │      │                      │
+    │  • AI Processing     │      │  • Rich Editor       │
+    │  • Task FSM          │      │  • Graph View        │
+    │  • Validation        │      │  • Search            │
+    │  • Auto-linking      │      │  • Plugins           │
+    │  • Calendar Sync     │      │  • Themes            │
+    │  • Reminders         │      │  • Visual Tools      │
+    └──────────┬───────────┘      └──────────┬───────────┘
+               │                             │
+               │    Both read & write        │
+               │    same markdown files      │
+               │                             │
+               └──────────┬──────────────────┘
+                          ↓
+              ┌────────────────────────┐
+              │   VAULT (Markdown)     │
+              │                        │
+              │   • tasks/*.md         │
+              │   • notes/*.md         │
+              │   • projects/*.md      │
+              │   • events/*.md        │
+              │   • journal/*.md       │
+              │                        │
+              │   Standard markdown +  │
+              │   YAML frontmatter     │
+              └────────────────────────┘
+```
+
+**The Flow:**
+1. **Via Kira (Telegram)**: You send *"Create task: Review Q4 report by Friday"*
+   - Kira processes with AI, validates, applies FSM rules
+   - Writes `tasks/task-20251011-1420.md` to vault
+
+2. **Via Obsidian**: You manually create a note or edit existing task
+   - Obsidian writes directly to vault as markdown
+   - Kira sees the change and validates on next sync
+
+3. **Result**: Both tools work with the same files
+   - Kira ensures structure, validation, automation
+   - Obsidian provides beautiful UI and manual control
+   - Your vault stays consistent and never corrupts
+
+---
+
+## Two Modes of Operation
+
+Kira operates in two complementary modes:
+
+### 🤖 Mode 1: AI Assistant (Primary)
+
+**Interact naturally, Kira handles the complexity.**
+
+Your primary interface is **Telegram** (with CLI and Web UI as alternatives). You send messages like:
+
+```
+You: "Create a task to review the Q4 report by Friday"
+Kira: ✓ Created task-20251015-1420
+      ✓ Due: 2025-10-11T17:00:00Z
+      ✓ Added to calendar
+      ✓ Linked to project Q4-planning
+```
+
+**Kira handles:**
+- Task creation with proper FSM state management
+- Bidirectional link updates in your graph
+- Calendar synchronization
+- Data validation and integrity checks
+- Daily summaries and reminders
+
+**You get:**
+- Hands-free knowledge management
+- GTD/Zettelkasten automation
+- Natural language interface
+- Real-time updates via Telegram
+
+### 📝 Mode 2: Obsidian Compatibility (Viewing & Editing)
+
+**Your vault is 100% Obsidian-compatible.**
+
+All data is stored as **standard markdown + YAML frontmatter**:
+
+```markdown
+---
+id: task-20251008-1420
+title: Review Q4 report
+status: todo
+due: 2025-10-11T17:00:00Z
+tags: [work, planning]
+---
+
+## Context
+Need to review financial projections and team feedback.
+
+Related: [[proj-q4-planning]], [[note-financial-model]]
+```
+
+**Open your vault in Obsidian to:**
+- 👁️ View your entire knowledge graph
+- ✏️ Manually edit notes and tasks
+- 🔍 Use Obsidian's powerful search
+- 📊 Leverage Obsidian plugins (Graph View, Dataview, etc.)
+- 🎨 Customize with themes and CSS
+
+**Why Both Modes?**
+
+| Use Case | Tool | Why |
+|----------|------|-----|
+| Quick task creation | Telegram → Kira | Fastest, hands-free |
+| Review knowledge graph | Obsidian | Best visualization |
+| Daily planning | Telegram → Kira | Conversational interface |
+| Deep work on notes | Obsidian | Focused editing environment |
+| Automation & workflows | Kira | Intelligence layer |
+| Manual refinement | Obsidian | Full control |
+
+**The synergy:** Kira maintains structure and automation. Obsidian provides the perfect viewing and editing experience.
 
 ---
 
@@ -191,7 +334,7 @@ Bidirectional links automatically updated:
 │  └─────┬────┘  └─────┬────┘  └─────┬────┘  └──────┬─────┘ │
 └────────┼─────────────┼─────────────┼──────────────┼────────┘
          │             │             │              │
-         └─────────────┴─────────────┴──────────────┘
+         └─────────────┴────┬────────┴──────────────┘
                             ↓
          ┌──────────────────────────────────────────┐
          │         Event Bus (At-Least-Once)        │
@@ -202,9 +345,9 @@ Bidirectional links automatically updated:
                            ↓
          ┌──────────────────────────────────────────┐
          │        Business Logic Layer              │
-         │  ┌─────────┐  ┌──────────┐  ┌─────────┐ │
-         │  │   FSM   │  │ Validator│  │ Plugins │ │
-         │  └─────────┘  └──────────┘  └─────────┘ │
+         │  ┌─────────┐  ┌──────────┐  ┌─────────┐  │
+         │  │   FSM   │  │ Validator│  │ Plugins │  │
+         │  └─────────┘  └──────────┘  └─────────┘  │
          └─────────────────┬────────────────────────┘
                            ↓
          ┌──────────────────────────────────────────┐
@@ -217,10 +360,10 @@ Bidirectional links automatically updated:
          ┌──────────────────────────────────────────┐
          │              Vault Storage               │
          │     (Plain Markdown + Frontmatter)       │
-         │  ┌─────┐  ┌─────┐  ┌──────┐  ┌───────┐  │
-         │  │Tasks│  │Notes│  │Events│  │Projects│ │
-         │  └─────┘  └─────┘  └──────┘  └───────┘  │
-         └──────────────────┬───────────────────────┘
+         │  ┌─────┐  ┌─────┐  ┌──────┐  ┌────────┐  │
+         │  │Tasks│  │Notes│  │Events│  │Projects│  │
+         │  └─────┘  └─────┘  └──────┘  └────────┘  │
+         └─────────────────┬────────────────────────┘
                            ↓
          ┌──────────────────────────────────────────┐
          │          External Systems                │
@@ -280,108 +423,155 @@ Bidirectional links automatically updated:
 - 🔧 CLI for automation and scripting
 - 🐳 Docker support for deployment
 
-### For Teams (Future)
+### For Teams
 
-While Kira is currently personal-focused, the architecture supports multi-user:
-- **Conflict Resolution**: CRDTs/OT for collaborative editing (planned)
-- **Permissions**: Plugin sandboxing already enforces access control
-- **Audit Trail**: Every change logged with user/trace ID
-- **API-First**: HTTP API ready for client apps
+Kira's architecture is designed for team collaboration from the ground up:
+- **Audit Trail**: Every change logged with user/trace ID for accountability
+- **Permissions**: Plugin sandboxing enforces access control and security boundaries
+- **API-First**: HTTP API enables integration with team workflows
+- **Collaborative Workflows**: Shared vault with conflict resolution (in development)
 
 ---
 
-## Key Differentiators
+## Kira + Obsidian: Better Together
 
-| Feature | Kira | Obsidian | Notion | Org-mode |
-|---------|------|----------|--------|----------|
-| **Data Format** | Markdown + YAML | Markdown | Proprietary | Org format |
-| **Validation** | ✅ Schema + FSM | ❌ None | ⚠️ Soft | ❌ None |
-| **AI Integration** | ✅ Native LLM | 🔌 Plugins | ✅ Native | ❌ Manual |
-| **Atomic Writes** | ✅ OS-level | ❌ No | ☁️ Cloud | ⚠️ Manual |
-| **Plugin Sandbox** | ✅ Enforced | ⚠️ Trusted | 🚫 N/A | ⚠️ Trusted |
-| **Event Bus** | ✅ Built-in | ❌ No | 🚫 N/A | ❌ No |
-| **External Sync** | ✅ GCal, Telegram | 🔌 Plugins | ✅ Many | 🔌 Elisp |
-| **Audit Logging** | ✅ JSONL | ❌ No | ⚠️ Limited | ❌ No |
-| **Open Source** | ✅ MIT | 💰 Freemium | ❌ Closed | ✅ GPL |
+**Think of Kira and Obsidian as partners, not competitors:**
+
+| Capability | Kira | Obsidian | Together |
+|------------|------|----------|----------|
+| **AI Assistant** | ✅ Native (Telegram/CLI) | ❌ Limited | 🚀 Chat-based automation |
+| **Visual Graph** | ⚠️ Basic | ✅ Excellent | 🚀 Kira maintains, Obsidian displays |
+| **Data Validation** | ✅ Schema + FSM | ❌ None | 🚀 Integrity guaranteed |
+| **Manual Editing** | ⚠️ CLI/API | ✅ Best-in-class | 🚀 Edit freely, Kira validates |
+| **Task FSM** | ✅ Automated | ❌ Manual | 🚀 State machine enforced |
+| **Calendar Sync** | ✅ Two-way | 🔌 Via plugins | 🚀 Seamless integration |
+| **Mobile Access** | ✅ Telegram | ✅ Mobile app | 🚀 Full mobility |
+| **Automation** | ✅ Event-driven | ❌ Manual | 🚀 Set-and-forget workflows |
+| **Plugin System** | ✅ Sandboxed | ✅ Rich ecosystem | 🚀 Best of both worlds |
+
+### Comparison with Other Tools
+
+| Feature | Kira + Obsidian | Notion | Roam Research | Org-mode |
+|---------|-----------------|--------|---------------|----------|
+| **Data Ownership** | ✅ Local files | ❌ Cloud only | ❌ Cloud only | ✅ Local |
+| **AI Automation** | ✅ Native | ⚠️ Limited | ❌ None | ❌ None |
+| **Validation** | ✅ Enforced | ⚠️ Soft | ❌ None | ❌ None |
+| **Telegram Bot** | ✅ Built-in | ❌ None | ❌ None | ❌ None |
+| **Visual Editor** | ✅ Obsidian | ✅ Native | ✅ Native | ⚠️ Emacs |
+| **Offline-First** | ✅ Always | ❌ No | ❌ No | ✅ Yes |
 
 ---
 
 ## Real-World Use Cases
 
-### 1. **Project Management**
-```yaml
-# vault/projects/proj-website-redesign.md
----
-id: proj-website-redesign
-title: Website Redesign Q4
-status: active
-start_date: 2025-10-01
-target_date: 2025-12-31
-owner: [[contact-john]]
-tags: [web, design, q4]
----
+### 1. **Morning Routine via Telegram**
+```
+[Telegram - 7:30 AM]
+You: "Good morning, what's on my plate?"
 
-## Overview
-Complete redesign of company website with modern framework.
+Kira: Good morning! Here's your day:
 
-## Tasks
-- [[task-20251008-001]] Research design systems
-- [[task-20251008-002]] Create wireframes
-- [[task-20251008-003]] Implement prototype
+      📋 Tasks (3):
+      • Review PR #45 (due 2pm) - HIGH
+      • Team standup (10am, blocked 30min)
+      • Draft Q4 goals
+
+      📅 Events (2):
+      • 10:00 Team Standup (Zoom)
+      • 14:00 Client call (45min)
+
+      📊 Yesterday: 4 tasks completed, 2h focused work
+
+You: "Create a task to prepare slides for the client call"
+
+Kira: ✓ Created task-20251008-0732
+      ✓ Due: Today 13:30 (30min before call)
+      ✓ Linked to event "Client call"
+      ✓ Calendar timebox created
+
+[You open Obsidian]
+→ See all tasks in your vault with proper links
+→ Edit notes manually if needed
+→ View your knowledge graph
+→ Kira keeps everything validated and synced
 ```
 
-**Kira automatically:**
-- Tracks task completion percentage
-- Sends reminders 1 week before deadline
-- Creates weekly rollup of progress
-- Syncs milestones to Google Calendar
+**Workflow:**
+- **Telegram**: Quick task creation and status updates
+- **Obsidian**: Review context, edit notes, visualize connections
+- **Kira**: Maintains integrity, enforces FSM, syncs calendar
 
-### 2. **Research & Learning**
-```markdown
-# vault/notes/note-atomic-habits.md
----
-id: note-atomic-habits
-title: Atomic Habits - Key Takeaways
-tags: [books, productivity, habits]
-source: "Atomic Habits by James Clear"
-created: 2025-10-08T10:30:00Z
----
+### 2. **Zettelkasten Automation**
+```
+[Telegram - During research]
+You: "Create note: Key insight from 'Atomic Habits' -
+     small changes compound. 1% better daily = 37x improvement yearly"
 
-## Core Concept
-Small changes compound over time. 1% better each day.
+Kira: ✓ Created note-20251008-1125
+      ✓ Tagged: #books, #productivity, #habits
+      ✓ Auto-linked to: [[note-habit-formation]]
+      ✓ Added to reading project
 
-Related: [[note-habit-formation]], [[proj-morning-routine]]
+You: "What have I learned about productivity this week?"
+
+Kira: Found 7 notes on productivity:
+      • note-atomic-habits (Oct 8)
+      • note-deep-work (Oct 6)
+      • note-pomodoro-technique (Oct 5)
+
+      Common themes: Focus, habit stacking, timeboxing
+
+      Would you like a weekly rollup?
+
+[Open in Obsidian]
+→ Beautiful graph view of all connected notes
+→ Dataview queries for book notes
+→ Manual refinement of connections
+→ Kira maintains bidirectional links automatically
 ```
 
-**Kira enables:**
-- Find all notes related to "productivity"
-- Generate weekly summary of learnings
-- Link concepts across notes automatically
-- RAG queries: "What did I learn about habits?"
+**Value:**
+- **Create**: Via Telegram, hands-free
+- **Maintain**: Kira auto-links and validates
+- **Explore**: Obsidian's graph view
+- **Query**: RAG-powered semantic search
 
-### 3. **Daily Operations**
+### 3. **GTD Workflow Automation**
 ```
-Morning:
-  You: "What's on my plate today?"
-  Kira: You have 3 tasks:
-        • Review PR #45 (due 2pm)
-        • Team standup (10am, timeboxed)
-        • Draft Q4 goals (high priority)
+[Telegram - Inbox Processing]
+You: "I need to organize next week's team workshop"
 
-Afternoon:
-  You: "Done with PR review, notes in the task"
-  Kira: ✓ Updated task-20251008-045 to 'done'
-        ✓ Logged completion time: 1.5h
-        ✓ Notified team via Telegram
+Kira: 📥 Added to inbox for clarification.
 
-Evening:
-  You: "Show me today's rollup"
-  Kira: Daily Rollup - 2025-10-08
-        ✓ 5 tasks completed
-        ✓ 2 notes created
-        ✓ 3h focused work
-        → Tomorrow: Start Q4 planning
+      This seems like a project. Would you like me to:
+      1. Create project "Team Workshop"
+      2. Break into tasks (venue, agenda, invites)
+      3. Set deadline for next week
+
+      Confirm?
+
+You: "Yes, deadline Friday 5pm"
+
+Kira: ✓ Created proj-team-workshop
+      ✓ Created 5 subtasks (todo state)
+      ✓ Deadline: 2025-10-11 17:00
+      ✓ Calendar blocks created
+
+      First task: "Book venue" - want to start now?
+
+[Later in Obsidian]
+→ Open project note
+→ See all linked tasks in clean format
+→ Add meeting notes and context
+→ Kira ensures tasks follow FSM rules
 ```
+
+**GTD Made Easy:**
+- **Capture**: Telegram inbox (no thinking)
+- **Clarify**: Kira asks smart questions
+- **Organize**: Automatic project/task creation
+- **Review**: Obsidian for big picture
+- **Execute**: State machine enforces flow
 
 ---
 
@@ -466,90 +656,85 @@ Evening:
 
 ## Philosophy & Design Principles
 
-### 1. **Data Sovereignty**
-Your data is yours. Always in readable format. No cloud required.
+### 1. **Obsidian-First Compatibility**
+100% standard markdown. Use Obsidian for viewing/editing. Kira for intelligence.
 
-### 2. **Local-First**
-Works offline. Sync is optional. Data never leaves your machine unless you decide.
+### 2. **Data Sovereignty**
+Your data is yours. Always in readable format. No cloud required. Obsidian-compatible always.
 
-### 3. **Correctness Over Speed**
-Every write is validated. Crashes can't corrupt state. Data integrity is non-negotiable.
+### 3. **Telegram-First Interaction**
+Primary interface is conversational. CLI and Web UI for power users.
 
-### 4. **Progressive Disclosure**
-Start simple (CLI for tasks), grow complex (plugins, integrations, AI).
+### 4. **Correctness Over Speed**
+Every write is validated. Crashes can't corrupt state. Your Obsidian vault stays clean.
 
-### 5. **Composable Tools**
-Each component usable independently. CLI, Agent, Vault—mix and match.
+### 5. **Automation Over Manual Work**
+Let Kira handle structure, linking, validation. You focus on thinking.
 
-### 6. **Explicit Over Implicit**
-State transitions require clear triggers. No hidden magic.
+### 6. **Explicit State Management**
+Task FSM enforces rules. No tasks stuck in limbo. Clear transitions.
 
 ### 7. **Fail Loud**
-Validation errors surface immediately. Malformed data quarantined, not silently ignored.
+Validation errors surface immediately. Malformed data quarantined, never corrupts your vault.
 
 ---
 
 ## Who Is Kira For?
 
 **Ideal Users:**
-- 🧑‍💻 Developers who want hackable PKM
-- 📝 Knowledge workers drowning in scattered notes
-- 🎯 Productivity enthusiasts seeking automation
-- 🔬 Researchers managing complex information
-- 👨‍💼 Solopreneurs tracking projects and clients
+- 📝 **Obsidian users** who want automation (primary target!)
+- 🧑‍💻 **Developers** who want hackable PKM with API access
+- 🎯 **GTD practitioners** tired of manual maintenance
+- 🔬 **Researchers** managing complex Zettelkasten
+- 👨‍💼 **Solopreneurs** needing task + knowledge management
+- 📱 **Mobile users** who want Telegram-based interaction
 
 **Not Ideal For:**
-- Users wanting zero-config, plug-and-play solution
-- Teams needing real-time collaboration (not yet supported)
-- Non-technical users uncomfortable with CLI/YAML
+- Users happy with manual Obsidian workflows
+- Teams needing real-time collaborative editing
+- Users who don't want AI automation
+- People who prefer GUI-only interaction
 
 ---
 
-## Contributing
+## Development Team
 
-Kira is open source (MIT License) and welcomes contributions!
-
-**Areas Where Help Is Needed:**
-- 🐛 Bug reports and edge case testing
-- 📖 Documentation improvements
-- 🔌 Plugin development
-- 🌍 Internationalization (i18n)
-- 🎨 UI/UX design for web interface
+Kira is developed by a dedicated team focused on delivering enterprise-grade personal knowledge management.
 
 **Architecture Decision Records (ADRs):**
-Kira documents every major design decision. Read `/docs/adr/` to understand why things are the way they are.
+Kira documents every major design decision. Read `/docs/adr/` to understand the technical rationale behind architectural choices.
+
+**Team Onboarding:**
+New team members should review:
+- Architecture documentation in `/docs`
+- Test suite for understanding system behavior
+- ADRs for context on design decisions
+- Plugin SDK for extensibility patterns
 
 ---
 
-## License
+## Contact & Support
 
-MIT License - See [LICENSE](LICENSE) file.
-
-**In short:** Use Kira however you want—personal, commercial, modified. Attribution appreciated but not required.
+For questions, issues, or feature requests, contact the development team through internal channels.
 
 ---
 
-## Support & Community
+## Technical Foundations
 
-- 📧 Issues: [GitHub Issues](https://github.com/werserk/kira-project/issues)
-- 💬 Discussions: [GitHub Discussions](https://github.com/werserk/kira-project/discussions)
-- 📖 Documentation: `/docs` directory (coming soon)
-- 🐦 Updates: Follow development on GitHub
-
----
-
-## Acknowledgments
-
-Kira builds on ideas from:
+Kira's design is informed by proven methodologies:
 - **GTD (Getting Things Done)** - David Allen's workflow methodology
 - **Zettelkasten** - Niklas Luhmann's note-taking system
-- **Obsidian** - Inspiration for local-first markdown
-- **Org-mode** - Plain-text task management done right
+- **Local-first software principles** - Data ownership and offline-first architecture
+- **Production engineering patterns** - From distributed systems and database design
 
-Special thanks to the open-source community for tools like FastAPI, Pydantic, Anthropic SDK, and countless others.
+Built with modern Python stack: FastAPI, Pydantic, Anthropic SDK, and battle-tested libraries.
 
 ---
 
-**Built with ❤️ for knowledge workers who demand more from their tools.**
+**Enterprise-grade personal knowledge management for demanding professionals.**
 
 *Version 0.1.0-alpha | Last Updated: 2025-10-08*
+
+---
+
+© 2025 Kira Development Team. All rights reserved.
