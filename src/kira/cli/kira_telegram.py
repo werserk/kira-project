@@ -197,9 +197,9 @@ def handle_telegram_start(
     ollama_adapter = OllamaAdapter()
 
     router_config = RouterConfig(
-        primary_provider="anthropic",
         planning_provider="anthropic",
-        fallback_provider="openai",
+        structuring_provider="openai",
+        default_provider="openrouter",
         enable_ollama_fallback=agent_config.enable_ollama_fallback,
     )
 
@@ -258,21 +258,19 @@ def handle_telegram_start(
     event_bus = create_event_bus()
     scheduler = create_scheduler()
 
-    # Create adapter config
-    adapter_config = TelegramAdapterConfig(
+    # Get polling timeout for logging
+    polling_timeout = telegram_config.get("polling_timeout", 30)
+
+    # Create adapter using factory function
+    adapter = create_telegram_adapter(
         bot_token=bot_token,
+        event_bus=event_bus,
+        scheduler=scheduler,
         allowed_chat_ids=allowed_chat_ids,
-        polling_timeout=telegram_config.get("polling_timeout", 30),
+        polling_timeout=polling_timeout,
         log_path=Path("logs/adapters/telegram.jsonl"),
         temp_dir=Path("tmp/telegram"),
         daily_briefing_time=telegram_config.get("daily_briefing_time", "09:00"),
-    )
-
-    # Create adapter
-    adapter = create_telegram_adapter(
-        config=adapter_config,
-        event_bus=event_bus,
-        scheduler=scheduler,
     )
 
     # === Connect Agent to Telegram via Event Bus ===
@@ -296,7 +294,7 @@ def handle_telegram_start(
 
         if verbose:
             click.echo("   Режим: long polling + event-driven agent")
-            click.echo(f"   Timeout: {adapter_config.polling_timeout}s")
+            click.echo(f"   Timeout: {polling_timeout}s")
 
         # Start polling (blocks until interrupted)
         adapter.start_polling()

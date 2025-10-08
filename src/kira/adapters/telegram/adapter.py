@@ -17,6 +17,11 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+try:
+    import httpx
+except ImportError:
+    httpx = None  # type: ignore
+
 if TYPE_CHECKING:
     from collections.abc import Callable
 
@@ -641,11 +646,140 @@ class TelegramAdapter:
 
         # Process text message
         if message.text:
+            # Check if it's a bot command
+            if message.text.startswith("/"):
+                command_handled = self._handle_bot_command(message, trace_id)
+                if command_handled:
+                    return  # Command handled, don't publish to event bus
+
             self._publish_message_received(message, trace_id)
 
         # Process file/photo
         if message.document or message.photo:
             self._publish_file_dropped(message, trace_id)
+
+    def _handle_bot_command(self, message: TelegramMessage, trace_id: str) -> bool:
+        """Handle bot commands like /start and /help.
+
+        Parameters
+        ----------
+        message
+            Message with command
+        trace_id
+            Trace ID for correlation
+
+        Returns
+        -------
+        bool
+            True if command was handled, False if should be passed to AI agent
+        """
+        command = message.text.strip().lower()
+
+        if command in ["/start", "/start@kirabot"]:
+            self._send_start_message(message.chat_id)
+            self._log_event(
+                "bot_command_handled",
+                {
+                    "trace_id": trace_id,
+                    "command": "/start",
+                    "chat_id": message.chat_id,
+                },
+            )
+            return True
+
+        if command in ["/help", "/help@kirabot"]:
+            self._send_help_message(message.chat_id)
+            self._log_event(
+                "bot_command_handled",
+                {
+                    "trace_id": trace_id,
+                    "command": "/help",
+                    "chat_id": message.chat_id,
+                },
+            )
+            return True
+
+        return False
+
+    def _send_start_message(self, chat_id: int) -> None:
+        """Send welcome message for /start command.
+
+        Parameters
+        ----------
+        chat_id
+            Target chat ID
+        """
+        message = """🤖 *Привет! Я Kira — ваш личный AI-ассистент*
+
+*Kira = AI Assistant + Obsidian Compatibility*
+
+Я помогаю управлять задачами, заметками и знаниями через простые сообщения.
+
+*Что я умею:*
+✅ Создавать и обновлять задачи
+✅ Управлять вашим Zettelkasten
+✅ Синхронизировать с календарем
+✅ Генерировать ежедневные отчеты
+✅ Поддерживать структуру данных
+
+*Как пользоваться:*
+Просто пишите мне естественным языком:
+• "Создай задачу: Проверить почту"
+• "Что у меня сегодня?"
+• "Покажи задачи на неделю"
+
+Все данные хранятся в Obsidian-совместимом формате в вашем vault.
+
+_Отправьте /help для подробной справки_
+"""
+        self.send_message(chat_id, message, parse_mode="Markdown")
+
+    def _send_help_message(self, chat_id: int) -> None:
+        """Send help message for /help command.
+
+        Parameters
+        ----------
+        chat_id
+            Target chat ID
+        """
+        message = """📖 *Справка по Kira Bot*
+
+*Основные возможности:*
+
+📋 *Задачи*
+• "Создай задачу: [название]"
+• "Список задач"
+• "Покажи задачи на сегодня"
+• "Отметь задачу [ID] выполненной"
+• "Начать работу над [ID]"
+
+📝 *Заметки*
+• "Создай заметку: [текст]"
+• "Найди заметки про [тема]"
+
+📅 *Календарь*
+• "Что у меня сегодня?"
+• "Расписание на завтра"
+• "Синхронизируй календарь"
+
+📊 *Аналитика*
+• "Дневной отчет"
+• "Что я сделал на этой неделе?"
+• "Статистика"
+
+*Архитектура:*
+• 🎯 Telegram — интерфейс взаимодействия
+• 🤖 AI Agent — обработка запросов
+• 💾 Vault — хранение в Markdown
+• 👁️ Obsidian — просмотр и редактирование
+
+*Полезные ссылки:*
+• [GitHub](https://github.com/your-org/kira)
+• Документация: См. README в вашем vault
+
+Просто пишите мне естественным языком, и я помогу! 🚀
+"""
+        self.send_message(chat_id, message, parse_mode="Markdown")
 
     def _is_allowed(self, chat_id: int, user_id: int) -> bool:
         """Check if chat/user is whitelisted.
@@ -900,14 +1034,14 @@ class TelegramAdapter:
                 }
                 self.event_bus.publish("telegram.callback", payload)
 
-    def _api_request(self, _method: str, _params: dict[str, Any]) -> dict[str, Any] | None:
+    def _api_request(self, method: str, params: dict[str, Any]) -> dict[str, Any] | None:
         """Make Telegram API request.
 
         Parameters
         ----------
-        _method
+        method
             API method name
-        _params
+        params
             Request parameters
 
         Returns
@@ -915,14 +1049,42 @@ class TelegramAdapter:
         dict or None
             API response or None on failure
         """
-        # Placeholder for actual HTTP implementation
-        # In real implementation, use requests library:
-        # import requests
-        # response = requests.post(f"{self._api_base_url}/{method}", json=params)
-        # return response.json()
+        if httpx is None:
+            # If httpx not installed, return placeholder response
+            self._log_event(
+                "api_request_skipped",
+                {
+                    "method": method,
+                    "reason": "httpx not installed",
+                },
+            )
+            return {"ok": True, "result": []}
 
-        # For now, return empty response (will be implemented with requests library)
-        return {"ok": True, "result": []}
+        try:
+            url = f"{self._api_base_url}/{method}"
+            response = httpx.post(url, json=params, timeout=30.0)
+            response.raise_for_status()
+            return response.json()
+        except httpx.HTTPError as exc:
+            self._log_event(
+                "api_request_failed",
+                {
+                    "method": method,
+                    "error": str(exc),
+                    "error_type": type(exc).__name__,
+                },
+            )
+            return None
+        except Exception as exc:
+            self._log_event(
+                "api_request_error",
+                {
+                    "method": method,
+                    "error": str(exc),
+                    "error_type": type(exc).__name__,
+                },
+            )
+            return None
 
     def _generate_csrf_token(self, request_id: str, callback_data: str) -> str:
         """Generate CSRF token for callback data.
