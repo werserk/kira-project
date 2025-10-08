@@ -70,11 +70,11 @@ class Settings:
         Log file path
     """
     
+    # Core settings (required fields first)
+    vault_path: Path
+    
     # Phase 0, Point 1: Runtime mode
     mode: str = "alpha"
-    
-    # Core settings
-    vault_path: Path
     default_timezone: str = "UTC"
     
     # Phase 0, Point 1: Feature flags (integrations off by default)
