@@ -11,7 +11,6 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
 from kira.plugin_sdk.context import PluginContext
 from kira.plugins.inbox.src.kira_plugin_inbox.plugin import (
-    ClarificationRequest,
     EntityClassification,
     InboxNormalizer,
     activate,
@@ -34,29 +33,6 @@ class TestEntityClassification:
         assert classification.entity_type == "task"
         assert classification.confidence == 0.85
         assert "title" in classification.extracted_fields
-
-
-class TestClarificationRequest:
-    """Test ClarificationRequest dataclass."""
-
-    def test_clarification_request_creation(self) -> None:
-        """Test creating clarification request."""
-        classification = EntityClassification(
-            entity_type="event",
-            confidence=0.6,
-            extracted_fields={},
-        )
-
-        request = ClarificationRequest(
-            request_id="clarify-123",
-            content="Test content",
-            classification=classification,
-            suggested_fields={"title": "Test"},
-        )
-
-        assert request.request_id == "clarify-123"
-        assert request.classification.entity_type == "event"
-        assert request.classification.confidence == 0.6
 
 
 class TestTextNormalization:
@@ -305,7 +281,8 @@ class TestClarificationQueue:
 
         # Check that request is in queue
         request_id = result["request_id"]
-        assert request_id in self.normalizer._clarifications
+        pending = self.normalizer._clarification_queue.get_pending()
+        assert any(item.clarification_id == request_id for item in pending)
 
     def test_clarification_confirmed(self) -> None:
         """Test handling clarification confirmation."""
@@ -329,8 +306,9 @@ class TestClarificationQueue:
         # Handle confirmation
         self.normalizer._handle_clarification_confirmed(event)
 
-        # Request should be removed from queue
-        assert request_id not in self.normalizer._clarifications
+        # Request should be marked as confirmed
+        pending = self.normalizer._clarification_queue.get_pending()
+        assert not any(item.clarification_id == request_id for item in pending)
 
     def test_clarification_alternative_selected(self) -> None:
         """Test handling alternative entity type selection."""
@@ -352,8 +330,9 @@ class TestClarificationQueue:
 
         self.normalizer._handle_clarification_confirmed(event)
 
-        # Request should be removed
-        assert request_id not in self.normalizer._clarifications
+        # Request should be marked as confirmed
+        pending = self.normalizer._clarification_queue.get_pending()
+        assert not any(item.clarification_id == request_id for item in pending)
 
     def test_clarification_skipped(self) -> None:
         """Test handling clarification skip."""
@@ -375,8 +354,9 @@ class TestClarificationQueue:
 
         self.normalizer._handle_clarification_confirmed(event)
 
-        # Request should be removed
-        assert request_id not in self.normalizer._clarifications
+        # Request should be marked as rejected
+        pending = self.normalizer._clarification_queue.get_pending()
+        assert not any(item.clarification_id == request_id for item in pending)
 
 
 class TestMessageProcessing:
@@ -466,20 +446,26 @@ class TestTelegramIntegration:
 
     def test_request_telegram_confirmation(self) -> None:
         """Test requesting Telegram confirmation."""
-        classification = EntityClassification(
-            entity_type="task",
-            confidence=0.6,
-            extracted_fields={"title": "Test"},
-        )
-
-        request = ClarificationRequest(
-            request_id="test-123",
-            content="Test content",
-            classification=classification,
-            suggested_fields={"title": "Test"},
-        )
-
-        self.normalizer._request_telegram_confirmation(request)
+        # Create a clarification item using the queue
+        content = "Test content"
+        metadata = {
+            "entity_type": "task",
+            "confidence": 0.6,
+            "title": "Test",
+        }
+        
+        result = self.normalizer._queue_clarification(content, metadata)
+        request_id = result["request_id"]
+        
+        # Get the item from queue
+        pending = self.normalizer._clarification_queue.get_pending()
+        item = next(i for i in pending if i.clarification_id == request_id)
+        
+        # Clear the mock to check new calls
+        self.normalizer.context.events.publish.reset_mock()
+        
+        # Request confirmation
+        self.normalizer._request_telegram_confirmation(item)
 
         # Should publish telegram.confirmation_request event
         assert self.normalizer.context.events.publish.called

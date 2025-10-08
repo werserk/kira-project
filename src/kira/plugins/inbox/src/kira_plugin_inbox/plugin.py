@@ -474,7 +474,7 @@ class InboxNormalizer:
             metadata["entity_type"] = item.extracted_type
             metadata["confidence"] = 1.0  # User confirmed
             result = self.create_entity(content, metadata)
-            
+
             # Update item status
             self._clarification_queue.confirm(request_id, {"confirmed": True})
             self.context.logger.info(f"Clarification confirmed: {request_id} -> {result}")
@@ -486,7 +486,7 @@ class InboxNormalizer:
             metadata["entity_type"] = alt_type
             metadata["confidence"] = 1.0
             result = self.create_entity(content, metadata)
-            
+
             # Update item status with alternative
             self._clarification_queue.confirm(request_id, {"confirmed": True, "alternative": alt_type})
             self.context.logger.info(f"Clarification alternative selected: {request_id} -> {alt_type}")

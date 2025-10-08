@@ -63,7 +63,7 @@ class PluginLoader:
         # Create context with vault access if provided
         if context is None:
             context = PluginContext(vault=vault) if vault else PluginContext()
-        
+
         self.context = context
         self.manifest_validator = PluginManifestValidator()
         self.vault_path = vault_path
@@ -103,8 +103,10 @@ class PluginLoader:
             raise PluginLoadError(f"Failed to load manifest: {e}") from e
 
         # Validate manifest structure
-        if not self.manifest_validator.validate_manifest(manifest):
-            raise PluginLoadError("Invalid plugin manifest")
+        errors = self.manifest_validator.validate_manifest(manifest)
+        if errors:
+            error_msg = "; ".join(errors)
+            raise PluginLoadError(f"Invalid plugin manifest: {error_msg}")
 
         # Check engine compatibility
         self._check_engine_compatibility(manifest)
