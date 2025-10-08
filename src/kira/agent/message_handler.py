@@ -6,11 +6,12 @@ Subscribes to message.received events and routes them to AgentExecutor.
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any, Callable
-
-from ..core.events import Event
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from ..core.events import Event
     from .executor import AgentExecutor
 
 logger = logging.getLogger(__name__)
@@ -137,11 +138,11 @@ class MessageHandler:
                         response_parts.append(f"❌ Шаг {i}: {error}")
 
                 return "\n".join(response_parts)
-            else:
-                logger.debug("No detailed results, returning success message")
-                return "✅ Запрос выполнен успешно"
 
-        elif result.status == "error":
+            logger.debug("No detailed results, returning success message")
+            return "✅ Запрос выполнен успешно"
+
+        if result.status == "error":
             error = getattr(result, "error", None)
             if error is None or error == "None":
                 logger.warning(f"Result has error status but error field is None/missing. Result: {result}")

@@ -229,7 +229,7 @@ class TelegramAdapter:
         text: str,
         *,
         reply_markup: dict[str, Any] | None = None,
-        parse_mode: str = "Markdown",
+        parse_mode: str | None = "Markdown",
     ) -> dict[str, Any] | None:
         """Send message to chat.
 
@@ -249,23 +249,50 @@ class TelegramAdapter:
         dict or None
             API response or None on failure
         """
-        params = {
+        params: dict[str, Any] = {
             "chat_id": chat_id,
             "text": text,
-            "parse_mode": parse_mode,
         }
+
+        if parse_mode:
+            params["parse_mode"] = parse_mode
 
         if reply_markup:
             params["reply_markup"] = json.dumps(reply_markup)
 
         try:
-            return self._api_request("sendMessage", params)
+            self._log_event(
+                "send_message_attempt",
+                {
+                    "chat_id": chat_id,
+                    "text_length": len(text),
+                    "text_preview": text[:100],
+                },
+            )
+            result = self._api_request("sendMessage", params)
+            if result:
+                self._log_event(
+                    "send_message_success",
+                    {
+                        "chat_id": chat_id,
+                        "message_id": result.get("result", {}).get("message_id") if isinstance(result, dict) else None,
+                    },
+                )
+            else:
+                self._log_event(
+                    "send_message_no_response",
+                    {
+                        "chat_id": chat_id,
+                    },
+                )
+            return result
         except Exception as exc:
             self._log_event(
                 "send_message_failed",
                 {
                     "chat_id": chat_id,
                     "error": str(exc),
+                    "error_type": type(exc).__name__,
                 },
             )
             return None

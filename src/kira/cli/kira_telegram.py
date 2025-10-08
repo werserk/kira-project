@@ -294,7 +294,8 @@ def handle_telegram_start(
     def send_response(source: str, chat_id: str, text: str) -> None:
         """Callback to send response back to Telegram."""
         if source == "telegram":
-            adapter.send_message(int(chat_id), text)
+            # Send without Markdown formatting to avoid parsing errors
+            adapter.send_message(int(chat_id), text, parse_mode=None)
 
     # Create message handler and subscribe to events
     message_handler = create_message_handler(executor, response_callback=send_response)
