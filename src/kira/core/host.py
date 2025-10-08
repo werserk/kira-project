@@ -1,7 +1,10 @@
-"""Host API for Vault operations (ADR-006).
+"""Host API for Vault operations (ADR-006, Phase 1 Point 5).
 
 Single point of access for all Vault operations with validation,
 ID generation, link maintenance, and event emission.
+
+Phase 1, Point 5: Domain validation before every write.
+Invalid entities never touch disk; errors are surfaced to callers.
 """
 
 from __future__ import annotations
@@ -17,12 +20,14 @@ from .ids import generate_entity_id, is_valid_entity_id, parse_entity_id
 from .links import LinkGraph, update_entity_links
 from .md_io import MarkdownDocument, MarkdownIOError, read_markdown, write_markdown
 from .schemas import SchemaCache, get_schema_cache
+from .validation import ValidationError, validate_entity
 
 __all__ = [
     "Entity",
     "EntityNotFoundError",
     "HostAPI",
     "VaultError",
+    "ValidationError",
     "create_host_api",
 ]
 
@@ -251,11 +256,20 @@ class HostAPI:
         data.setdefault("created", now.isoformat())
         data["updated"] = now.isoformat()
 
-        # Validate against schema
+        # Phase 1, Point 5: Domain validation before write
+        # Invalid entities never touch disk
+        validation_result = validate_entity(entity_type, data)
+        if not validation_result.valid:
+            raise ValidationError(
+                f"Entity validation failed for {entity_type} '{entity_id}'",
+                errors=validation_result.errors,
+            )
+
+        # Validate against schema (legacy, now part of validate_entity)
         if self.schema_cache:
-            validation_result = self.schema_cache.validate_entity(entity_type, data)
-            if not validation_result:
-                raise VaultError(f"Schema validation failed: {'; '.join(validation_result.errors)}")
+            validation_result_schema = self.schema_cache.validate_entity(entity_type, data)
+            if not validation_result_schema:
+                raise VaultError(f"Schema validation failed: {'; '.join(validation_result_schema.errors)}")
 
         # Enforce folder contracts (ADR-007)
         contract_violations = self._enforce_folder_contracts(entity_type, data)
@@ -378,11 +392,19 @@ class HostAPI:
 
         new_content = content if content is not None else entity.content
 
-        # Validate updates
+        # Phase 1, Point 5: Domain validation before write
+        validation_result = validate_entity(entity.entity_type, new_metadata)
+        if not validation_result.valid:
+            raise ValidationError(
+                f"Entity validation failed for {entity.entity_type} '{entity_id}'",
+                errors=validation_result.errors,
+            )
+
+        # Validate updates (legacy)
         if self.schema_cache:
-            validation_result = self.schema_cache.validate_entity(entity.entity_type, new_metadata)
-            if not validation_result:
-                raise VaultError(f"Schema validation failed: {'; '.join(validation_result.errors)}")
+            validation_result_schema = self.schema_cache.validate_entity(entity.entity_type, new_metadata)
+            if not validation_result_schema:
+                raise VaultError(f"Schema validation failed: {'; '.join(validation_result_schema.errors)}")
 
         # Update entity
         entity.metadata = new_metadata
