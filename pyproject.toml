@@ -24,7 +24,14 @@ httpx = { version = ">=0.23.1,<0.28.0", optional = true }
 [tool.poetry.extras]
 telegram = ["python-telegram-bot", "httpx"]
 gcal = ["google-auth", "google-auth-oauthlib", "google-api-python-client"]
-all = ["python-telegram-bot", "google-auth", "google-auth-oauthlib", "google-api-python-client", "croniter", "httpx"]
+all = [
+  "python-telegram-bot",
+  "google-auth",
+  "google-auth-oauthlib",
+  "google-api-python-client",
+  "croniter",
+  "httpx",
+]
 
 [tool.poetry.scripts]
 kira = "kira.cli.__main__:main"
@@ -111,9 +118,9 @@ ignore = [
   "ANN201",
   "ANN202",
   "ANN204",
-  "B011",  # assert False
-  "B017",  # pytest.raises(Exception)
-  "B018",  # useless attribute access in tests
+  "B011",   # assert False
+  "B017",   # pytest.raises(Exception)
+  "B018",   # useless attribute access in tests
   "C901",
   "SIM102",
   "SIM117",
@@ -121,27 +128,27 @@ ignore = [
   "UP028",
 ] # use of assert, test methods
 "src/kira/cli/**/*.py" = [
-  "C901",  # CLI commands are naturally complex
-  "ANN001",  # Click decorators handle type annotations
-  "ANN201",  # Click commands return int
-  "ANN202",  # Private functions in CLI
-  "ARG001",  # CLI interface consistency (kira_ext, kira_validate)
+  "C901",   # CLI commands are naturally complex
+  "ANN001", # Click decorators handle type annotations
+  "ANN201", # Click commands return int
+  "ANN202", # Private functions in CLI
+  "ARG001", # CLI interface consistency (kira_ext, kira_validate)
 ] # CLI commands
 "src/kira/plugins/**/*.py" = [
-  "C901",  # Plugin logic can be complex
-  "ARG001",  # Plugin interface (inbox plugin)
+  "C901",   # Plugin logic can be complex
+  "ARG001", # Plugin interface (inbox plugin)
 ] # Plugins
-"src/kira/core/host.py" = ["C901"]  # Core complexity is architectural
-"src/kira/core/links.py" = ["C901", "E741", "ARG001"]  # Link graph complexity
-"src/kira/core/sandbox.py" = ["C901"]  # Sandbox complexity
-"src/kira/core/task_fsm.py" = ["C901"]  # FSM complexity
-"src/kira/core/telemetry.py" = ["C901"]  # Telemetry formatting
-"src/kira/core/yaml_serializer.py" = ["C901"]  # Serialization complexity
-"src/kira/core/idempotency.py" = ["ANN001"]  # Context manager protocol
-"src/kira/core/ordering.py" = ["ARG002"]  # Interface compliance
-"src/kira/migration/**/*.py" = ["C901"]  # Migration logic is complex
-"src/kira/observability/**/*.py" = ["ANN003"]  # Logging kwargs
-"src/kira/sync/ledger.py" = ["ANN001"]  # Context manager protocol
+"src/kira/core/host.py" = ["C901"] # Core complexity is architectural
+"src/kira/core/links.py" = ["C901", "E741", "ARG001"] # Link graph complexity
+"src/kira/core/sandbox.py" = ["C901"] # Sandbox complexity
+"src/kira/core/task_fsm.py" = ["C901"] # FSM complexity
+"src/kira/core/telemetry.py" = ["C901"] # Telemetry formatting
+"src/kira/core/yaml_serializer.py" = ["C901"] # Serialization complexity
+"src/kira/core/idempotency.py" = ["ANN001"] # Context manager protocol
+"src/kira/core/ordering.py" = ["ARG002"] # Interface compliance
+"src/kira/migration/**/*.py" = ["C901"] # Migration logic is complex
+"src/kira/observability/**/*.py" = ["ANN003"] # Logging kwargs
+"src/kira/sync/ledger.py" = ["ANN001"] # Context manager protocol
 
 [tool.ruff.format]
 quote-style = "double"
@@ -181,7 +188,21 @@ module = "kira.observability.*"
 ignore_errors = true
 
 [[tool.mypy.overrides]]
-module = ["kira.config.settings", "kira.sync.ledger", "kira.core.telemetry", "kira.core.quarantine", "kira.core.idempotency", "kira.core.ordering", "kira.core.yaml_serializer", "kira.core.task_fsm", "kira.core.event_envelope", "kira.core.config", "kira.core.ingress", "kira.migration.migrator", "kira.maintenance.backup"]
+module = [
+  "kira.config.settings",
+  "kira.sync.ledger",
+  "kira.core.telemetry",
+  "kira.core.quarantine",
+  "kira.core.idempotency",
+  "kira.core.ordering",
+  "kira.core.yaml_serializer",
+  "kira.core.task_fsm",
+  "kira.core.event_envelope",
+  "kira.core.config",
+  "kira.core.ingress",
+  "kira.migration.migrator",
+  "kira.maintenance.backup",
+]
 ignore_errors = true
 
 [[tool.mypy.overrides]]
@@ -194,7 +215,7 @@ python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
 markers = [
-    "integration: marks tests as integration tests (deselect with '-m \"not integration\"')",
-    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+  "integration: marks tests as integration tests (deselect with '-m \"not integration\"')",
+  "slow: marks tests as slow (deselect with '-m \"not slow\"')",
 ]
 addopts = "-ra --strict-markers"

@@ -207,31 +207,42 @@ class TestPluginProcess:
 class TestSandboxIntegration:
     """Integration tests for sandbox (mocked subprocess)."""
 
-    @pytest.mark.skip(reason="Launch behavior changed - needs update to match new implementation")
     def test_launch_requires_valid_policy(self, tmp_path):
-        """Test launching requires valid policy."""
+        """Test launching requires valid policy and working entry point."""
         sandbox = Sandbox()
 
         plugin_path = tmp_path / "test-plugin"
         plugin_path.mkdir()
-        (plugin_path / "src").mkdir()
+        src_path = plugin_path / "src"
+        src_path.mkdir()
+
+        # Create a minimal plugin module
+        module_path = src_path / "test_module.py"
+        module_path.write_text("""
+def activate(context):
+    return {"status": "ok", "message": "Test plugin activated"}
+""")
 
         manifest = {
             "name": "test-plugin",
             "permissions": [],
-            "entry": "module:activate",
+            "entry": "test_module:activate",
         }
         policy = Policy.from_manifest(manifest)
 
-        # This will fail because the module doesn't exist, but we're testing
-        # that it gets to the subprocess launch stage
-        with pytest.raises(SandboxError):
-            sandbox.launch(
-                plugin_name="test",
-                entry_point="module:activate",
-                plugin_path=plugin_path,
-                policy=policy,
-            )
+        # Launch should succeed with valid policy and entry point
+        process = sandbox.launch(
+            plugin_name="test",
+            entry_point="test_module:activate",
+            plugin_path=plugin_path,
+            policy=policy,
+        )
+
+        # Process should be running
+        assert process.is_alive()
+
+        # Clean up
+        sandbox.stop("test")
 
 
 class TestSandboxADR004Compliance:
