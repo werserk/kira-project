@@ -93,13 +93,19 @@ poetry install --extras telegram
 
 ```yaml
 # В kira.yaml
-adapters:
-  telegram:
-    enabled: true
-    
 plugins:
   enabled:
     - kira-inbox
+    - kira-calendar
+    - kira-deadlines
+
+adapters:
+  telegram:
+    enabled: true
+    mode: "bot"
+  
+  gcal:
+    enabled: true
 ```
 
 ### 5. Тест

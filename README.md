@@ -351,7 +351,9 @@ Please ensure:
 ### Personal Task Management
 ```bash
 kira vault new --type task --title "Buy groceries"
-kira vault new --type task --title "Write report" --status doing
+kira task add "Write report"
+kira task start <task-id>
+kira task done <task-id>
 kira rollup daily
 ```
 
