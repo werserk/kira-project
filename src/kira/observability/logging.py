@@ -120,8 +120,8 @@ class StructuredLogger:
         self._logger = logging.getLogger(name)
         self._logger.setLevel(getattr(logging, self.level))
 
-        # Console handler (JSON)
-        console_handler = logging.StreamHandler(sys.stdout)
+        # Console handler (JSON) - write to stderr to avoid mixing with CLI JSON output on stdout
+        console_handler = logging.StreamHandler(sys.stderr)
         console_handler.setFormatter(logging.Formatter("%(message)s"))
         self._logger.addHandler(console_handler)
 
