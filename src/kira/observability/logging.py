@@ -54,6 +54,8 @@ class LogEntry:
         Entity UID (if applicable)
     event_id : str | None
         Event ID (if applicable)
+    trace_id : str | None
+        Trace ID from CLI or pipeline (for full chain correlation)
     source : str | None
         Source of event
     metadata : dict[str, Any]
@@ -67,6 +69,7 @@ class LogEntry:
     correlation_id: str | None = None
     entity_id: str | None = None
     event_id: str | None = None
+    trace_id: str | None = None
     source: str | None = None
     metadata: dict[str, Any] = field(default_factory=dict)
 
@@ -138,6 +141,7 @@ class StructuredLogger:
         correlation_id: str | None = None,
         entity_id: str | None = None,
         event_id: str | None = None,
+        trace_id: str | None = None,
         source: str | None = None,
         metadata: dict[str, Any] | None = None,
     ) -> None:
@@ -157,6 +161,8 @@ class StructuredLogger:
             Entity UID
         event_id
             Event ID
+        trace_id
+            Trace ID from CLI or pipeline (for full chain correlation)
         source
             Source of event
         metadata
@@ -170,6 +176,7 @@ class StructuredLogger:
             correlation_id=correlation_id,
             entity_id=entity_id,
             event_id=event_id,
+            trace_id=trace_id,
             source=source,
             metadata=metadata or {},
         )

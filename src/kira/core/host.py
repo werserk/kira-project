@@ -272,14 +272,32 @@ class HostAPI:
         # Invalid entities never touch disk
         validation_result = validate_entity(entity_type, data)
         if not validation_result.valid:
+            # Phase 5, Point 17: Log validation failure (import locally to avoid circular dependency)
+            from ..observability.logging import log_quarantine, log_validation_failure
+            
+            log_validation_failure(
+                entity_id=entity_id,
+                entity_type=entity_type,
+                errors=validation_result.errors,
+                metadata={"data": data},
+            )
+            
             # Phase 1, Point 6: Quarantine invalid entities
             quarantine_dir = self.vault_path / "artifacts" / "quarantine"
-            quarantine_invalid_entity(
+            quarantine_path = quarantine_invalid_entity(
                 entity_type=entity_type,
                 payload=data,
                 errors=validation_result.errors,
                 reason=f"Validation failed for {entity_type}",
                 quarantine_dir=quarantine_dir,
+            )
+            
+            # Phase 5, Point 17: Log quarantine
+            log_quarantine(
+                entity_id=entity_id,
+                reason=f"Validation failed: {'; '.join(validation_result.errors)}",
+                quarantine_path=quarantine_path,
+                metadata={"errors": validation_result.errors},
             )
 
             raise ValidationError(
@@ -297,6 +315,15 @@ class HostAPI:
         contract_violations = self._enforce_folder_contracts(entity_type, data)
         if contract_violations:
             raise VaultError(f"Folder contract violations: {'; '.join(contract_violations)}")
+
+        # Phase 5, Point 17: Log validation success (import locally to avoid circular dependency)
+        from ..observability.logging import log_upsert, log_validation_success
+        
+        log_validation_success(
+            entity_id=entity_id,
+            entity_type=entity_type,
+            metadata={"operation": "create"},
+        )
 
         # Create entity
         entity = Entity(
@@ -334,7 +361,15 @@ class HostAPI:
                 },
             )
 
-        # Log operation
+        # Phase 5, Point 17: Log upsert (already imported above)
+        log_upsert(
+            entity_id=entity_id,
+            entity_type=entity_type,
+            operation="create",
+            metadata={"path": str(file_path)},
+        )
+
+        # Legacy logging (kept for backward compatibility)
         if self.logger:
             self.logger.info(
                 f"Entity created: {entity_id}",

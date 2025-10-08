@@ -111,9 +111,32 @@ class Settings:
         if self.log_file and isinstance(self.log_file, str):
             self.log_file = Path(self.log_file)
 
-        # Validate required fields
+        # Validate required fields (Phase 5, Point 18: clear error messages)
         if not self.vault_path:
-            raise ConfigError("vault_path is required")
+            raise ConfigError(
+                "KIRA_VAULT_PATH is required. "
+                "Set it in .env or environment (e.g., KIRA_VAULT_PATH=vault)"
+            )
+        
+        # Validate feature flag dependencies (Phase 5, Point 18)
+        if self.gcal_enabled:
+            if not self.gcal_calendar_id:
+                raise ConfigError(
+                    "KIRA_GCAL_CALENDAR_ID is required when KIRA_GCAL_ENABLED=true. "
+                    "Please set your Google Calendar ID in .env"
+                )
+            if not self.gcal_credentials_file:
+                raise ConfigError(
+                    "KIRA_GCAL_CREDENTIALS_FILE is required when KIRA_GCAL_ENABLED=true. "
+                    "Please provide path to GCal credentials JSON in .env"
+                )
+        
+        if self.telegram_enabled:
+            if not self.telegram_bot_token:
+                raise ConfigError(
+                    "KIRA_TELEGRAM_BOT_TOKEN is required when KIRA_TELEGRAM_ENABLED=true. "
+                    "Get a bot token from @BotFather and set it in .env"
+                )
 
     @classmethod
     def from_env(cls, env_file: Path | str | None = None) -> Settings:
@@ -146,11 +169,18 @@ class Settings:
         if env_file.exists():
             load_env_file(env_file)
 
-        # Load settings from environment
+        # Load settings from environment (Phase 5, Point 18: clear error messages)
         try:
             vault_path = os.environ.get("KIRA_VAULT_PATH")
             if not vault_path:
-                raise ConfigError("KIRA_VAULT_PATH is required. " "Set it in .env or environment.")
+                raise ConfigError(
+                    "KIRA_VAULT_PATH is required.\n\n"
+                    "Quick fix:\n"
+                    "  1. Copy config/env.example to .env\n"
+                    "  2. Set KIRA_VAULT_PATH=vault in .env\n"
+                    "  3. Run your command again\n\n"
+                    "Or set it in environment: export KIRA_VAULT_PATH=vault"
+                )
 
             # Parse settings
             return cls(
