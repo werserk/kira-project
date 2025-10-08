@@ -1,69 +1,8 @@
-"""Unit tests for RAG and memory components."""
-
-from pathlib import Path
+"""Unit tests for conversation memory management."""
 
 import pytest
 
 from kira.agent.memory import ConversationMemory, ConversationTurn
-from kira.agent.rag import Document, RAGStore, SearchResult
-
-
-class TestRAGStore:
-    """Tests for RAG store."""
-
-    def test_add_and_search_documents(self, tmp_path):
-        """Test adding and searching documents."""
-        index_path = tmp_path / "test_index.json"
-        rag = RAGStore(index_path)
-
-        # Add documents
-        doc1 = Document(
-            id="doc1",
-            content="How to create tasks in Kira",
-            metadata={"type": "help"},
-        )
-        doc2 = Document(
-            id="doc2",
-            content="Understanding task status workflow",
-            metadata={"type": "help"},
-        )
-
-        rag.add_document(doc1)
-        rag.add_document(doc2)
-
-        # Search
-        results = rag.search("create task", top_k=2)
-
-        assert len(results) > 0
-        assert all(isinstance(r, SearchResult) for r in results)
-
-    def test_persistence(self, tmp_path):
-        """Test index persistence."""
-        index_path = tmp_path / "test_index.json"
-
-        # Create and populate
-        rag1 = RAGStore(index_path)
-        doc = Document(id="test", content="Test content", metadata={})
-        rag1.add_document(doc)
-
-        # Load in new instance
-        rag2 = RAGStore(index_path)
-        results = rag2.search("test", top_k=1)
-
-        assert len(results) > 0
-        assert results[0].document.id == "test"
-
-    def test_clear(self, tmp_path):
-        """Test clearing index."""
-        index_path = tmp_path / "test_index.json"
-        rag = RAGStore(index_path)
-
-        doc = Document(id="test", content="Test", metadata={})
-        rag.add_document(doc)
-        assert len(rag.documents) == 1
-
-        rag.clear()
-        assert len(rag.documents) == 0
 
 
 class TestConversationMemory:
@@ -120,3 +59,41 @@ class TestConversationMemory:
 
         assert messages1[0].content == "Message1"
         assert messages2[0].content == "Message2"
+
+    def test_empty_memory(self):
+        """Test behavior with no stored context."""
+        memory = ConversationMemory()
+
+        assert not memory.has_context("nonexistent")
+        messages = memory.get_context_messages("nonexistent")
+        assert len(messages) == 0
+
+    def test_multiple_turns_same_session(self):
+        """Test multiple conversation turns in same session."""
+        memory = ConversationMemory(max_exchanges=5)
+
+        memory.add_turn("session1", "Question 1", "Answer 1")
+        memory.add_turn("session1", "Question 2", "Answer 2")
+        memory.add_turn("session1", "Question 3", "Answer 3")
+
+        messages = memory.get_context_messages("session1")
+
+        # Should have 6 messages (3 exchanges)
+        assert len(messages) == 6
+        assert messages[0].role == "user"
+        assert messages[1].role == "assistant"
+
+    def test_context_overflow(self):
+        """Test that oldest exchanges are dropped when limit exceeded."""
+        memory = ConversationMemory(max_exchanges=2)
+
+        memory.add_turn("trace1", "First question", "First answer")
+        memory.add_turn("trace1", "Second question", "Second answer")
+        memory.add_turn("trace1", "Third question", "Third answer")
+
+        messages = memory.get_context_messages("trace1")
+
+        # Should only have 2 most recent exchanges
+        assert len(messages) == 4
+        assert "First" not in messages[0].content
+        assert "Second" in messages[0].content or "Third" in messages[0].content
