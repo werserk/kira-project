@@ -2,6 +2,8 @@
 
 Provides atomic read/write operations for Markdown files with
 structured frontmatter metadata.
+
+Phase 0, Point 2: Uses deterministic YAML serialization for consistency.
 """
 
 from __future__ import annotations
@@ -13,6 +15,8 @@ from pathlib import Path
 from typing import Any
 
 import yaml  # type: ignore[import-untyped]
+
+from .yaml_serializer import parse_frontmatter, serialize_frontmatter
 
 __all__ = [
     "MarkdownDocument",
@@ -90,6 +94,11 @@ class MarkdownDocument:
 
     def to_markdown_string(self) -> str:
         """Convert to full Markdown string with frontmatter.
+        
+        Uses deterministic serialization (Phase 0, Point 2) with:
+        - Fixed key ordering
+        - ISO-8601 UTC timestamps
+        - Consistent formatting
 
         Returns
         -------
@@ -99,13 +108,8 @@ class MarkdownDocument:
         if not self.frontmatter:
             return self.content
 
-        # Serialize frontmatter to YAML
-        frontmatter_yaml = yaml.dump(
-            self.frontmatter,
-            default_flow_style=False,
-            allow_unicode=True,
-            sort_keys=False,
-        ).rstrip()
+        # Serialize frontmatter using deterministic serializer (Phase 0, Point 2)
+        frontmatter_yaml = serialize_frontmatter(self.frontmatter)
 
         # Assemble document
         parts = ["---", frontmatter_yaml, "---"]
@@ -153,18 +157,14 @@ def parse_markdown(content: str) -> MarkdownDocument:
         frontmatter_raw = parts[1].strip()
         markdown_content = parts[2].lstrip("\n") if len(parts) > 2 else ""
 
-        # Parse YAML frontmatter
+        # Parse YAML frontmatter using deterministic parser (Phase 0, Point 2)
         if frontmatter_raw:
             try:
-                frontmatter = yaml.safe_load(frontmatter_raw) or {}
-            except yaml.YAMLError as exc:
-                raise MarkdownIOError(f"Invalid YAML frontmatter: {exc}") from exc
+                frontmatter = parse_frontmatter(frontmatter_raw)
+            except ValueError as exc:
+                raise MarkdownIOError(str(exc)) from exc
         else:
             frontmatter = {}
-
-        # Ensure frontmatter is dict
-        if not isinstance(frontmatter, dict):
-            raise MarkdownIOError(f"Frontmatter must be dictionary, got: {type(frontmatter)}")
 
         return MarkdownDocument(frontmatter=frontmatter, content=markdown_content)
 

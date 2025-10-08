@@ -77,9 +77,57 @@ Run this command to check for violations:
 grep -r "open(.*'w" src/kira/cli/ src/kira/plugins/
 ```
 
-## Point 2: Strict YAML Front-matter Schema - STATUS: In Progress
+## Point 2: Strict YAML Front-matter Schema - STATUS: Complete
 
-TODO: Document after implementation
+### What's Done
+
+- ✅ Created `src/kira/core/yaml_serializer.py` with:
+  - `serialize_frontmatter()` - deterministic YAML serialization
+  - `parse_frontmatter()` - parse YAML with validation
+  - `normalize_timestamps_to_utc()` - ensure all timestamps are UTC
+  - `get_canonical_key_order()` - fixed key ordering for consistency
+  - `validate_strict_schema()` - enforce required fields
+
+- ✅ Deterministic serialization features:
+  - Fixed key ordering per `CANONICAL_KEY_ORDER`
+  - ISO-8601 UTC timestamps enforced
+  - Consistent quoting and formatting
+  - Round-trip guarantee: serialize → parse → serialize = identical output
+
+- ✅ Required schema keys enforced:
+  - `uid` (or `id`)
+  - `title`
+  - `created_ts` (or `created`)
+  - `updated_ts` (or `updated`)  
+  - `state` (or `status` for tasks)
+  - `tags[]` (must be list)
+
+- ✅ Optional schema keys supported:
+  - `due_ts`, `due_date`
+  - `links[]`, `relates_to[]`, `depends_on[]`
+  - `x-kira{}` (sync metadata for Phase 4)
+  - Custom fields appear alphabetically after canonical fields
+
+- ✅ Integrated with `md_io.py`:
+  - `MarkdownDocument.to_markdown_string()` uses deterministic serializer
+  - `parse_markdown()` uses deterministic parser
+  - All vault operations now produce consistent YAML
+
+- ✅ Comprehensive tests in `tests/unit/test_yaml_serializer.py`:
+  - 17 tests covering deterministic serialization
+  - Round-trip tests for Task, Note, Event entities
+  - Special character handling
+  - Nested dict support (x-kira metadata)
+  - Timestamp normalization
+  - Schema validation
+
+### DoD Status
+
+✅ Strict schema defined with required keys  
+✅ Deterministic serialization (key order, quoting, ISO-8601 UTC)  
+✅ Round-trip tests pass: serialize→parse→serialize yields identical output  
+✅ Integration with existing Vault operations  
+✅ All 26 tests passing (vault storage + YAML serializer)
 
 ## Point 3: UTC Time Discipline - STATUS: Pending
 
