@@ -313,10 +313,19 @@ def find_incoming_links(vault_path: Path, target_id: str) -> list[Path]:
 
 
 def add_link_to_file(file_path: Path, target_id: str, target_title: str) -> None:
-    """Добавить ссылку в конец файла."""
-    with open(file_path, "r", encoding="utf-8") as f:
-        content = f.read()
-
+    """Добавить ссылку в конец файла (Phase 0, Point 2: Single Writer).
+    
+    Uses HostAPI to route all mutations through vault.py.
+    No direct file writes allowed.
+    """
+    # Read using markdown I/O
+    from ..core.md_io import read_markdown
+    from ..core.host import create_host_api
+    from ..core.config import load_config
+    
+    doc = read_markdown(file_path)
+    content = doc.content
+    
     # Проверить, есть ли уже эта ссылка
     if f"[[{target_id}]]" in content:
         return
@@ -328,9 +337,18 @@ def add_link_to_file(file_path: Path, target_id: str, target_title: str) -> None
     # Добавить ссылку
     link_text = f"- [[{target_id}]] - {target_title}\n"
     content += link_text
-
-    with open(file_path, "w", encoding="utf-8") as f:
-        f.write(content)
+    
+    # Use HostAPI for single writer pattern (Phase 0, Point 2)
+    entity_id = doc.get_metadata("id")
+    if not entity_id:
+        raise ValueError("File missing 'id' field")
+    
+    config = load_config()
+    vault_path = Path(config.get("vault", {}).get("path", "vault"))
+    host_api = create_host_api(vault_path)
+    
+    # Update through single writer with new content
+    host_api.update_entity(entity_id, {}, content=content)
 
 
 def build_graph(vault_path: Path, entity_id: str, depth: int, visited: set) -> dict:

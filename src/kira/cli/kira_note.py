@@ -228,17 +228,18 @@ def tag_command(note_id: str, tags: tuple[str, ...], remove: bool, verbose: bool
             current_tags |= set(tags)
             action = "добавлены"
 
-        metadata["tags"] = sorted(current_tags)
-        metadata["updated"] = datetime.now(timezone.utc).isoformat()
-
-        # Сохранить
-        new_content = f"---\n{yaml.dump(metadata, allow_unicode=True, default_flow_style=False)}---{parts[2]}"
-        with open(note_path, "w", encoding="utf-8") as f:
-            f.write(new_content)
+        # Use HostAPI for single writer pattern (Phase 0, Point 2)
+        entity_id = metadata.get("id")
+        if not entity_id:
+            click.echo("❌ Заметка не имеет ID")
+            return 1
+        
+        host_api = create_host_api(vault_path)
+        host_api.update_entity(entity_id, {"tags": sorted(current_tags)})
 
         click.echo(f"✅ Теги {action}: {', '.join(tags)}")
         if verbose:
-            click.echo(f"📝 Все теги: {', '.join(metadata['tags'])}")
+            click.echo(f"📝 Все теги: {', '.join(sorted(current_tags))}")
 
         return 0
 

@@ -29,23 +29,31 @@ class ConfigError(Exception):
 
 @dataclass
 class Settings:
-    """Centralized settings for Kira (Phase 5, Point 18).
+    """Centralized settings for Kira (Phase 0 + Phase 5, Point 18).
     
     All configuration in one place:
+    - Mode (alpha/beta/stable)
     - Vault path
     - Default timezone
+    - Feature flags (GCal, Telegram, Plugins)
     - GCal sync parameters
     - Sandbox limits
     - Logging config
     
     Attributes
     ----------
+    mode : str
+        Runtime mode: alpha, beta, or stable (Phase 0, Point 1)
     vault_path : Path
         Path to vault directory (required)
     default_timezone : str
         Default timezone (default: UTC)
-    gcal_enabled : bool
-        Enable Google Calendar sync
+    enable_gcal : bool
+        Enable Google Calendar sync (Phase 0, Point 1: default false)
+    enable_telegram : bool
+        Enable Telegram adapter (Phase 0, Point 1: default false)
+    enable_plugins : bool
+        Enable plugin system (Phase 0, Point 1: default false)
     gcal_calendar_id : str | None
         GCal calendar ID
     gcal_sync_interval_minutes : int
@@ -62,12 +70,19 @@ class Settings:
         Log file path
     """
     
+    # Phase 0, Point 1: Runtime mode
+    mode: str = "alpha"
+    
     # Core settings
     vault_path: Path
     default_timezone: str = "UTC"
     
+    # Phase 0, Point 1: Feature flags (integrations off by default)
+    enable_gcal: bool = False
+    enable_telegram: bool = False
+    enable_plugins: bool = False
+    
     # Google Calendar sync
-    gcal_enabled: bool = False
     gcal_calendar_id: str | None = None
     gcal_sync_interval_minutes: int = 15
     gcal_credentials_file: str | None = None
@@ -82,7 +97,6 @@ class Settings:
     log_file: Path | None = None
     
     # Telegram (optional)
-    telegram_enabled: bool = False
     telegram_bot_token: str | None = None
     telegram_allowed_users: list[int] = field(default_factory=list)
     
@@ -142,11 +156,18 @@ class Settings:
             
             # Parse settings
             settings = cls(
+                # Phase 0, Point 1: Runtime mode (defaults to alpha)
+                mode=os.environ.get("KIRA_MODE", "alpha"),
+                
                 vault_path=Path(vault_path),
                 default_timezone=os.environ.get("KIRA_DEFAULT_TZ", "UTC"),
                 
+                # Phase 0, Point 1: Feature flags (off by default)
+                enable_gcal=os.environ.get("KIRA_ENABLE_GCAL", "false").lower() == "true",
+                enable_telegram=os.environ.get("KIRA_ENABLE_TELEGRAM", "false").lower() == "true",
+                enable_plugins=os.environ.get("KIRA_ENABLE_PLUGINS", "false").lower() == "true",
+                
                 # GCal
-                gcal_enabled=os.environ.get("KIRA_GCAL_ENABLED", "false").lower() == "true",
                 gcal_calendar_id=os.environ.get("KIRA_GCAL_CALENDAR_ID"),
                 gcal_sync_interval_minutes=int(os.environ.get("KIRA_GCAL_SYNC_INTERVAL", "15")),
                 gcal_credentials_file=os.environ.get("KIRA_GCAL_CREDENTIALS_FILE"),
@@ -161,7 +182,6 @@ class Settings:
                 log_file=Path(os.environ["KIRA_LOG_FILE"]) if "KIRA_LOG_FILE" in os.environ else None,
                 
                 # Telegram
-                telegram_enabled=os.environ.get("KIRA_TELEGRAM_ENABLED", "false").lower() == "true",
                 telegram_bot_token=os.environ.get("KIRA_TELEGRAM_BOT_TOKEN"),
                 telegram_allowed_users=parse_int_list(os.environ.get("KIRA_TELEGRAM_ALLOWED_USERS", "")),
             )
@@ -278,7 +298,7 @@ def get_settings() -> Settings:
 
 
 def generate_example_env(output_path: Path | None = None) -> str:
-    """Generate example .env file with all settings.
+    """Generate example .env file with all settings (Phase 0, Point 1).
     
     Parameters
     ----------
@@ -290,37 +310,57 @@ def generate_example_env(output_path: Path | None = None) -> str:
     str
         Example .env contents
     """
-    example = """# Kira Configuration (Phase 5, Point 18)
+    example = """# Kira Configuration (Phase 0 + Phase 5)
 # Copy this to .env and adjust values
+# DoD: Kira bootstraps with a single .env; integrations are off by default
+
+# ====================
+# Phase 0: Runtime Mode & Feature Flags
+# ====================
+
+# Runtime mode (optional, default: alpha)
+# Options: alpha, beta, stable
+KIRA_MODE=alpha
 
 # ====================
 # Core Settings
 # ====================
 
 # Path to vault directory (required)
-KIRA_VAULT_PATH=/home/user/vault
+KIRA_VAULT_PATH=vault
 
 # Default timezone (optional, default: UTC)
-KIRA_DEFAULT_TZ=America/New_York
+# Examples: UTC, America/New_York, Europe/Brussels
+KIRA_DEFAULT_TZ=Europe/Brussels
 
 # ====================
-# Google Calendar Sync
+# Phase 0: Feature Flags (ALL OFF BY DEFAULT)
 # ====================
 
-# Enable GCal sync (optional, default: false)
-KIRA_GCAL_ENABLED=false
+# Enable Google Calendar sync (optional, default: false)
+KIRA_ENABLE_GCAL=false
 
-# GCal calendar ID (required if GCAL_ENABLED=true)
+# Enable Telegram adapter (optional, default: false)
+KIRA_ENABLE_TELEGRAM=false
+
+# Enable plugin system (optional, default: false)
+KIRA_ENABLE_PLUGINS=false
+
+# ====================
+# Google Calendar Sync (requires KIRA_ENABLE_GCAL=true)
+# ====================
+
+# GCal calendar ID (required if ENABLE_GCAL=true)
 # KIRA_GCAL_CALENDAR_ID=your-calendar-id@group.calendar.google.com
 
 # Sync interval in minutes (optional, default: 15)
 KIRA_GCAL_SYNC_INTERVAL=15
 
-# Path to GCal credentials JSON (required if GCAL_ENABLED=true)
+# Path to GCal credentials JSON (required if ENABLE_GCAL=true)
 # KIRA_GCAL_CREDENTIALS_FILE=/home/user/.kira/gcal-credentials.json
 
 # ====================
-# Plugin Sandbox
+# Plugin Sandbox (requires KIRA_ENABLE_PLUGINS=true)
 # ====================
 
 # Max CPU time for plugins in seconds (optional, default: 30)
@@ -341,16 +381,13 @@ KIRA_SANDBOX_ALLOW_NETWORK=false
 KIRA_LOG_LEVEL=INFO
 
 # Log file path (optional, logs to console if not set)
-# KIRA_LOG_FILE=/home/user/vault/artifacts/kira.log
+# KIRA_LOG_FILE=logs/kira.log
 
 # ====================
-# Telegram Integration
+# Telegram Integration (requires KIRA_ENABLE_TELEGRAM=true)
 # ====================
 
-# Enable Telegram bot (optional, default: false)
-KIRA_TELEGRAM_ENABLED=false
-
-# Telegram bot token (required if TELEGRAM_ENABLED=true)
+# Telegram bot token (required if ENABLE_TELEGRAM=true)
 # KIRA_TELEGRAM_BOT_TOKEN=your-bot-token
 
 # Comma-separated list of allowed user IDs (optional)

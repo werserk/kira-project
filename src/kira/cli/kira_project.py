@@ -462,21 +462,29 @@ def find_project_tasks(vault_path: Path, project_id: str) -> list[dict]:
 
 
 def update_project_metadata(project_path: Path, updates: dict) -> None:
-    """Обновить метаданные проекта."""
-    with open(project_path, "r", encoding="utf-8") as f:
-        content = f.read()
-
-    parts = content.split("---", 2)
-    if len(parts) < 3:
-        raise ValueError("Invalid project file format")
-
-    metadata = yaml.safe_load(parts[1])
-    metadata.update(updates)
-
-    new_content = f"---\n{yaml.dump(metadata, allow_unicode=True, default_flow_style=False)}---{parts[2]}"
-
-    with open(project_path, "w", encoding="utf-8") as f:
-        f.write(new_content)
+    """Обновить метаданные проекта (Phase 0, Point 2: Single Writer).
+    
+    Uses HostAPI to route all mutations through vault.py.
+    No direct file writes allowed.
+    """
+    # Extract entity ID from file
+    from ..core.md_io import read_markdown
+    from ..core.host import create_host_api
+    from ..core.config import load_config
+    
+    doc = read_markdown(project_path)
+    entity_id = doc.get_metadata("id")
+    
+    if not entity_id:
+        raise ValueError("Project file missing 'id' field")
+    
+    # Use HostAPI for single writer pattern (Phase 0, Point 2)
+    config = load_config()
+    vault_path = Path(config.get("vault", {}).get("path", "vault"))
+    host_api = create_host_api(vault_path)
+    
+    # Update through single writer
+    host_api.update_entity(entity_id, updates)
 
 
 def main(args: list[str] | None = None) -> int:

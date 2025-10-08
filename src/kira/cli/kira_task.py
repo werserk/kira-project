@@ -650,21 +650,26 @@ def change_task_status(task_id: str, new_status: str, verbose: bool) -> int:
 
 
 def update_task_metadata(task_path: Path, updates: dict) -> None:
-    """Обновить метаданные задачи."""
-    with open(task_path, "r", encoding="utf-8") as f:
-        content = f.read()
-
-    parts = content.split("---", 2)
-    if len(parts) < 3:
-        raise ValueError("Invalid task file format")
-
-    metadata = yaml.safe_load(parts[1])
-    metadata.update(updates)
-
-    new_content = f"---\n{yaml.dump(metadata, allow_unicode=True, default_flow_style=False)}---{parts[2]}"
-
-    with open(task_path, "w", encoding="utf-8") as f:
-        f.write(new_content)
+    """Обновить метаданные задачи (Phase 0, Point 2: Single Writer).
+    
+    Uses HostAPI to route all mutations through vault.py.
+    No direct file writes allowed.
+    """
+    # Extract entity ID from file
+    from ..core.md_io import read_markdown
+    doc = read_markdown(task_path)
+    entity_id = doc.get_metadata("id")
+    
+    if not entity_id:
+        raise ValueError("Task file missing 'id' field")
+    
+    # Use HostAPI for single writer pattern (Phase 0, Point 2)
+    config = load_config()
+    vault_path = Path(config.get("vault", {}).get("path", "vault"))
+    host_api = create_host_api(vault_path)
+    
+    # Update through single writer
+    host_api.update_entity(entity_id, updates)
 
 
 def parse_date(date_str: str) -> datetime:

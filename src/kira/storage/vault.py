@@ -1,14 +1,26 @@
-"""Vault storage layer with atomic writes and file locking (Phase 0, Point 1).
+"""Vault storage layer with atomic writes and file locking (Phase 0, Point 2).
 
-This module implements the Single Writer pattern by providing a centralized
-storage layer with:
+SINGLE WRITER PATTERN (Phase 0 Definition of Done):
+====================================================
+This module implements the Single Writer pattern:
+- ALL vault entity mutations MUST go through this layer
+- NO direct `open(..., 'w')` allowed outside this module for vault entities
+- NO direct file.write_text() for vault entities outside this module
+- Route: CLI/Plugins/Adapters → HostAPI → vault.py → md_io.py
+
+Enforcement verified by: grep -r "open(.*'w'" src/kira/{cli,plugins,adapters}
+DoD: Zero offenders outside vault.py for entity writes.
+
+This module provides:
 - Per-entity file locking to prevent concurrent write conflicts
 - Atomic file writes (temp file + rename) for crash safety
 - Single interface for all Vault mutations
 - Integration with HostAPI for validation and event emission
 
-All mutations MUST go through this layer. No direct `open(..., 'w')` allowed
-outside this module.
+Acceptable file writes OUTSIDE this module:
+- System files (config, logs, quarantine, caches)
+- Report/artifact generation (validation reports, backups)
+- Plugin-specific storage (not vault entities)
 """
 
 from __future__ import annotations
