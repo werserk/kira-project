@@ -1,0 +1,49 @@
+# Kira Alpha - Docker Compose Configuration
+# For local development and alpha deployment
+
+services:
+  kira-agent:
+    build: .
+    image: kira-agent:latest
+    container_name: kira-agent
+    ports:
+      - "8000:8000"
+    environment:
+      - KIRA_VAULT_PATH=/app/vault
+      - KIRA_DEFAULT_TZ=UTC
+      - LLM_PROVIDER=${LLM_PROVIDER:-openrouter}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - ENABLE_OLLAMA_FALLBACK=true
+      - OLLAMA_BASE_URL=http://ollama:11434
+      - ENABLE_RAG=false
+      - ENABLE_CONVERSATION_MEMORY=true
+      - KIRA_LOG_LEVEL=INFO
+    volumes:
+      - ./vault:/app/vault
+      - ./artifacts:/app/artifacts
+      - ./logs:/app/logs
+      - ./.env:/app/.env:ro
+    depends_on:
+      - ollama
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import httpx; httpx.get('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: kira-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    restart: unless-stopped
+
+volumes:
+  ollama_data:
+    driver: local

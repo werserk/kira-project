@@ -1,0 +1,79 @@
+# Sandbox Security Policies for Kira Plugins
+# Controls resource limits and access permissions for sandboxed plugin execution
+
+# Default policy for all plugins
+default:
+  network:
+    enabled: false  # Block network access by default
+    allowed_hosts: []
+  
+  filesystem:
+    write_enabled: false  # Read-only by default
+    allowed_paths:
+      - "vault/"  # Can read vault
+    blocked_paths:
+      - ".env"  # Block sensitive files
+      - ".credentials/"
+      - ".secrets/"
+  
+  resources:
+    max_cpu_seconds: 30
+    max_memory_mb: 256
+    max_execution_time_seconds: 60
+  
+  capabilities:
+    - read
+
+# Policy for inbox plugin
+inbox:
+  network:
+    enabled: false
+  filesystem:
+    write_enabled: true  # Can write to inbox
+    allowed_paths:
+      - "vault/inbox/"
+      - "vault/processed/"
+  resources:
+    max_cpu_seconds: 20
+    max_memory_mb: 128
+    max_execution_time_seconds: 45
+  capabilities:
+    - read
+    - create
+
+# Policy for calendar plugin
+calendar:
+  network:
+    enabled: true  # Needs network for GCal sync
+    allowed_hosts:
+      - "www.googleapis.com"
+      - "accounts.google.com"
+  filesystem:
+    write_enabled: true
+    allowed_paths:
+      - "vault/events/"
+      - ".credentials/gcal_token.json"
+  resources:
+    max_cpu_seconds: 45
+    max_memory_mb: 256
+    max_execution_time_seconds: 90
+  capabilities:
+    - read
+    - create
+    - update
+
+# Policy for code indexer plugin
+code:
+  network:
+    enabled: false
+  filesystem:
+    write_enabled: false  # Read-only code scanning
+    allowed_paths:
+      - "src/"
+      - "tests/"
+  resources:
+    max_cpu_seconds: 60
+    max_memory_mb: 512
+    max_execution_time_seconds: 120
+  capabilities:
+    - read

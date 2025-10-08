@@ -1,0 +1,13 @@
+{
+  "allowed_capabilities": [
+    "read",
+    "create",
+    "update"
+  ],
+  "allowed_tools": null,
+  "require_confirmation": [
+    "task_delete",
+    "vault_export"
+  ],
+  "max_tool_calls_per_request": 10
+}
