@@ -9,14 +9,17 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
 import click
 
+from .kira_backup import cli as backup_cli
 from .kira_calendar import cli as calendar_cli
 from .kira_code import cli as code_cli
+from .kira_context import cli as context_cli
 from .kira_diag import diag_command
 from .kira_ext import cli as ext_cli
 from .kira_inbox import cli as inbox_cli
 from .kira_links import cli as links_cli
 from .kira_note import cli as note_cli
 from .kira_plugin_template import cli as plugin_cli
+from .kira_project import cli as project_cli
 from .kira_review import cli as review_cli
 from .kira_rollup import cli as rollup_cli
 from .kira_schedule import cli as schedule_cli
@@ -98,6 +101,7 @@ def validate_vault() -> int:
 cli.add_command(today_cli, "today")
 cli.add_command(task_cli, "task")
 cli.add_command(note_cli, "note")
+cli.add_command(project_cli, "project")
 cli.add_command(search_cli, "search")
 cli.add_command(inbox_cli, "inbox")
 cli.add_command(calendar_cli, "calendar")
@@ -105,11 +109,13 @@ cli.add_command(schedule_cli, "schedule")
 cli.add_command(rollup_cli, "rollup")
 cli.add_command(review_cli, "review")
 cli.add_command(stats_cli, "stats")
+cli.add_command(context_cli, "context")
 cli.add_command(links_cli, "links")
 cli.add_command(code_cli, "code")
 cli.add_command(ext_cli, "ext")
 cli.add_command(plugin_cli, "plugin")
 cli.add_command(vault_cli, "vault")
+cli.add_command(backup_cli, "backup")
 cli.add_command(diag_command, "diag")
 
 
