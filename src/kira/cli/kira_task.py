@@ -460,7 +460,11 @@ def load_tasks(tasks_dir: Path) -> list[dict]:
     def sort_key(task):
         status = task.get("status", "todo")
         status_order = {"doing": 0, "todo": 1, "review": 2, "blocked": 3, "done": 4}
-        return (status_order.get(status, 5), task.get("created", ""))
+        created = task.get("created", "")
+        # Ensure created is always a string for comparison
+        if hasattr(created, "isoformat"):
+            created = created.isoformat()
+        return (status_order.get(status, 5), str(created))
 
     tasks.sort(key=sort_key)
     return tasks

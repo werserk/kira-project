@@ -16,6 +16,7 @@ from pathlib import Path
 __all__ = [
     "ConfigError",
     "Settings",
+    "get_app_config",
     "get_settings",
     "load_settings",
 ]
@@ -383,3 +384,25 @@ KIRA_LOG_LEVEL=INFO
         output_path.write_text(example)
 
     return example
+
+
+def get_app_config() -> dict:
+    """Get application-level configuration (paths, directories, etc.).
+
+    Returns simple dict with non-secret application settings.
+    """
+    # Try to use vault path from settings if available
+    try:
+        settings = get_settings()
+        vault_path = settings.vault_path
+    except ConfigError:
+        # Fallback to env or default
+        vault_path = Path(os.environ.get("KIRA_VAULT_PATH", "vault"))
+
+    # Always use current working directory for artifacts
+    # This ensures consistent behavior in tests and production
+    return {
+        "vault_path": str(vault_path),
+        "artifacts_dir": "artifacts",  # Always relative to cwd
+        "log_dir": "logs",
+    }

@@ -453,17 +453,17 @@ class TestTelegramIntegration:
             "confidence": 0.6,
             "title": "Test",
         }
-        
+
         result = self.normalizer._queue_clarification(content, metadata)
         request_id = result["request_id"]
-        
+
         # Get the item from queue
         pending = self.normalizer._clarification_queue.get_pending()
         item = next(i for i in pending if i.clarification_id == request_id)
-        
+
         # Clear the mock to check new calls
         self.normalizer.context.events.publish.reset_mock()
-        
+
         # Request confirmation
         self.normalizer._request_telegram_confirmation(item)
 
