@@ -5,13 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from kira.agent.policies import (
-    AgentPolicy,
-    Capability,
-    PolicyManager,
-    PolicyViolationError,
-    TOOL_CAPABILITIES,
-)
+from kira.agent.policies import TOOL_CAPABILITIES, AgentPolicy, Capability, PolicyManager, PolicyViolationError
 
 
 class TestCapability:

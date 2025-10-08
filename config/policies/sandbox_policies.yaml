@@ -6,7 +6,7 @@ default:
   network:
     enabled: false  # Block network access by default
     allowed_hosts: []
-  
+
   filesystem:
     write_enabled: false  # Read-only by default
     allowed_paths:
@@ -15,12 +15,12 @@ default:
       - ".env"  # Block sensitive files
       - ".credentials/"
       - ".secrets/"
-  
+
   resources:
     max_cpu_seconds: 30
     max_memory_mb: 256
     max_execution_time_seconds: 60
-  
+
   capabilities:
     - read
 
