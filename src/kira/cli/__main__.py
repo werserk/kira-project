@@ -15,6 +15,7 @@ from .kira_calendar import cli as calendar_cli
 from .kira_code import cli as code_cli
 from .kira_context import cli as context_cli
 from .kira_diag import diag_command
+from .kira_doctor import doctor as doctor_command
 from .kira_ext import cli as ext_cli
 from .kira_inbox import cli as inbox_cli
 from .kira_links import cli as links_cli
@@ -127,6 +128,7 @@ cli.add_command(vault_cli, "vault")
 cli.add_command(backup_cli, "backup")
 cli.add_command(migrate_cli, "migrate")
 cli.add_command(diag_command, "diag")
+cli.add_command(doctor_command, "doctor")
 
 
 def main(args: list[str] | None = None) -> int:
