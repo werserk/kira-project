@@ -29,12 +29,7 @@ except ImportError:
 
 # Phase 2: Tool schemas and execution
 from .context_memory import ContextMemory, EntityFact, create_context_memory
-from .persistence import (
-    FileStatePersistence,
-    SQLiteStatePersistence,
-    StatePersistence,
-    create_persistence,
-)
+from .persistence import FileStatePersistence, SQLiteStatePersistence, StatePersistence, create_persistence
 from .rag_integration import RAGIntegration, create_rag_integration
 from .tool_executor import ToolExecutor, create_tool_executor
 from .tool_schemas import TOOL_SCHEMAS, validate_tool_args

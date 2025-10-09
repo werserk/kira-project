@@ -7,11 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from kira.agent.persistence import (
-    FileStatePersistence,
-    SQLiteStatePersistence,
-    create_persistence,
-)
+from kira.agent.persistence import FileStatePersistence, SQLiteStatePersistence, create_persistence
 from kira.agent.state import AgentState, Budget
 
 
