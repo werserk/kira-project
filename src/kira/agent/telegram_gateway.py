@@ -17,6 +17,7 @@ Use Cases:
 from __future__ import annotations
 
 import json
+import uuid
 from typing import Any
 
 try:
@@ -75,12 +76,13 @@ class TelegramGateway:
         if not text:
             return "Please send a text message."
 
-        # Use chat_id as trace_id for conversation continuity
-        trace_id = f"telegram-{chat_id}"
+        # Create consistent session_id format for conversation memory
+        session_id = f"telegram:{chat_id}"
+        trace_id = f"telegram-{chat_id}-{uuid.uuid4()}"
 
         try:
-            # Execute request
-            result = self.executor.chat_and_execute(text, trace_id=trace_id)
+            # Execute request with session_id for memory continuity
+            result = self.executor.chat_and_execute(text, trace_id=trace_id, session_id=session_id)
 
             # Check if result has natural language response (LangGraph)
             if hasattr(result, "response") and result.response:

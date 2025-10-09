@@ -111,15 +111,15 @@ class MessageHandler:
         """
         logger.debug(f"Formatting response: result type={type(result)}, has status={hasattr(result, 'status')}")
 
-        # Check if result has natural language response (LangGraph)
+        # Both executors now return .response field with natural language response
         if hasattr(result, "response"):
             # Use NL response if it's not empty
             if result.response and result.response.strip():
-                logger.info(f"Using natural language response from LangGraph: {result.response[:100]}...")
+                logger.info(f"Using natural language response: {result.response[:100]}...")
                 return result.response
             else:
-                logger.warning("LangGraph returned empty response, falling back to formatter")
-                # Continue to legacy formatter below
+                logger.warning("Empty response returned, falling back to formatter")
+                # Continue to fallback formatter below
 
         if not hasattr(result, "status"):
             logger.debug(f"Result without status, converting to string: {result}")
@@ -261,7 +261,7 @@ class MessageHandler:
 
 
 def create_message_handler(
-    executor: AgentExecutor,
+    executor: Any,  # AgentExecutor or UnifiedExecutor
     response_callback: Callable[[str, str, str], None] | None = None,
 ) -> MessageHandler:
     """Factory function to create message handler.
@@ -269,7 +269,7 @@ def create_message_handler(
     Parameters
     ----------
     executor
-        Agent executor
+        Agent executor (AgentExecutor or UnifiedExecutor)
     response_callback
         Optional callback for sending responses
 

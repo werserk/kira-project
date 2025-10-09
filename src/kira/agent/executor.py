@@ -51,6 +51,7 @@ class ExecutionResult:
     status: str  # "ok", "error", "partial"
     results: list[dict[str, Any]] = field(default_factory=list)
     error: str | None = None
+    response: str = ""  # Natural language response for user
     trace_id: str = field(default_factory=lambda: str(uuid.uuid4()))
     timestamp: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
 
@@ -59,6 +60,7 @@ class ExecutionResult:
         result: dict[str, Any] = {
             "status": self.status,
             "results": self.results,
+            "response": self.response,
             "trace_id": self.trace_id,
             "timestamp": self.timestamp,
         }
@@ -335,6 +337,84 @@ class AgentExecutor:
             trace_id=trace_id,
         )
 
+    def _generate_nl_response(self, user_request: str, result: ExecutionResult) -> str:
+        """Generate natural language response from execution result.
+
+        Parameters
+        ----------
+        user_request
+            Original user request
+        result
+            Execution result
+
+        Returns
+        -------
+        str
+            Natural language response
+        """
+        # Build context from execution results
+        context_parts = []
+
+        if result.results:
+            context_parts.append("EXECUTION RESULTS:")
+            for i, step_result in enumerate(result.results, 1):
+                tool_name = step_result.get("tool", "unknown")
+                status = step_result.get("status", "unknown")
+                data = step_result.get("data", {})
+                context_parts.append(f"{i}. Tool: {tool_name}")
+                context_parts.append(f"   Status: {status}")
+                if data:
+                    context_parts.append(f"   Data: {json.dumps(data, ensure_ascii=False)}")
+
+        if result.error:
+            context_parts.append(f"\nERROR: {result.error}")
+
+        context = "\n".join(context_parts)
+
+        # System prompt for friendly response generation
+        system_prompt = """Ты - Кира, дружелюбный и заботливый AI-ассистент. Общайся на "ты", тепло и по-человечески.
+
+ВАЖНО:
+- Обращайся на "ты" (не "вы")
+- Будь дружелюбной, теплой, ласковой и услужливой
+- НЕ используй эмодзи или смайлики - только текст
+- Отвечай кратко, но информативно
+- Если задача выполнена - радуйся вместе с пользователем
+- Если ошибка - объясни понятно и предложи решение
+- Говори на языке пользователя (русский/английский)
+- Не упоминай технические детали (названия инструментов, ID)
+- Будь как настоящий заботливый друг-помощник"""
+
+        user_prompt = f"""Пользователь спросил: "{user_request}"
+
+{context}
+
+Сгенерируй дружелюбный и естественный ответ на основе результатов выше. Помни - общайся на "ты" и будь теплой!"""
+
+        try:
+            messages = [
+                Message(role="system", content=system_prompt),
+                Message(role="user", content=user_prompt),
+            ]
+
+            response = self.llm_adapter.chat(
+                messages,
+                temperature=0.8,
+                max_tokens=500,
+                timeout=15.0,
+            )
+
+            nl_response = response.content.strip()
+            logger.info(f"Generated NL response: {nl_response[:100]}...")
+            return nl_response
+
+        except Exception as e:
+            logger.error(f"NL response generation failed: {e}", exc_info=True)
+            # Fallback to simple response
+            if result.error is None:
+                return "Хорошо, выполнено!"
+            return f"Произошла ошибка: {result.error}"
+
     def chat_and_execute(self, user_request: str, *, trace_id: str | None = None, session_id: str | None = None) -> ExecutionResult:
         """Full workflow: plan → execute.
 
@@ -343,31 +423,41 @@ class AgentExecutor:
         user_request
             Natural language request
         trace_id
-            Optional trace ID for memory context
+            Optional trace ID for request tracing
         session_id
-            Optional session ID (ignored by legacy executor, used by LangGraph)
+            Optional session ID for conversation memory (preferred over trace_id)
 
         Returns
         -------
         ExecutionResult
-            Execution result
+            Execution result with natural language response
         """
         if trace_id is None:
             trace_id = str(uuid.uuid4())
 
+        # Use session_id for memory if provided, otherwise fall back to trace_id
+        memory_key = session_id if session_id else trace_id
+
         try:
-            plan = self.plan(user_request, trace_id=trace_id)
+            # Get conversation history from memory
+            plan = self.plan(user_request, trace_id=memory_key)
             result = self.execute_plan(plan, trace_id=trace_id)
 
-            # Store in memory if successful
-            if result.status == "ok" and result.results:
-                assistant_message = f"Executed {len(result.results)} steps successfully"
-                self.memory.add_turn(trace_id, user_request, assistant_message)
+            # Generate natural language response
+            nl_response = self._generate_nl_response(user_request, result)
+            result.response = nl_response
+
+            # Store in memory
+            self.memory.add_turn(memory_key, user_request, nl_response)
 
             return result
         except Exception as e:
-            return ExecutionResult(
+            logger.error(f"Execution failed: {e}", exc_info=True)
+            error_result = ExecutionResult(
                 status="error",
                 error=str(e),
                 trace_id=trace_id,
             )
+            # Generate error response
+            error_result.response = self._generate_nl_response(user_request, error_result)
+            return error_result

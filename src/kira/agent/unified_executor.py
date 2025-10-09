@@ -71,26 +71,31 @@ class UnifiedExecutor:
         user_request
             User's natural language request
         trace_id
-            Optional trace ID for correlation
+            Optional trace ID for request correlation
         session_id
-            Optional session ID for conversation memory (same for all messages in a chat)
+            Optional session ID for conversation memory (preferred)
 
         Returns
         -------
         ExecutionResult
-            Execution result (format depends on executor type)
+            Execution result with .response field (both executors)
         """
         logger.debug(f"Executing via {self.executor_type}: {user_request[:100]}...")
 
-        if self.executor_type == ExecutorType.LANGGRAPH:
-            # LangGraphExecutor.execute() returns ExecutionResult
-            result = self.executor.execute(user_request, trace_id=trace_id, session_id=session_id)  # type: ignore[attr-defined]
+        # Ensure session_id exists for conversation continuity
+        if session_id is None:
+            import uuid
 
-            # Return the ExecutionResult directly (it has .response field)
-            # For LangGraph, the natural language response is in result.response
+            # Generate default session_id if not provided
+            session_id = f"default:{uuid.uuid4()}"
+            logger.debug(f"Generated default session_id: {session_id}")
+
+        if self.executor_type == ExecutorType.LANGGRAPH:
+            # LangGraphExecutor.execute() returns ExecutionResult with .response
+            result = self.executor.execute(user_request, trace_id=trace_id, session_id=session_id)  # type: ignore[attr-defined]
             return result
         else:
-            # Legacy AgentExecutor
+            # AgentExecutor now also returns ExecutionResult with .response
             return self.executor.chat_and_execute(user_request, trace_id=trace_id, session_id=session_id)
 
 
