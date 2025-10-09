@@ -9,13 +9,13 @@ from pathlib import Path
 
 import pytest
 
-from src.kira.adapters.llm import AnthropicAdapter
-from src.kira.agent.config import AgentConfig
-from src.kira.agent.executor import AgentExecutor, ExecutionResult
-from src.kira.agent.kira_tools import TaskCreateTool, TaskListTool
-from src.kira.agent.tools import ToolRegistry
-from src.kira.agent.unified_executor import ExecutorType, UnifiedExecutor
-from src.kira.core.host import create_host_api
+from kira.adapters.llm import AnthropicAdapter
+from kira.agent.config import AgentConfig
+from kira.agent.executor import AgentExecutor, ExecutionResult
+from kira.agent.kira_tools import TaskCreateTool, TaskListTool
+from kira.agent.tools import ToolRegistry
+from kira.agent.unified_executor import ExecutorType, UnifiedExecutor
+from kira.core.host import create_host_api
 
 
 @pytest.fixture
@@ -145,7 +145,7 @@ class TestMessageHandlerSimplification:
 
     def test_message_handler_uses_response_field(self):
         """Test that MessageHandler prefers .response over manual formatting."""
-        from src.kira.agent.message_handler import MessageHandler
+        from kira.agent.message_handler import MessageHandler
 
         # Create mock executor that returns .response
         class MockExecutor:
@@ -172,7 +172,7 @@ class TestTelegramGatewaySessionID:
 
     def test_telegram_gateway_creates_consistent_session_id(self):
         """Test that TelegramGateway creates consistent session_id format."""
-        from src.kira.agent.telegram_gateway import TelegramGateway
+        from kira.agent.telegram_gateway import TelegramGateway
 
         # Create mock executor to capture session_id
         captured_session_id = None
