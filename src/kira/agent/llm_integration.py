@@ -19,7 +19,7 @@ __all__ = ["create_langgraph_llm_adapter", "LangGraphLLMBridge"]
 
 class LangGraphLLMBridge:
     """Bridge between LangGraph and LLMRouter.
-    
+
     Wraps LLMRouter to provide LLMAdapter interface for LangGraph nodes.
     Ensures provider-agnostic operation with fallback support.
     """

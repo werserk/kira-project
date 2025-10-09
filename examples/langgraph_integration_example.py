@@ -13,22 +13,16 @@ import os
 from pathlib import Path
 
 # Phase 1-3 imports
-from kira.agent import (
-    # LangGraph
+from kira.agent import (  # LangGraph; LLM Integration - ключевой компонент!; Tools; Memory & RAG; Persistence; Safety & Observability
     LangGraphExecutor,
-    # LLM Integration - ключевой компонент!
-    create_langgraph_llm_adapter,
-    # Tools
-    create_tool_executor,
-    # Memory & RAG
-    create_context_memory,
-    create_rag_integration,
-    # Persistence
-    create_persistence,
-    # Safety & Observability
-    create_policy_enforcer,
     create_audit_logger,
+    create_context_memory,
+    create_langgraph_llm_adapter,
     create_metrics_collector,
+    create_persistence,
+    create_policy_enforcer,
+    create_rag_integration,
+    create_tool_executor,
 )
 from kira.core.host import create_host_api
 
