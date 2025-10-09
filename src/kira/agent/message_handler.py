@@ -109,6 +109,11 @@ class MessageHandler:
         """
         logger.debug(f"Formatting response: result type={type(result)}, has status={hasattr(result, 'status')}")
 
+        # Check if result has natural language response (LangGraph)
+        if hasattr(result, "response") and result.response:
+            logger.info("Using natural language response from LangGraph")
+            return result.response
+
         if not hasattr(result, "status"):
             logger.debug(f"Result without status, converting to string: {result}")
             return str(result)
