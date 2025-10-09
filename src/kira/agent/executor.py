@@ -202,6 +202,51 @@ class AgentExecutor:
 
         return self._parse_plan(response.content)
 
+    def _find_similar_tool(self, requested_tool: str) -> str | None:
+        """Try to find a similar tool name if exact match not found.
+        
+        Handles common mistakes like:
+        - create_task → task_create
+        - update_task → task_update
+        
+        Parameters
+        ----------
+        requested_tool
+            Tool name requested by LLM
+            
+        Returns
+        -------
+        str | None
+            Corrected tool name or None if no match found
+        """
+        available_tools = [t.name for t in self.tool_registry.list_tools()]
+        
+        # Check for reversed underscore patterns (create_task → task_create)
+        if "_" in requested_tool:
+            parts = requested_tool.split("_")
+            if len(parts) == 2:
+                reversed_name = f"{parts[1]}_{parts[0]}"
+                if reversed_name in available_tools:
+                    logger.warning(
+                        f"Tool '{requested_tool}' not found, but '{reversed_name}' exists. "
+                        "Auto-correcting tool name."
+                    )
+                    return reversed_name
+        
+        # Check for similar names (fuzzy match)
+        for tool_name in available_tools:
+            # Simple heuristic: same words but different order or format
+            requested_words = set(requested_tool.lower().replace("_", " ").split())
+            tool_words = set(tool_name.lower().replace("_", " ").split())
+            if requested_words == tool_words:
+                logger.warning(
+                    f"Tool '{requested_tool}' not found, but '{tool_name}' has same words. "
+                    "Auto-correcting tool name."
+                )
+                return tool_name
+        
+        return None
+    
     def execute_step(self, step: ExecutionStep, *, trace_id: str) -> ToolResult:
         """Execute a single step.
 
@@ -219,10 +264,21 @@ class AgentExecutor:
         """
         logger.debug(f"Executing step: tool={step.tool}, args={step.args}, dry_run={step.dry_run}")
         tool = self.tool_registry.get(step.tool)
+        
+        # Try to auto-correct if tool not found
+        if not tool:
+            corrected_name = self._find_similar_tool(step.tool)
+            if corrected_name:
+                logger.info(f"Auto-corrected '{step.tool}' to '{corrected_name}'")
+                step.tool = corrected_name
+                tool = self.tool_registry.get(corrected_name)
+        
         if not tool:
             available_tools = [t.name for t in self.tool_registry.list_tools()]
             logger.error(f"Tool '{step.tool}' not found. Available tools: {available_tools}")
-            return ToolResult.error(f"Tool not found: {step.tool}")
+            return ToolResult.error(
+                f"Tool not found: {step.tool}. Available tools: {', '.join(available_tools)}"
+            )
 
         try:
             logger.debug(f"Calling tool {step.tool}")

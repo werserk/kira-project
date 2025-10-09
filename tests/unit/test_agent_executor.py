@@ -211,9 +211,9 @@ class TestAgentExecutor:
 
     def test_plan_with_wrong_tool_name(self):
         """Test when LLM returns wrong tool name.
-
+        
         Bug scenario: LLM returns 'create_task' instead of 'task_create'.
-        Should fail gracefully with clear error message.
+        Should auto-correct and execute successfully.
         """
         # Mock LLM to return wrong tool name
         self.mock_llm.chat.return_value = LLMResponse(
@@ -228,15 +228,23 @@ class TestAgentExecutor:
             """
         )
 
+        # Register a real tool with correct name
+        mock_tool = Mock()
+        mock_tool.name = "task_create"
+        mock_tool.description = "Create task"
+        mock_tool.get_parameters.return_value = {}
+        mock_tool.execute.return_value = ToolResult.ok({"id": "task-123", "title": "Test"})
+
+        self.tool_registry.register(mock_tool)
+
         executor = AgentExecutor(self.mock_llm, self.tool_registry, self.config)
 
         result = executor.chat_and_execute("Create a test task")
 
-        # Should complete but with error for missing tool
-        assert result.status == "error"
+        # Should auto-correct and succeed
+        assert result.status == "ok", f"Expected ok but got: {result.error}, results: {result.results}"
         assert len(result.results) == 1
-        assert "Tool not found" in result.results[0]["error"]
-        assert "create_task" in result.results[0]["error"]
+        assert result.results[0]["status"] == "ok"
 
     def test_execute_with_rate_limit_error(self):
         """Test handling when LLM API returns rate limit error."""

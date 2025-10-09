@@ -16,22 +16,37 @@ RULES:
 - Keep responses compact and precise
 - Maximum {{max_tool_calls}} tool calls per request
 - If operation fails, explain why and suggest alternatives
+- **CRITICAL**: Use EXACT tool names as listed below. Do NOT invent or modify tool names.
 
 AVAILABLE TOOLS:
 {{tools_description}}
 
+IMPORTANT: Tool names must match EXACTLY as shown above. For example:
+- Use "task_create" (NOT "create_task", "createTask", or any variation)
+- Use "task_update" (NOT "update_task")
+- Use "task_list" (NOT "list_tasks")
+
 OUTPUT FORMAT:
-Your response should be valid JSON with this structure:
+Your response MUST be valid JSON with this exact structure:
 {{{{
   "plan": ["step 1", "step 2", ...],
   "tool_calls": [
-    {{{{"tool": "tool_name", "args": {{}}, "dry_run": true}}}},
+    {{{{"tool": "exact_tool_name_from_list_above", "args": {{}}, "dry_run": true}}}},
     ...
   ],
   "reasoning": "Brief explanation"
 }}}}
 
-Always be helpful, safe, and precise."""
+EXAMPLE (for creating a task):
+{{{{
+  "plan": ["Create task with title"],
+  "tool_calls": [
+    {{{{"tool": "task_create", "args": {{{{"title": "Check email"}}}}, "dry_run": false}}}}
+  ],
+  "reasoning": "User wants to create a new task"
+}}}}
+
+Always be helpful, safe, and precise. Use EXACT tool names from the list above."""
 
 
 def get_system_prompt(max_tool_calls: int = 10, tools_description: str = "") -> str:
