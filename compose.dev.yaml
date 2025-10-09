@@ -8,47 +8,110 @@ services:
       dockerfile: Dockerfile.dev
     image: kira-dev:latest
     container_name: kira-telegram-dev
+
+    # Default: Telegram bot with hot-reload
     command: python -m kira.cli telegram start --verbose
+
     environment:
+      # Python settings
       - PYTHONUNBUFFERED=1
       - PYTHONPATH=/app/src
+
+      # Core Kira settings
       - KIRA_VAULT_PATH=/app/vault
-      - KIRA_DEFAULT_TZ=UTC
-      - LLM_PROVIDER=${LLM_PROVIDER:-openrouter}
-      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
-      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
-      - ENABLE_OLLAMA_FALLBACK=true
+      - KIRA_DEFAULT_TZ=${KIRA_DEFAULT_TZ:-UTC}
+      - KIRA_LOG_LEVEL=${KIRA_LOG_LEVEL:-DEBUG}
+      - KIRA_EXECUTOR_TYPE=${KIRA_EXECUTOR_TYPE:-langgraph}
+
+      # LLM Provider (choose one)
+      - LLM_PROVIDER=${LLM_PROVIDER:-ollama}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+
+      # Ollama (local AI)
+      - ENABLE_OLLAMA_FALLBACK=${ENABLE_OLLAMA_FALLBACK:-true}
       - OLLAMA_BASE_URL=http://ollama:11434
-      - ENABLE_RAG=false
-      - ENABLE_CONVERSATION_MEMORY=true
-      - KIRA_LOG_LEVEL=DEBUG
-      - KIRA_EXECUTOR_TYPE=langgraph
+
+      # Telegram
+      - KIRA_TELEGRAM_ENABLED=${KIRA_TELEGRAM_ENABLED:-true}
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}
+      - TELEGRAM_ALLOWED_CHAT_IDS=${TELEGRAM_ALLOWED_CHAT_IDS:-}
+
+      # Google Calendar (optional)
+      - KIRA_GCAL_ENABLED=${KIRA_GCAL_ENABLED:-false}
+      - GCAL_CREDENTIALS_PATH=${GCAL_CREDENTIALS_PATH:-./credentials.json}
+
+      # Features
+      - ENABLE_RAG=${ENABLE_RAG:-false}
+      - ENABLE_CONVERSATION_MEMORY=${ENABLE_CONVERSATION_MEMORY:-true}
+      - KIRA_ENABLE_PLUGINS=${KIRA_ENABLE_PLUGINS:-false}
+
     volumes:
-      # Hot-reload: монтируем исходный код (read-write для автоперезагрузки)
-      - ./src/kira:/app/src/kira
+      # Hot-reload: mount source code (read-write for auto-reload)
+      - ./src/kira:/app/src/kira:rw
+
+      # Tests (for running tests in container)
+      - ./tests:/app/tests:ro
+
+      # Data persistence
       - ./vault:/app/vault
       - ./artifacts:/app/artifacts
       - ./logs:/app/logs
+      - ./tmp:/app/tmp
+
+      # Configuration (read-only)
       - ./config:/app/config:ro
       - ./.env:/app/.env:ro
+
+      # Optional: Google Calendar credentials
+      # - ./credentials.json:/app/credentials.json:ro
+
     depends_on:
-      - ollama
+      ollama:
+        condition: service_started
+
     restart: unless-stopped
+
     networks:
       - kira-network
+
+    # Development doesn't need strict limits
+    deploy:
+      resources:
+        limits:
+          memory: 4G
 
   ollama:
     image: ollama/ollama:latest
     container_name: kira-ollama-dev
+
     ports:
       - "11434:11434"
+
     volumes:
       - ollama_dev_data:/root/.ollama
+
     restart: unless-stopped
+
     networks:
       - kira-network
+
+    deploy:
+      resources:
+        limits:
+          memory: 8G
+        reservations:
+          memory: 2G
+
+    # Auto-pull a lightweight model for development
+    # Uncomment to enable:
+    # command: >
+    #   sh -c "ollama serve &
+    #          sleep 10 &&
+    #          ollama pull llama2 &&
+    #          echo '✅ Ollama ready with llama2 model' &&
+    #          wait"
 
 volumes:
   ollama_dev_data:

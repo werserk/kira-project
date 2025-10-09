@@ -1,45 +1,75 @@
-# Kira Alpha - Docker Compose Configuration
-# For local development and alpha deployment
+# Kira Production - Docker Compose Configuration
+# Optimized for production deployment with HTTP API
 
 services:
   kira-agent:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile
     image: kira-agent:latest
     container_name: kira-agent
     ports:
       - "8000:8000"
     environment:
+      # Core settings
       - KIRA_VAULT_PATH=/app/vault
-      - KIRA_DEFAULT_TZ=UTC
-      - LLM_PROVIDER=${LLM_PROVIDER:-openrouter}
-      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
-      - ENABLE_OLLAMA_FALLBACK=true
+      - KIRA_DEFAULT_TZ=${KIRA_DEFAULT_TZ:-UTC}
+      - KIRA_LOG_LEVEL=${KIRA_LOG_LEVEL:-INFO}
+
+      # LLM Provider (choose one)
+      - LLM_PROVIDER=${LLM_PROVIDER:-ollama}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+
+      # Ollama (local AI)
+      - ENABLE_OLLAMA_FALLBACK=${ENABLE_OLLAMA_FALLBACK:-true}
       - OLLAMA_BASE_URL=http://ollama:11434
-      - ENABLE_RAG=false
-      - ENABLE_CONVERSATION_MEMORY=true
-      - KIRA_LOG_LEVEL=INFO
+
+      # Features
+      - ENABLE_RAG=${ENABLE_RAG:-false}
+      - ENABLE_CONVERSATION_MEMORY=${ENABLE_CONVERSATION_MEMORY:-true}
+      - KIRA_ENABLE_PLUGINS=${KIRA_ENABLE_PLUGINS:-false}
+
     volumes:
+      # Data persistence
       - ./vault:/app/vault
       - ./artifacts:/app/artifacts
       - ./logs:/app/logs
+
+      # Configuration (read-only)
+      - ./config:/app/config:ro
       - ./.env:/app/.env:ro
+
     depends_on:
-      - ollama
+      ollama:
+        condition: service_started
+
     restart: unless-stopped
+
     healthcheck:
       test:
         [
           "CMD",
           "python",
           "-c",
-          "import httpx; httpx.get('http://localhost:8000/health')",
+          "import httpx; httpx.get('http://localhost:8000/health', timeout=5.0)",
         ]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 10s
+      start_period: 15s
+
+    networks:
+      - kira-network
+
+    # Resource limits (adjust based on your needs)
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+        reservations:
+          memory: 512M
 
   ollama:
     image: ollama/ollama:latest
@@ -50,6 +80,28 @@ services:
       - ollama_data:/root/.ollama
     restart: unless-stopped
 
+    networks:
+      - kira-network
+
+    # Ollama needs more resources for models
+    deploy:
+      resources:
+        limits:
+          memory: 8G
+        reservations:
+          memory: 2G
+
+    # Optional: Auto-pull a model on startup
+    # command: >
+    #   sh -c "ollama serve &
+    #          sleep 5 &&
+    #          ollama pull llama2 &&
+    #          wait"
+
 volumes:
   ollama_data:
     driver: local
+
+networks:
+  kira-network:
+    driver: bridge
