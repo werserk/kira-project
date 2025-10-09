@@ -1,26 +1,23 @@
-"""Capability-based access control for agent operations.
+"""Capability policies for agent tool execution.
 
-Enforces security policies at tool execution boundary.
+Phase 3, Item 11: Capabilities & policy enforcement.
+Enforces read/create/update/delete/export permissions at tool_node boundary.
 """
 
 from __future__ import annotations
 
-import json
-from dataclasses import dataclass
+import logging
+from dataclasses import dataclass, field
 from enum import Enum
-from pathlib import Path
 from typing import Any
 
-__all__ = [
-    "Capability",
-    "AgentPolicy",
-    "PolicyViolationError",
-    "PolicyManager",
-]
+logger = logging.getLogger(__name__)
+
+__all__ = ["Capability", "ToolPolicy", "PolicyEnforcer", "PolicyViolation", "create_policy_enforcer"]
 
 
-class Capability(Enum):
-    """Agent capabilities."""
+class Capability(str, Enum):
+    """Tool capability types."""
 
     READ = "read"
     CREATE = "create"
@@ -29,213 +26,297 @@ class Capability(Enum):
     EXPORT = "export"
 
 
-class PolicyViolationError(Exception):
-    """Raised when policy is violated."""
+class PolicyViolation(Exception):
+    """Raised when a policy is violated."""
 
-    def __init__(self, message: str, *, capability: str, tool: str) -> None:
-        """Initialize error.
-
-        Parameters
-        ----------
-        message
-            Error message
-        capability
-            Required capability
-        tool
-            Tool that was blocked
-        """
-        super().__init__(message)
-        self.capability = capability
-        self.tool = tool
+    pass
 
 
 @dataclass
-class AgentPolicy:
-    """Agent security policy."""
+class ToolPolicy:
+    """Policy for a single tool."""
 
-    allowed_capabilities: set[Capability]
-    allowed_tools: set[str] | None = None  # None = all tools
-    require_confirmation: set[str] | None = None  # Tools requiring confirmation
-    max_tool_calls_per_request: int = 10
+    tool_name: str
+    required_capabilities: list[Capability]
+    destructive: bool = False  # Requires confirmation
+    allowed: bool = True  # Can be blocked entirely
+    read_only: bool = False  # Read operations only
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def can_execute(self, tool: str, capability: Capability) -> bool:
-        """Check if tool can be executed with capability.
+    def requires_confirmation(self) -> bool:
+        """Check if tool requires confirmation."""
+        return self.destructive
+
+    def is_allowed(self, capabilities: set[Capability]) -> bool:
+        """Check if tool is allowed with given capabilities.
 
         Parameters
         ----------
-        tool
-            Tool name
-        capability
-            Required capability
+        capabilities
+            Set of available capabilities
 
         Returns
         -------
         bool
-            True if allowed
+            True if all required capabilities are present
         """
-        # Check capability
-        if capability not in self.allowed_capabilities:
+        if not self.allowed:
             return False
 
-        # Check tool whitelist
-        if self.allowed_tools is not None and tool not in self.allowed_tools:
-            return False
+        required = set(self.required_capabilities)
+        return required.issubset(capabilities)
 
-        return True
 
-    def requires_confirmation(self, tool: str) -> bool:
-        """Check if tool requires confirmation.
+class PolicyEnforcer:
+    """Enforces capability policies for tool execution.
+
+    Checks:
+    - Tool is in allowlist
+    - User has required capabilities
+    - Destructive operations have confirmation
+    - No policy violations
+    """
+
+    def __init__(
+        self,
+        policies: dict[str, ToolPolicy] | None = None,
+        available_capabilities: set[Capability] | None = None,
+        require_confirmation_for_destructive: bool = True,
+    ) -> None:
+        """Initialize policy enforcer.
 
         Parameters
         ----------
-        tool
-            Tool name
-
-        Returns
-        -------
-        bool
-            True if confirmation required
+        policies
+            Tool policies (tool_name -> ToolPolicy)
+        available_capabilities
+            Set of capabilities available to agent
+        require_confirmation_for_destructive
+            If True, destructive operations require explicit confirmation
         """
-        if self.require_confirmation is None:
-            return False
-        return tool in self.require_confirmation
+        self.policies = policies or self._get_default_policies()
+        self.available_capabilities = available_capabilities or self._get_default_capabilities()
+        self.require_confirmation_for_destructive = require_confirmation_for_destructive
 
-    @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> AgentPolicy:
-        """Load policy from dictionary.
-
-        Parameters
-        ----------
-        data
-            Policy data
-
-        Returns
-        -------
-        AgentPolicy
-            Loaded policy
-        """
-        capabilities = {Capability(c) for c in data.get("allowed_capabilities", [])}
-
-        allowed_tools = data.get("allowed_tools")
-        if allowed_tools is not None:
-            allowed_tools = set(allowed_tools)
-
-        require_confirmation = data.get("require_confirmation")
-        if require_confirmation is not None:
-            require_confirmation = set(require_confirmation)
-
-        return cls(
-            allowed_capabilities=capabilities,
-            allowed_tools=allowed_tools,
-            require_confirmation=require_confirmation,
-            max_tool_calls_per_request=data.get("max_tool_calls_per_request", 10),
-        )
-
-    def to_dict(self) -> dict[str, Any]:
-        """Convert policy to dictionary.
+    def _get_default_policies(self) -> dict[str, ToolPolicy]:
+        """Get default tool policies.
 
         Returns
         -------
         dict
-            Policy data
+            Default policies for all tools
         """
         return {
-            "allowed_capabilities": [c.value for c in self.allowed_capabilities],
-            "allowed_tools": list(self.allowed_tools) if self.allowed_tools else None,
-            "require_confirmation": list(self.require_confirmation) if self.require_confirmation else None,
-            "max_tool_calls_per_request": self.max_tool_calls_per_request,
+            "task_create": ToolPolicy(
+                tool_name="task_create",
+                required_capabilities=[Capability.CREATE],
+                destructive=False,
+            ),
+            "task_update": ToolPolicy(
+                tool_name="task_update",
+                required_capabilities=[Capability.UPDATE],
+                destructive=False,
+            ),
+            "task_get": ToolPolicy(
+                tool_name="task_get",
+                required_capabilities=[Capability.READ],
+                read_only=True,
+            ),
+            "task_list": ToolPolicy(
+                tool_name="task_list",
+                required_capabilities=[Capability.READ],
+                read_only=True,
+            ),
+            "task_delete": ToolPolicy(
+                tool_name="task_delete",
+                required_capabilities=[Capability.DELETE],
+                destructive=True,
+            ),
+            "rollup_daily": ToolPolicy(
+                tool_name="rollup_daily",
+                required_capabilities=[Capability.CREATE, Capability.EXPORT],
+                destructive=False,
+            ),
+            "inbox_normalize": ToolPolicy(
+                tool_name="inbox_normalize",
+                required_capabilities=[Capability.UPDATE],
+                destructive=False,
+            ),
         }
 
-
-class PolicyManager:
-    """Manages agent policies."""
-
-    def __init__(self, policy_path: Path | None = None) -> None:
-        """Initialize policy manager.
-
-        Parameters
-        ----------
-        policy_path
-            Path to policy file
-        """
-        self.policy_path = policy_path
-        self.policy = self._load_policy()
-
-    def _load_policy(self) -> AgentPolicy:
-        """Load policy from file or use default.
+    def _get_default_capabilities(self) -> set[Capability]:
+        """Get default capabilities (all except delete).
 
         Returns
         -------
-        AgentPolicy
-            Loaded policy
+        set
+            Default capability set
         """
-        if self.policy_path and self.policy_path.exists():
-            try:
-                with self.policy_path.open() as f:
-                    data = json.load(f)
-                    return AgentPolicy.from_dict(data)
-            except Exception:
-                # Fall back to default on error
-                pass
+        return {
+            Capability.READ,
+            Capability.CREATE,
+            Capability.UPDATE,
+            Capability.EXPORT,
+        }
 
-        # Default policy: allow read and create only
-        return AgentPolicy(
-            allowed_capabilities={Capability.READ, Capability.CREATE},
-            require_confirmation={"task_delete", "vault_export"},
-        )
-
-    def save_policy(self) -> None:
-        """Save current policy to file."""
-        if self.policy_path:
-            self.policy_path.parent.mkdir(parents=True, exist_ok=True)
-            with self.policy_path.open("w") as f:
-                json.dump(self.policy.to_dict(), f, indent=2)
-
-    def check_permission(
+    def check_policy(
         self,
-        tool: str,
-        capability: Capability,
+        tool_name: str,
+        args: dict[str, Any],
         *,
-        confirmed: bool = False,
+        has_confirmation: bool = False,
     ) -> None:
-        """Check if operation is permitted.
+        """Check if tool execution is allowed by policy.
 
         Parameters
         ----------
-        tool
+        tool_name
             Tool name
-        capability
-            Required capability
-        confirmed
-            Whether user confirmed operation
+        args
+            Tool arguments
+        has_confirmation
+            Whether user has provided confirmation for destructive ops
 
         Raises
         ------
-        PolicyViolationError
-            If operation not permitted
+        PolicyViolation
+            If policy check fails
         """
-        if not self.policy.can_execute(tool, capability):
-            raise PolicyViolationError(
-                f"Tool '{tool}' requires capability '{capability.value}' which is not allowed",
-                capability=capability.value,
-                tool=tool,
+        # Check if tool is in policy list
+        if tool_name not in self.policies:
+            logger.warning(f"Tool '{tool_name}' not in policy list, denying by default")
+            raise PolicyViolation(f"Tool not in allowlist: {tool_name}")
+
+        policy = self.policies[tool_name]
+
+        # Check if tool is allowed at all
+        if not policy.allowed:
+            logger.warning(f"Tool '{tool_name}' is explicitly blocked")
+            raise PolicyViolation(f"Tool is blocked: {tool_name}")
+
+        # Check capabilities
+        if not policy.is_allowed(self.available_capabilities):
+            missing = set(policy.required_capabilities) - self.available_capabilities
+            logger.warning(f"Missing capabilities for '{tool_name}': {missing}")
+            raise PolicyViolation(
+                f"Insufficient capabilities for {tool_name}. Missing: {', '.join(c.value for c in missing)}"
             )
 
-        if self.policy.requires_confirmation(tool) and not confirmed:
-            raise PolicyViolationError(
-                f"Tool '{tool}' requires explicit confirmation (--yes flag)",
-                capability=capability.value,
-                tool=tool,
-            )
+        # Check confirmation for destructive operations
+        if (
+            self.require_confirmation_for_destructive
+            and policy.requires_confirmation()
+            and not has_confirmation
+        ):
+            logger.warning(f"Destructive operation '{tool_name}' requires confirmation")
+            raise PolicyViolation(f"Destructive operation requires confirmation: {tool_name}")
+
+        logger.debug(f"Policy check passed for tool '{tool_name}'")
+
+    def is_tool_allowed(self, tool_name: str) -> bool:
+        """Check if tool is allowed (basic check).
+
+        Parameters
+        ----------
+        tool_name
+            Tool name
+
+        Returns
+        -------
+        bool
+            True if tool is in allowlist and not blocked
+        """
+        if tool_name not in self.policies:
+            return False
+
+        policy = self.policies[tool_name]
+        return policy.allowed and policy.is_allowed(self.available_capabilities)
+
+    def get_allowed_tools(self) -> list[str]:
+        """Get list of allowed tool names.
+
+        Returns
+        -------
+        list[str]
+            List of allowed tool names
+        """
+        return [name for name in self.policies if self.is_tool_allowed(name)]
+
+    def add_capability(self, capability: Capability) -> None:
+        """Add a capability to available set.
+
+        Parameters
+        ----------
+        capability
+            Capability to add
+        """
+        self.available_capabilities.add(capability)
+        logger.info(f"Added capability: {capability.value}")
+
+    def remove_capability(self, capability: Capability) -> None:
+        """Remove a capability from available set.
+
+        Parameters
+        ----------
+        capability
+            Capability to remove
+        """
+        self.available_capabilities.discard(capability)
+        logger.info(f"Removed capability: {capability.value}")
+
+    def set_tool_policy(self, policy: ToolPolicy) -> None:
+        """Set or update policy for a tool.
+
+        Parameters
+        ----------
+        policy
+            Tool policy
+        """
+        self.policies[policy.tool_name] = policy
+        logger.info(f"Updated policy for tool: {policy.tool_name}")
 
 
-# Tool to capability mapping
-TOOL_CAPABILITIES: dict[str, Capability] = {
-    "task_create": Capability.CREATE,
-    "task_update": Capability.UPDATE,
-    "task_delete": Capability.DELETE,
-    "task_get": Capability.READ,
-    "task_list": Capability.READ,
-    "rollup_daily": Capability.READ,
-    "vault_export": Capability.EXPORT,
-}
+def create_policy_enforcer(
+    *,
+    enable_delete: bool = False,
+    require_confirmation: bool = True,
+    custom_policies: dict[str, ToolPolicy] | None = None,
+) -> PolicyEnforcer:
+    """Factory function to create policy enforcer.
+
+    Parameters
+    ----------
+    enable_delete
+        Enable DELETE capability
+    require_confirmation
+        Require confirmation for destructive operations
+    custom_policies
+        Custom tool policies to merge with defaults
+
+    Returns
+    -------
+    PolicyEnforcer
+        Configured policy enforcer
+    """
+    capabilities = {
+        Capability.READ,
+        Capability.CREATE,
+        Capability.UPDATE,
+        Capability.EXPORT,
+    }
+
+    if enable_delete:
+        capabilities.add(Capability.DELETE)
+
+    enforcer = PolicyEnforcer(
+        available_capabilities=capabilities,
+        require_confirmation_for_destructive=require_confirmation,
+    )
+
+    # Merge custom policies
+    if custom_policies:
+        for policy in custom_policies.values():
+            enforcer.set_tool_policy(policy)
+
+    logger.info(f"Created policy enforcer with capabilities: {[c.value for c in capabilities]}")
+    return enforcer
