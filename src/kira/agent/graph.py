@@ -47,67 +47,67 @@ def build_agent_graph(
         ) from e
 
     from .nodes import plan_node, reflect_node, respond_node, route_node, tool_node, verify_node
-    from .state import AgentState
+    from .state import AgentState as AgentStateClass
 
     # Create state graph
-    graph = StateGraph(AgentState)
+    graph = StateGraph(AgentStateClass)
 
     # Add nodes with partial application of dependencies
-    def _plan_node(state: AgentState) -> dict[str, Any]:
+    def _plan_node(state):  # type: ignore[no-untyped-def]
         return plan_node(state, llm_adapter, tools_description)
 
-    def _reflect_node(state: AgentState) -> dict[str, Any]:
+    def _reflect_node(state):  # type: ignore[no-untyped-def]
         return reflect_node(state, llm_adapter)
 
-    def _tool_node(state: AgentState) -> dict[str, Any]:
+    def _tool_node(state):  # type: ignore[no-untyped-def]
         return tool_node(state, tool_registry)
 
-    def _verify_node(state: AgentState) -> dict[str, Any]:
+    def _verify_node(state):  # type: ignore[no-untyped-def]
         return verify_node(state, tool_registry)
 
-    def _respond_node(state: AgentState) -> dict[str, Any]:
+    def _respond_node(state):  # type: ignore[no-untyped-def]
         return respond_node(state, llm_adapter)
 
-    graph.add_node("plan", _plan_node)
-    graph.add_node("reflect", _reflect_node)
-    graph.add_node("tool", _tool_node)
-    graph.add_node("verify", _verify_node)
-    graph.add_node("respond", _respond_node)
+    graph.add_node("plan_step", _plan_node)
+    graph.add_node("reflect_step", _reflect_node)
+    graph.add_node("tool_step", _tool_node)
+    graph.add_node("verify_step", _verify_node)
+    graph.add_node("respond_step", _respond_node)
 
     # Set entry point
-    graph.set_entry_point("plan")
+    graph.set_entry_point("plan_step")
 
     # Add conditional edges based on routing logic
-    def route_after_plan(state: AgentState) -> str:
+    def route_after_plan(state):  # type: ignore[no-untyped-def]
         """Route after planning."""
         if state.error or state.status == "error":
             return "halt"
         if state.flags.enable_reflection:
-            return "reflect"
-        return "tool"
+            return "reflect_step"
+        return "tool_step"
 
-    def route_after_reflect(state: AgentState) -> str:
+    def route_after_reflect(state):  # type: ignore[no-untyped-def]
         """Route after reflection."""
         if state.error or state.status == "error":
             return "halt"
-        return "tool"
+        return "tool_step"
 
-    def route_after_tool(state: AgentState) -> str:
+    def route_after_tool(state):  # type: ignore[no-untyped-def]
         """Route after tool execution."""
         if state.budget.is_exceeded():
             return "halt"
         if state.error or state.status == "error":
             if state.retry_count < 2:
-                return "plan"
+                return "plan_step"
             return "halt"
         if state.flags.enable_verification:
-            return "verify"
+            return "verify_step"
         # Check if more steps remain
         if state.current_step < len(state.plan):
-            return "tool"
+            return "tool_step"
         return "done"
 
-    def route_after_verify(state: AgentState) -> str:
+    def route_after_verify(state):  # type: ignore[no-untyped-def]
         """Route after verification."""
         if state.budget.is_exceeded():
             return "halt"
@@ -115,57 +115,57 @@ def build_agent_graph(
             return "halt"
         # Check if more steps remain
         if state.current_step < len(state.plan):
-            return "tool"
-        return "respond"  # Generate NL response
+            return "tool_step"
+        return "respond_step"  # Generate NL response
 
-    def route_after_respond(state: AgentState) -> str:
+    def route_after_respond(state):  # type: ignore[no-untyped-def]
         """Route after response generation."""
         return "done"
 
     # Add conditional edges
     graph.add_conditional_edges(
-        "plan",
+        "plan_step",
         route_after_plan,
         {
-            "reflect": "reflect",
-            "tool": "tool",
+            "reflect_step": "reflect_step",
+            "tool_step": "tool_step",
             "halt": END,
         },
     )
 
     graph.add_conditional_edges(
-        "reflect",
+        "reflect_step",
         route_after_reflect,
         {
-            "tool": "tool",
+            "tool_step": "tool_step",
             "halt": END,
         },
     )
 
     graph.add_conditional_edges(
-        "tool",
+        "tool_step",
         route_after_tool,
         {
-            "verify": "verify",
-            "tool": "tool",
-            "plan": "plan",
+            "verify_step": "verify_step",
+            "tool_step": "tool_step",
+            "plan_step": "plan_step",
             "done": END,
             "halt": END,
         },
     )
 
     graph.add_conditional_edges(
-        "verify",
+        "verify_step",
         route_after_verify,
         {
-            "tool": "tool",
-            "respond": "respond",
+            "tool_step": "tool_step",
+            "respond_step": "respond_step",
             "halt": END,
         },
     )
 
     graph.add_conditional_edges(
-        "respond",
+        "respond_step",
         route_after_respond,
         {
             "done": END,

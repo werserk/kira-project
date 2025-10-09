@@ -273,7 +273,7 @@ def handle_telegram_start(
         enable_langgraph_verification=agent_config.enable_langgraph_verification,
         max_steps=agent_config.langgraph_max_steps,
     )
-    
+
     # Use wrapper for consistent interface
     executor = executor_wrapper
 
