@@ -82,6 +82,12 @@ class TelegramGateway:
             # Execute request
             result = self.executor.chat_and_execute(text, trace_id=trace_id)
 
+            # Check if result has natural language response (LangGraph)
+            if hasattr(result, "response") and result.response:
+                # LangGraph ExecutionResult with NL response - use it directly!
+                return result.response
+
+            # Legacy ExecutionResult - format manually
             if result.status == "ok":
                 # Format response
                 if result.results:

@@ -36,6 +36,7 @@ class ExecutionResult:
         self.error = state.error
         self.tool_results = state.tool_results
         self.budget_used = state.budget
+        self.response = state.response  # Natural language response
 
     @property
     def success(self) -> bool:
@@ -51,6 +52,7 @@ class ExecutionResult:
             "tool_results": self.tool_results,
             "budget": self.budget_used.to_dict(),
             "success": self.success,
+            "response": self.response,  # NL response for user
         }
 
 

@@ -81,6 +81,7 @@ class AgentState:
     plan: list[dict[str, Any]] = field(default_factory=list)
     current_step: int = 0
     tool_results: list[dict[str, Any]] = field(default_factory=list)
+    response: str = ""  # Natural language response from respond_node
 
     # Memory and context
     memory: dict[str, Any] = field(default_factory=dict)
@@ -95,7 +96,7 @@ class AgentState:
     flags: ContextFlags = field(default_factory=ContextFlags)
 
     # Status
-    status: str = "pending"  # pending, planning, executing, verifying, completed, error
+    status: str = "pending"  # pending, planning, executing, verifying, responded, completed, error
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization."""
@@ -107,6 +108,7 @@ class AgentState:
             "plan": self.plan,
             "current_step": self.current_step,
             "tool_results": self.tool_results,
+            "response": self.response,
             "memory": self.memory,
             "rag_snippets": self.rag_snippets,
             "error": self.error,

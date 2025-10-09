@@ -84,15 +84,9 @@ class UnifiedExecutor:
             # LangGraphExecutor.execute() returns ExecutionResult
             result = self.executor.execute(user_request, trace_id=trace_id)  # type: ignore[attr-defined]
 
-            # Convert LangGraphExecutor result to AgentExecutor format for compatibility
-            from .executor import ExecutionResult as LegacyExecutionResult
-
-            return LegacyExecutionResult(
-                status=result.status if result.success else "error",
-                results=result.tool_results,
-                error=result.error,
-                trace_id=result.trace_id,
-            )
+            # Return the ExecutionResult directly (it has .response field)
+            # For LangGraph, the natural language response is in result.response
+            return result
         else:
             # Legacy AgentExecutor
             return self.executor.chat_and_execute(user_request, trace_id=trace_id)

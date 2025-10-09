@@ -11,13 +11,13 @@ import time
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
+    from ..adapters.llm import LLMAdapter, Message
     from .state import AgentState
     from .tools import ToolRegistry
-    from ..adapters.llm import LLMAdapter, Message
 
 logger = logging.getLogger(__name__)
 
-__all__ = ["plan_node", "reflect_node", "tool_node", "verify_node", "route_node"]
+__all__ = ["plan_node", "reflect_node", "tool_node", "verify_node", "respond_node", "route_node"]
 
 
 def plan_node(state: AgentState, llm_adapter: LLMAdapter, tools_description: str) -> dict[str, Any]:
@@ -300,6 +300,111 @@ def verify_node(state: AgentState, tool_registry: ToolRegistry) -> dict[str, Any
     return {"status": "verified"}
 
 
+def respond_node(state: AgentState, llm_adapter: LLMAdapter) -> dict[str, Any]:
+    """Response generation node - creates natural language response.
+
+    Generates a conversational, natural language response based on:
+    - Original user request
+    - Execution plan
+    - Tool results
+    - Any errors
+
+    Parameters
+    ----------
+    state
+        Current agent state
+    llm_adapter
+        LLM adapter for generating response
+
+    Returns
+    -------
+    dict
+        State updates with natural language response
+    """
+    logger.info(f"[{state.trace_id}] Response generation phase started")
+    state.status = "responding"
+
+    # Extract user request
+    user_request = ""
+    if state.messages:
+        user_request = state.messages[0].get("content", "")
+
+    # Build context for response generation
+    context_parts = []
+
+    # Add execution summary
+    if state.tool_results:
+        context_parts.append("EXECUTION RESULTS:")
+        for i, result in enumerate(state.tool_results, 1):
+            tool_name = result.get("tool", "unknown")
+            status = result.get("status", "unknown")
+            data = result.get("data", {})
+            context_parts.append(f"{i}. Tool: {tool_name}")
+            context_parts.append(f"   Status: {status}")
+            if data:
+                context_parts.append(f"   Data: {json.dumps(data, ensure_ascii=False)}")
+
+    # Add error if present
+    if state.error:
+        context_parts.append(f"\nERROR: {state.error}")
+
+    context = "\n".join(context_parts)
+
+    # Build prompt for natural response
+    system_prompt = """You are Kira, a personal AI assistant. Generate a natural, conversational response to the user.
+
+GUIDELINES:
+- Be friendly, warm, and helpful
+- Use emoji sparingly (1-2 per response max)
+- Be concise but complete
+- If task succeeded, confirm what was done
+- If there was an error, explain it clearly and suggest next steps
+- Speak in the user's language (English/Russian)
+- Don't mention technical details like tool names or IDs unless asked
+
+Your response should feel like talking to a real personal assistant, not a robot."""
+
+    user_prompt = f"""User asked: "{user_request}"
+
+{context}
+
+Generate a natural language response to the user based on the execution results above."""
+
+    try:
+        from ..adapters.llm import Message
+
+        messages: list[Message] = [
+            Message(role="system", content=system_prompt),
+            Message(role="user", content=user_prompt),
+        ]
+
+        response = llm_adapter.chat(
+            messages,
+            temperature=0.8,  # Slightly higher for more natural responses
+            max_tokens=500,
+            timeout=15.0,
+        )
+
+        nl_response = response.content.strip()
+        logger.info(f"[{state.trace_id}] Generated natural response: {nl_response[:100]}...")
+
+        return {
+            "response": nl_response,
+            "status": "responded",
+        }
+
+    except Exception as e:
+        logger.error(f"[{state.trace_id}] Response generation failed: {e}", exc_info=True)
+
+        # Fallback to simple response
+        fallback = "Хорошо, выполнено!" if state.error is None else f"Произошла ошибка: {state.error}"
+
+        return {
+            "response": fallback,
+            "status": "responded",
+        }
+
+
 def route_node(state: AgentState) -> str:
     """Routing node - decides next step based on state.
 
@@ -353,9 +458,11 @@ def route_node(state: AgentState) -> str:
         if state.current_step < len(state.plan):
             return "tool"
         else:
-            return "done"
-    elif state.status == "completed":
+            return "respond"  # Generate NL response before done
+    elif state.status == "responded":
         return "done"
+    elif state.status == "completed":
+        return "respond"  # Always generate NL response
     else:
         logger.warning(f"[{state.trace_id}] Unknown status: {state.status}")
         return "halt"

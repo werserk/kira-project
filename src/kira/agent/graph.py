@@ -9,9 +9,9 @@ import logging
 from typing import TYPE_CHECKING, Any, Callable
 
 if TYPE_CHECKING:
+    from ..adapters.llm import LLMAdapter
     from .state import AgentState
     from .tools import ToolRegistry
-    from ..adapters.llm import LLMAdapter
 
 logger = logging.getLogger(__name__)
 
@@ -40,13 +40,13 @@ def build_agent_graph(
         Compiled agent graph ready for execution
     """
     try:
-        from langgraph.graph import StateGraph, END  # type: ignore[import-untyped]
+        from langgraph.graph import END, StateGraph  # type: ignore[import-untyped]
     except ImportError as e:
         raise ImportError(
             "LangGraph is not installed. Install with: pip install kira[agent] or poetry install --extras agent"
         ) from e
 
-    from .nodes import plan_node, reflect_node, tool_node, verify_node, route_node
+    from .nodes import plan_node, reflect_node, respond_node, route_node, tool_node, verify_node
     from .state import AgentState
 
     # Create state graph
@@ -65,10 +65,14 @@ def build_agent_graph(
     def _verify_node(state: AgentState) -> dict[str, Any]:
         return verify_node(state, tool_registry)
 
+    def _respond_node(state: AgentState) -> dict[str, Any]:
+        return respond_node(state, llm_adapter)
+
     graph.add_node("plan", _plan_node)
     graph.add_node("reflect", _reflect_node)
     graph.add_node("tool", _tool_node)
     graph.add_node("verify", _verify_node)
+    graph.add_node("respond", _respond_node)
 
     # Set entry point
     graph.set_entry_point("plan")
@@ -112,6 +116,10 @@ def build_agent_graph(
         # Check if more steps remain
         if state.current_step < len(state.plan):
             return "tool"
+        return "respond"  # Generate NL response
+
+    def route_after_respond(state: AgentState) -> str:
+        """Route after response generation."""
         return "done"
 
     # Add conditional edges
@@ -151,8 +159,16 @@ def build_agent_graph(
         route_after_verify,
         {
             "tool": "tool",
-            "done": END,
+            "respond": "respond",
             "halt": END,
+        },
+    )
+
+    graph.add_conditional_edges(
+        "respond",
+        route_after_respond,
+        {
+            "done": END,
         },
     )
 
