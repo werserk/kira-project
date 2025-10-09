@@ -335,7 +335,7 @@ class AgentExecutor:
             trace_id=trace_id,
         )
 
-    def chat_and_execute(self, user_request: str, *, trace_id: str | None = None) -> ExecutionResult:
+    def chat_and_execute(self, user_request: str, *, trace_id: str | None = None, session_id: str | None = None) -> ExecutionResult:
         """Full workflow: plan → execute.
 
         Parameters
@@ -344,6 +344,8 @@ class AgentExecutor:
             Natural language request
         trace_id
             Optional trace ID for memory context
+        session_id
+            Optional session ID (ignored by legacy executor, used by LangGraph)
 
         Returns
         -------

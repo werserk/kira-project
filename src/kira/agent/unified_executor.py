@@ -26,7 +26,7 @@ __all__ = ["UnifiedExecutor", "create_unified_executor", "ExecutorType"]
 class ExecutorProtocol(Protocol):
     """Protocol for executor interface."""
 
-    def chat_and_execute(self, user_request: str, *, trace_id: str | None = None) -> Any:
+    def chat_and_execute(self, user_request: str, *, trace_id: str | None = None, session_id: str | None = None) -> Any:
         """Execute user request."""
         ...
 
@@ -63,7 +63,7 @@ class UnifiedExecutor:
         self.executor_type = executor_type
         logger.info(f"Initialized unified executor with type: {executor_type}")
 
-    def chat_and_execute(self, user_request: str, *, trace_id: str | None = None) -> Any:
+    def chat_and_execute(self, user_request: str, *, trace_id: str | None = None, session_id: str | None = None) -> Any:
         """Execute user request through underlying executor.
 
         Parameters
@@ -72,6 +72,8 @@ class UnifiedExecutor:
             User's natural language request
         trace_id
             Optional trace ID for correlation
+        session_id
+            Optional session ID for conversation memory (same for all messages in a chat)
 
         Returns
         -------
@@ -82,14 +84,14 @@ class UnifiedExecutor:
 
         if self.executor_type == ExecutorType.LANGGRAPH:
             # LangGraphExecutor.execute() returns ExecutionResult
-            result = self.executor.execute(user_request, trace_id=trace_id)  # type: ignore[attr-defined]
+            result = self.executor.execute(user_request, trace_id=trace_id, session_id=session_id)  # type: ignore[attr-defined]
 
             # Return the ExecutionResult directly (it has .response field)
             # For LangGraph, the natural language response is in result.response
             return result
         else:
             # Legacy AgentExecutor
-            return self.executor.chat_and_execute(user_request, trace_id=trace_id)
+            return self.executor.chat_and_execute(user_request, trace_id=trace_id, session_id=session_id)
 
 
 def create_unified_executor(

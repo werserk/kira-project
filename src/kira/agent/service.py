@@ -188,8 +188,11 @@ def create_agent_app(config: AgentConfig | None = None) -> FastAPI:
     host_api = create_host_api(config.vault_path)
 
     # Register tools
+    from .kira_tools import TaskDeleteTool
+
     tool_registry.register(TaskCreateTool(host_api=host_api))
     tool_registry.register(TaskUpdateTool(host_api=host_api))
+    tool_registry.register(TaskDeleteTool(host_api=host_api))
     tool_registry.register(TaskGetTool(host_api=host_api))
     tool_registry.register(TaskListTool(host_api=host_api))
     tool_registry.register(RollupDailyTool(vault_path=config.vault_path))

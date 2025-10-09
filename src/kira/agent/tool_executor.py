@@ -13,13 +13,7 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from ..core.host import HostAPI
 
-from .kira_tools import (
-    RollupDailyTool,
-    TaskCreateTool,
-    TaskGetTool,
-    TaskListTool,
-    TaskUpdateTool,
-)
+from .kira_tools import RollupDailyTool, TaskCreateTool, TaskGetTool, TaskListTool, TaskUpdateTool
 from .tool_schemas import TOOL_SCHEMAS, validate_tool_args
 from .tools import AgentTool, ToolRegistry, ToolResult
 
@@ -87,9 +81,12 @@ class ToolExecutor:
 
     def _init_tools(self) -> None:
         """Initialize tool instances."""
+        from .kira_tools import TaskDeleteTool
+
         self._tool_instances = {
             "task_create": TaskCreateTool(host_api=self.host_api),
             "task_update": TaskUpdateTool(host_api=self.host_api),
+            "task_delete": TaskDeleteTool(host_api=self.host_api),
             "task_get": TaskGetTool(host_api=self.host_api),
             "task_list": TaskListTool(host_api=self.host_api),
             "rollup_daily": RollupDailyTool(vault_path=self.vault_path),

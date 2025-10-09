@@ -174,7 +174,14 @@ def handle_telegram_start(
     from ..adapters.telegram.adapter import TelegramAdapter, TelegramAdapterConfig, create_telegram_adapter
     from ..agent.config import AgentConfig
     from ..agent.executor import AgentExecutor
-    from ..agent.kira_tools import RollupDailyTool, TaskCreateTool, TaskGetTool, TaskListTool, TaskUpdateTool
+    from ..agent.kira_tools import (
+        RollupDailyTool,
+        TaskCreateTool,
+        TaskDeleteTool,
+        TaskGetTool,
+        TaskListTool,
+        TaskUpdateTool,
+    )
     from ..agent.memory import ConversationMemory
     from ..agent.message_handler import create_message_handler
     from ..agent.rag import RAGStore, build_rag_index
@@ -235,6 +242,7 @@ def handle_telegram_start(
     # Register tools
     tool_registry.register(TaskCreateTool(host_api=host_api))
     tool_registry.register(TaskUpdateTool(host_api=host_api))
+    tool_registry.register(TaskDeleteTool(host_api=host_api))
     tool_registry.register(TaskGetTool(host_api=host_api))
     tool_registry.register(TaskListTool(host_api=host_api))
     tool_registry.register(RollupDailyTool(vault_path=vault_path))

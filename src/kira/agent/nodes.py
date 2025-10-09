@@ -62,6 +62,14 @@ RULES:
 - Only use dry_run=true if user explicitly asks to simulate/preview
 - Keep plans concise (max {state.budget.max_steps - state.budget.steps_used} steps)
 - Return ONLY valid JSON, no markdown or extra text
+
+IMPORTANT FOR DELETIONS:
+- To delete a task, you MUST first get its 'uid' from task_list
+- Use task_list to find the task, then task_delete with the uid
+- Example: [
+    {{"tool": "task_list", "args": {{}}, "dry_run": false}},
+    {{"tool": "task_delete", "args": {{"uid": "<uid_from_previous_step>"}}, "dry_run": false}}
+  ]
 """
 
     # Get last user message
@@ -141,10 +149,11 @@ OUTPUT FORMAT (JSON only):
 }
 
 SAFETY CHECKS:
-- No operations that could cause unintended data loss
 - FSM state transitions are valid
-- Arguments are reasonable
-- User intent is clear (e.g., "delete all" requires explicit confirmation)
+- Arguments are present and have correct types
+- ALLOW deletions if user explicitly requested (e.g., "удали задачу X", "delete task Y")
+- BLOCK only if user intent is ambiguous (e.g., "delete all" without explicit confirmation)
+- BLOCK if task_delete has no valid uid argument
 """
 
     try:
@@ -212,7 +221,7 @@ def tool_node(state: AgentState, tool_registry: ToolRegistry) -> dict[str, Any]:
     args = step.get("args", {})
     dry_run = step.get("dry_run", False) or state.flags.dry_run
 
-    logger.info(f"[{state.trace_id}] Executing tool: {tool_name} (dry_run={dry_run})")
+    logger.info(f"[{state.trace_id}] Executing tool: {tool_name} (dry_run={dry_run}, args={args})")
 
     start_time = time.time()
 

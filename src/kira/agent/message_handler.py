@@ -12,7 +12,6 @@ if TYPE_CHECKING:
     from collections.abc import Callable
 
     from ..core.events import Event
-    from .executor import AgentExecutor
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +29,7 @@ class MessageHandler:
 
     def __init__(
         self,
-        executor: AgentExecutor,
+        executor: Any,  # AgentExecutor or UnifiedExecutor
         response_callback: Callable[[str, str, str], None] | None = None,
     ) -> None:
         """Initialize message handler.
@@ -38,7 +37,7 @@ class MessageHandler:
         Parameters
         ----------
         executor
-            Agent executor to process messages
+            Agent executor to process messages (AgentExecutor or UnifiedExecutor)
         response_callback
             Callback to send responses back: callback(source, chat_id, response_text)
             Example: lambda source, chat_id, text: telegram_adapter.send_message(chat_id, text)
@@ -64,17 +63,20 @@ class MessageHandler:
         chat_id = str(payload.get("chat_id", ""))
         trace_id = payload.get("trace_id", f"{source}-{chat_id}")
 
+        # Session ID для постоянной памяти (одинаковый для всех сообщений из чата)
+        session_id = f"{source}:{chat_id}"
+
         if not message_text:
             logger.warning(f"Received empty message from {source}:{chat_id}")
             return
 
-        logger.info(f"Processing message from {source}:{chat_id}, trace_id={trace_id}")
+        logger.info(f"Processing message from {source}:{chat_id}, trace_id={trace_id}, session_id={session_id}")
         logger.debug(f"Message content: {message_text[:100]}...")
 
         try:
             # Execute request through agent
             logger.info(f"Executing agent request, trace_id={trace_id}")
-            result = self.executor.chat_and_execute(message_text, trace_id=trace_id)
+            result = self.executor.chat_and_execute(message_text, trace_id=trace_id, session_id=session_id)
             logger.info(f"Agent execution completed, status={getattr(result, 'status', 'unknown')}")
 
             # Format response

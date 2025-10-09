@@ -159,6 +159,55 @@ class TaskUpdateTool:
 
 
 @dataclass
+class TaskDeleteTool:
+    """Delete a task permanently."""
+
+    name: str = "task_delete"
+    description: str = "Delete a task permanently by its ID"
+    host_api: HostAPI | None = None
+
+    def get_parameters(self) -> dict[str, Any]:
+        """Get parameter schema."""
+        return {
+            "type": "object",
+            "properties": {
+                "uid": {"type": "string", "description": "Task ID to delete"},
+            },
+            "required": ["uid"],
+        }
+
+    def execute(self, args: dict[str, Any], *, dry_run: bool = False) -> ToolResult:
+        """Execute task deletion."""
+        if not self.host_api:
+            return ToolResult.error("HostAPI not initialized")
+
+        uid = args.get("uid")
+        if not uid:
+            return ToolResult.error("uid is required")
+
+        if dry_run:
+            return ToolResult.ok(
+                {"message": "Dry run: would delete task", "uid": uid},
+                meta={"dry_run": True},
+            )
+
+        try:
+            # Delete the entity
+            self.host_api.delete_entity(uid)
+
+            return ToolResult.ok(
+                {
+                    "uid": uid,
+                    "message": "Task deleted successfully",
+                }
+            )
+        except ValueError as e:
+            return ToolResult.error(f"Task not found: {e}")
+        except Exception as e:
+            return ToolResult.error(f"Failed to delete task: {e}")
+
+
+@dataclass
 class TaskGetTool:
     """Get task by ID."""
 

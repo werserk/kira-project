@@ -106,18 +106,23 @@ class LangGraphExecutor:
         self.enable_reflection = enable_reflection
         self.enable_verification = enable_verification
 
+        # Conversation memory for multi-turn context
+        from .memory import ConversationMemory
+        self.conversation_memory = ConversationMemory(max_exchanges=5)  # Keep last 5 exchanges
+
         # Build graph on initialization
         tools_desc = tool_registry.get_tools_description()
         from .graph import build_agent_graph
 
         self.graph = build_agent_graph(llm_adapter, tool_registry, tools_desc)
-        logger.info("LangGraph executor initialized")
+        logger.info("LangGraph executor initialized with conversation memory")
 
     def execute(
         self,
         user_request: str,
         *,
         trace_id: str | None = None,
+        session_id: str | None = None,
         user: str = "default",
         dry_run: bool = False,
     ) -> ExecutionResult:
@@ -133,6 +138,8 @@ class LangGraphExecutor:
             Natural language request
         trace_id
             Optional trace ID for correlation
+        session_id
+            Optional session ID for conversation memory (same for all messages in a chat)
         user
             User identifier
         dry_run
@@ -146,15 +153,28 @@ class LangGraphExecutor:
         if trace_id is None:
             trace_id = str(uuid.uuid4())
 
-        logger.info(f"[{trace_id}] Executing request: {user_request[:100]}...")
+        if session_id is None:
+            session_id = user  # Fallback to user ID if no session
+
+        logger.info(f"[{trace_id}] Executing request: {user_request[:100]}... (session={session_id})")
+
+        # Get conversation history from memory
+        conversation_history = self.conversation_memory.get_context_messages(session_id)
+
+        # Build messages list: [old context] + [new user message]
+        messages = [{"role": msg.role, "content": msg.content} for msg in conversation_history]
+        messages.append({"role": "user", "content": user_request})
+
+        logger.debug(f"[{trace_id}] Building state with {len(messages)} messages (history: {len(conversation_history)})")
 
         # Create initial state
         from .state import AgentState, Budget, ContextFlags
 
         state = AgentState(
             trace_id=trace_id,
+            session_id=session_id,
             user=user,
-            messages=[{"role": "user", "content": user_request}],
+            messages=messages,  # Include conversation history!
             budget=Budget(
                 max_steps=self.max_steps,
                 max_tokens=self.max_tokens,
@@ -173,6 +193,15 @@ class LangGraphExecutor:
 
         result = ExecutionResult(final_state)
         logger.info(f"[{trace_id}] Execution completed: success={result.success}, status={result.status}")
+
+        # Save this exchange to conversation memory
+        assistant_response = final_state.response or "Ошибка выполнения"
+        self.conversation_memory.add_turn(
+            session_id,
+            user_message=user_request,
+            assistant_message=assistant_response
+        )
+        logger.debug(f"[{trace_id}] Saved conversation turn to memory (session={session_id})")
 
         return result
 

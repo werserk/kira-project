@@ -26,8 +26,8 @@ services:
       - KIRA_LOG_LEVEL=DEBUG
       - KIRA_EXECUTOR_TYPE=langgraph
     volumes:
-      # Hot-reload: монтируем исходный код (будет работать с PYTHONPATH)
-      - ./src/kira:/app/src/kira:ro
+      # Hot-reload: монтируем исходный код (read-write для автоперезагрузки)
+      - ./src/kira:/app/src/kira
       - ./vault:/app/vault
       - ./artifacts:/app/artifacts
       - ./logs:/app/logs
