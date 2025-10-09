@@ -211,7 +211,7 @@ class TestAgentExecutor:
 
     def test_plan_with_wrong_tool_name(self):
         """Test when LLM returns wrong tool name.
-        
+
         Bug scenario: LLM returns 'create_task' instead of 'task_create'.
         Should auto-correct and execute successfully.
         """
