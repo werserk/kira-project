@@ -195,7 +195,7 @@ class TestAgentExecutor:
 
     def test_chat_and_execute_with_timeout(self):
         """Test chat and execute with LLM timeout.
-        
+
         Real scenario: OpenRouter/Anthropic API takes >30 seconds to respond.
         System should catch timeout and return clear error.
         """
@@ -211,7 +211,7 @@ class TestAgentExecutor:
 
     def test_plan_with_wrong_tool_name(self):
         """Test when LLM returns wrong tool name.
-        
+
         Bug scenario: LLM returns 'create_task' instead of 'task_create'.
         Should fail gracefully with clear error message.
         """
@@ -252,7 +252,7 @@ class TestAgentExecutor:
 
     def test_complex_user_query_with_date(self):
         """Test parsing complex user query with temporal information.
-        
+
         Real query: 'Завтра мне нужно помыть полы. Поставь задачу'
         Should extract date and create task with due_ts.
         """

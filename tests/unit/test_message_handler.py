@@ -316,7 +316,7 @@ class TestMessageHandler:
 
     def test_handle_message_with_llm_timeout(self) -> None:
         """Test handling when LLM request times out.
-        
+
         Simulates real-world scenario where LLM API takes too long to respond.
         User should receive clear error message about timeout.
         """
@@ -345,7 +345,7 @@ class TestMessageHandler:
         # Verify error callback was called
         callback.assert_called_once()
         args = callback.call_args[0]
-        
+
         # Check response format
         assert args[0] == "telegram"  # source
         assert args[1] == "916542313"  # chat_id
@@ -354,12 +354,12 @@ class TestMessageHandler:
 
     def test_handle_message_with_long_response_time(self) -> None:
         """Test handling when LLM takes a very long time but eventually responds.
-        
+
         This tests the scenario where the LLM doesn't timeout but takes 20-30 seconds,
         which should still succeed.
         """
         import time
-        
+
         # Setup
         executor = Mock()
         callback = Mock()
@@ -402,7 +402,7 @@ class TestMessageHandler:
 
     def test_handle_message_with_connection_error(self) -> None:
         """Test handling when LLM API connection fails completely.
-        
+
         Simulates network issues or API being down.
         """
         # Setup
@@ -434,7 +434,7 @@ class TestMessageHandler:
 
     def test_handle_complex_message_with_date(self) -> None:
         """Test handling message with date/time information.
-        
+
         Real user query: 'Завтра мне нужно помыть полы. Поставь задачу'
         Should successfully create task with due date.
         """

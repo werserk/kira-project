@@ -118,16 +118,16 @@ class MessageHandler:
         if result.status == "ok":
             if hasattr(result, "results") and result.results:
                 logger.debug(f"Formatting {len(result.results)} step results")
-                
+
                 # Check if all steps were successful
                 all_success = all(r.get("status") == "ok" for r in result.results)
-                
+
                 if all_success and len(result.results) == 1:
                     # Single successful step - give a clean, human-friendly message
                     step_result = result.results[0]
                     data = step_result.get("data", {})
                     tool_name = step_result.get("tool", "action")
-                    
+
                     # Create human-friendly response based on tool
                     if "task" in tool_name.lower() and data:
                         if "dry_run" in str(data).lower():
@@ -139,17 +139,17 @@ class MessageHandler:
                             response = self._humanize_result(tool_name, data)
                     else:
                         response = self._humanize_result(tool_name, data)
-                    
+
                     logger.debug(f"Humanized single-step response: {response}")
                     return response
-                
+
                 # Multiple steps or mixed results - show detailed info
                 response_parts = []
                 for i, step_result in enumerate(result.results, 1):
                     if step_result.get("status") == "ok":
                         data = step_result.get("data", {})
                         tool_name = step_result.get("tool", "action")
-                        
+
                         if data and isinstance(data, dict):
                             summary = self._summarize_dict(data)
                             if "dry" not in summary.lower():
@@ -204,14 +204,14 @@ class MessageHandler:
         """
         if not data:
             return "✅ Готово"
-        
+
         # Task-related responses
         if "task" in tool_name.lower():
             if data.get("title"):
                 return f"✅ Создана задача: {data['title']}"
             if data.get("count") is not None:
                 return f"✅ Найдено задач: {data['count']}"
-        
+
         # Generic success with data summary
         if "id" in data and "title" in data:
             return f"✅ Готово: {data['title']}"
@@ -219,9 +219,9 @@ class MessageHandler:
             return f"✅ {data['message']}"
         elif "count" in data:
             return f"✅ Найдено записей: {data['count']}"
-        
+
         return "✅ Готово"
-    
+
     def _summarize_dict(self, data: dict[str, Any]) -> str:
         """Create human-readable summary of dict data.
 
