@@ -11,6 +11,7 @@ from .config import AgentConfig
 from .executor import AgentExecutor, ExecutionPlan, ExecutionResult
 from .service import create_agent_app
 from .tools import AgentTool, ToolRegistry
+from .unified_executor import ExecutorType, UnifiedExecutor, create_unified_executor
 
 # Phase 1: LangGraph components (optional, requires langgraph extras)
 try:
@@ -51,6 +52,10 @@ __all__ = [
     "AgentTool",
     "ToolRegistry",
     "create_agent_app",
+    # Unified Executor (Phase 1-3 integration)
+    "UnifiedExecutor",
+    "ExecutorType",
+    "create_unified_executor",
     # Phase 1: LangGraph
     "LangGraphExecutor",
     "AgentState",

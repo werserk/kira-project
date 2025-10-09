@@ -40,6 +40,7 @@ from .memory import ConversationMemory
 from .rag import RAGStore
 from .telegram_gateway import create_telegram_router
 from .tools import ToolRegistry
+from .unified_executor import create_unified_executor
 
 __all__ = ["create_agent_app", "AuditLogger"]
 
@@ -202,15 +203,27 @@ def create_agent_app(config: AgentConfig | None = None) -> FastAPI:
     # Initialize conversation memory
     memory = ConversationMemory(max_exchanges=config.memory_max_exchanges)
 
-    # Initialize executor with RAG and Memory
-    # Note: LLMRouter implements LLMAdapter protocol with additional features
-    executor = AgentExecutor(
-        cast(LLMAdapter, llm_adapter),
-        tool_registry,
-        config,
+    # Initialize executor with unified interface (supports both legacy and LangGraph)
+    # Choose executor based on config.executor_type
+    executor_wrapper = create_unified_executor(
+        llm_adapter=cast(LLMAdapter, llm_adapter),
+        tool_registry=tool_registry,
+        config=config,
+        host_api=host_api,
+        vault_path=config.vault_path,
+        executor_type=config.executor_type,  # "legacy" or "langgraph"
+        # Legacy executor options
         rag_store=rag_store,
         memory=memory,
+        # LangGraph executor options
+        enable_langgraph_reflection=config.enable_langgraph_reflection,
+        enable_langgraph_verification=config.enable_langgraph_verification,
+        max_steps=config.langgraph_max_steps,
     )
+
+    # Unwrap for backward compatibility (executor_wrapper.executor is the actual executor)
+    # But use wrapper for consistent interface
+    executor = executor_wrapper
 
     # Initialize audit logger
     audit_dir = Path("artifacts/audit")

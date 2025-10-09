@@ -41,6 +41,12 @@ class AgentConfig:
     timeout: float = 60.0
     temperature: float = 0.7
 
+    # Executor selection (Phase 1-3 integration)
+    executor_type: str = "legacy"  # "legacy" or "langgraph"
+    enable_langgraph_reflection: bool = True
+    enable_langgraph_verification: bool = True
+    langgraph_max_steps: int = 10
+
     # Service settings
     host: str = "0.0.0.0"
     port: int = 8000
