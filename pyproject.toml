@@ -24,11 +24,14 @@ httpx = { version = ">=0.23.1,<0.28.0", optional = true }
 fastapi = { version = "^0.100.0", optional = true }
 uvicorn = { version = "^0.23.0", optional = true }
 pydantic = { version = "^2.0.0", optional = true }
+# LangGraph integration
+langgraph = { version = "^0.2.0", optional = true }
+langchain-core = { version = "^0.3.0", optional = true }
 
 [tool.poetry.extras]
 telegram = ["python-telegram-bot", "httpx"]
 gcal = ["google-auth", "google-auth-oauthlib", "google-api-python-client"]
-agent = ["httpx", "fastapi", "uvicorn", "pydantic"]
+agent = ["httpx", "fastapi", "uvicorn", "pydantic", "langgraph", "langchain-core"]
 all = [
   "python-telegram-bot",
   "google-auth",
@@ -39,6 +42,8 @@ all = [
   "fastapi",
   "uvicorn",
   "pydantic",
+  "langgraph",
+  "langchain-core",
 ]
 
 [tool.poetry.scripts]
