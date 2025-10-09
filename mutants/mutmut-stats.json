@@ -1,0 +1,32 @@
+{
+    "tests_by_mangled_function_name": {},
+    "duration_by_test": {
+        "tests/unit/test_idempotency.py::TestPayloadNormalization::test_normalize_removes_volatile_fields": 8.853700273903087e-05,
+        "tests/unit/test_idempotency.py::TestPayloadNormalization::test_normalize_sorts_keys": 0.00011804299720097333,
+        "tests/unit/test_idempotency.py::TestPayloadNormalization::test_normalize_consistent_separators": 8.826699922792614e-05,
+        "tests/unit/test_idempotency.py::TestEventIDGeneration::test_generate_event_id_returns_sha256": 8.460999379167333e-05,
+        "tests/unit/test_idempotency.py::TestEventIDGeneration::test_identical_events_produce_same_id": 7.515199831686914e-05,
+        "tests/unit/test_idempotency.py::TestEventIDGeneration::test_different_payloads_produce_different_ids": 7.7627002610825e-05,
+        "tests/unit/test_idempotency.py::TestEventIDGeneration::test_different_sources_produce_different_ids": 6.701699749100953e-05,
+        "tests/unit/test_idempotency.py::TestEventIDGeneration::test_different_external_ids_produce_different_ids": 8.277600136352703e-05,
+        "tests/unit/test_idempotency.py::TestEventIDGeneration::test_payload_with_retry_fields_normalized": 6.867999763926491e-05,
+        "tests/unit/test_idempotency.py::TestEventDedupeStore::test_create_dedupe_store": 0.00013323099847184494,
+        "tests/unit/test_idempotency.py::TestEventDedupeStore::test_is_duplicate_false_for_new_event": 0.00014288999955169857,
+        "tests/unit/test_idempotency.py::TestEventDedupeStore::test_mark_seen_returns_true_for_new_event": 0.00013814100384479389,
+        "tests/unit/test_idempotency.py::TestEventDedupeStore::test_mark_seen_returns_false_for_duplicate": 0.00015109500236576423,
+        "tests/unit/test_idempotency.py::TestEventDedupeStore::test_is_duplicate_true_after_mark_seen": 0.00020853400201303884,
+        "tests/unit/test_idempotency.py::TestEventDedupeStore::test_get_event_info_none_for_unseen": 0.000154131994349882,
+        "tests/unit/test_idempotency.py::TestEventDedupeStore::test_get_event_info_returns_data_for_seen": 0.00012424499436747283,
+        "tests/unit/test_idempotency.py::TestEventDedupeStore::test_seen_count_increments_on_duplicates": 0.00014726799417985603,
+        "tests/unit/test_idempotency.py::TestEventDedupeStore::test_last_seen_ts_updates_on_duplicates": 0.00014404200192075223,
+        "tests/unit/test_idempotency.py::TestTTLCleanup::test_cleanup_old_events": 0.00013263100117910653,
+        "tests/unit/test_idempotency.py::TestTTLCleanup::test_cleanup_respects_ttl": 0.0001352559993392788,
+        "tests/unit/test_idempotency.py::TestDedupeStoreStats::test_get_stats_empty_store": 0.00010435700096422806,
+        "tests/unit/test_idempotency.py::TestDedupeStoreStats::test_get_stats_with_events": 0.00014258000010158867,
+        "tests/unit/test_idempotency.py::TestCreateDedupeStore::test_create_dedupe_store_from_vault_path": 0.00012102899927413091,
+        "tests/unit/test_idempotency.py::TestDedupeContextManager::test_context_manager_closes_connection": 0.00011804399400716648,
+        "tests/unit/test_idempotency.py::TestIdempotencyIntegration::test_republishing_same_event_is_noop": 0.00013655799557454884,
+        "tests/unit/test_idempotency.py::TestIdempotencyIntegration::test_retry_with_different_metadata_is_noop": 0.0001595009962329641
+    },
+    "stats_time": 0.68158258
+}
