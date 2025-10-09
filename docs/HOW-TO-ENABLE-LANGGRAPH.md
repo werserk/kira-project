@@ -1,21 +1,28 @@
-# Как включить LangGraph в Telegram боте
+# LangGraph в Telegram боте
+
+**⚠️ ВАЖНО:** LangGraph включен **по умолчанию**! Это основа для всех NL взаимодействий в Kira.
 
 ## TL;DR - Быстрый старт
 
 ```bash
-# 1. Установите зависимости (если еще не установлены)
+# 1. Установите зависимости
 poetry install --extras agent
 
-# 2. Включите LangGraph в .env
-echo "KIRA_EXECUTOR_TYPE=langgraph" >> .env
+# 2. Добавьте хотя бы один API ключ в .env
+echo "ANTHROPIC_API_KEY=sk-ant-..." >> .env
+# ИЛИ используйте Ollama (бесплатно)
+echo "KIRA_ENABLE_OLLAMA_FALLBACK=true" >> .env
 
-# 3. Перезапустите бота
-# Готово! Теперь Telegram использует LangGraph с Phase 1-3
+# 3. Запустите бота
+poetry run kira-telegram
+# Готово! LangGraph работает автоматически
 ```
 
-## Что получите
+## Архитектура
 
-### ДО (Legacy Executor)
+LangGraph - это **единственный** рекомендованный способ для NL взаимодействия в Kira.
+
+### Старый подход (Legacy Executor - deprecated)
 ```
 Пользователь: "Создай задачу"
     ↓
@@ -33,7 +40,7 @@ AgentExecutor:
 - ❌ Нет circuit breaker
 - ❌ Простая цепочка без рефлексии
 
-### ПОСЛЕ (LangGraph Executor)
+### Текущий подход (LangGraph Executor - DEFAULT)
 ```
 Пользователь: "Создай задачу"
     ↓
@@ -261,19 +268,17 @@ curl http://localhost:8000/metrics
 Кира: ✅ Создана задача
 ```
 
-## Откат на Legacy (если что-то не так)
+## Откат на Legacy (только для отладки!)
 
-Просто измените в `.env`:
+⚠️ **Не рекомендуется!** Legacy executor оставлен только для backward compatibility и отладки.
+
+Если нужно временно использовать legacy (например, для отладки):
 
 ```bash
-# Было:
-KIRA_EXECUTOR_TYPE=langgraph
-
-# Стало:
-KIRA_EXECUTOR_TYPE=legacy
+KIRA_EXECUTOR_TYPE=legacy  # Только для debugging!
 ```
 
-Перезапустите бота - всё вернется к старому поведению.
+**Важно:** В production всегда используйте LangGraph.
 
 ## Мониторинг
 
@@ -354,7 +359,9 @@ KIRA_ENABLE_OLLAMA_FALLBACK=true  # Только Ollama
 
 **Testing:**
 ```bash
-KIRA_EXECUTOR_TYPE=legacy  # Быстрее для unit tests
+# LangGraph используется и в тестах (полная интеграция)
+KIRA_EXECUTOR_TYPE=langgraph
+KIRA_LANGGRAPH_MAX_STEPS=5  # Меньше шагов для быстрых тестов
 ```
 
 ## Что дальше?

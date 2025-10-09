@@ -42,7 +42,7 @@ class AgentConfig:
     temperature: float = 0.7
 
     # Executor selection (Phase 1-3 integration)
-    executor_type: str = "legacy"  # "legacy" or "langgraph"
+    executor_type: str = "langgraph"  # LangGraph is the default and recommended
     enable_langgraph_reflection: bool = True
     enable_langgraph_verification: bool = True
     langgraph_max_steps: int = 10
