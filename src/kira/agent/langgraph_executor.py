@@ -22,14 +22,19 @@ __all__ = ["LangGraphExecutor", "ExecutionResult"]
 class ExecutionResult:
     """Result of LangGraph execution."""
 
-    def __init__(self, state: AgentState) -> None:
+    def __init__(self, state: AgentState | dict[str, Any]) -> None:
         """Initialize from final state.
 
         Parameters
         ----------
         state
-            Final agent state after graph execution
+            Final agent state after graph execution (AgentState or dict)
         """
+        # LangGraph returns dict, not dataclass
+        if isinstance(state, dict):
+            from .state import AgentState as AgentStateClass
+            state = AgentStateClass.from_dict(state)
+        
         self.state = state
         self.trace_id = state.trace_id
         self.status = state.status

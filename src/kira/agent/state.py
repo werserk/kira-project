@@ -132,6 +132,7 @@ class AgentState:
             plan=data.get("plan", []),
             current_step=data.get("current_step", 0),
             tool_results=data.get("tool_results", []),
+            response=data.get("response", ""),  # Natural language response
             memory=data.get("memory", {}),
             rag_snippets=data.get("rag_snippets", []),
             error=data.get("error"),

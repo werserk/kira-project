@@ -208,8 +208,11 @@ class AgentGraph:
         logger.info(f"[{state.trace_id}] Starting graph execution")
 
         try:
-            # LangGraph returns the final state
-            final_state: AgentState = self.graph.invoke(state)  # type: ignore[no-untyped-call]
+            # LangGraph returns dict (AddableValuesDict), not dataclass
+            result_dict = self.graph.invoke(state)  # type: ignore[no-untyped-call]
+            
+            # Convert dict back to AgentState
+            final_state = AgentStateClass.from_dict(result_dict)
             logger.info(f"[{state.trace_id}] Graph execution completed: status={final_state.status}")
             return final_state
         except Exception as e:
