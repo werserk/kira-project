@@ -324,10 +324,17 @@ def respond_node(state: AgentState, llm_adapter: LLMAdapter) -> dict[str, Any]:
     logger.info(f"[{state.trace_id}] Response generation phase started")
     state.status = "responding"
 
-    # Extract user request
+    # Extract user request (get the LAST user message, not first!)
     user_request = ""
     if state.messages:
-        user_request = state.messages[0].get("content", "")
+        # Find the last user message in the conversation
+        for msg in reversed(state.messages):
+            if msg.get("role") == "user":
+                user_request = msg.get("content", "")
+                break
+        # Fallback to first message if no user role found
+        if not user_request:
+            user_request = state.messages[0].get("content", "")
 
     # Build context for response generation
     context_parts = []

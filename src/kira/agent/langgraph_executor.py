@@ -123,6 +123,10 @@ class LangGraphExecutor:
     ) -> ExecutionResult:
         """Execute user request through LangGraph.
 
+        This is the main entry point for LangGraph execution.
+        For compatibility with UnifiedExecutor, this is called by
+        UnifiedExecutor.chat_and_execute() when executor_type is LANGGRAPH.
+
         Parameters
         ----------
         user_request
@@ -164,6 +168,7 @@ class LangGraphExecutor:
         )
 
         # Execute graph
+        # Note: AgentGraph.invoke() handles conversion from dict to AgentState
         final_state = self.graph.invoke(state)
 
         result = ExecutionResult(final_state)
@@ -178,7 +183,7 @@ class LangGraphExecutor:
         trace_id: str | None = None,
         user: str = "default",
         dry_run: bool = False,
-    ) -> Any:  # type: ignore[misc]
+    ) -> Any:
         """Stream execution progress step by step.
 
         Parameters
@@ -222,9 +227,9 @@ class LangGraphExecutor:
         )
 
         # Stream graph execution
-        for node_name, updated_state in self.graph.stream(state):
+        for node_name_val, updated_state in self.graph.stream(state):
             result = ExecutionResult(updated_state)
-            yield node_name, result
+            yield node_name_val, result
 
     def get_graph_diagram(self) -> str:
         """Get Mermaid diagram of the execution graph.

@@ -124,6 +124,22 @@ class AgentState:
         budget_data = data.get("budget", {})
         flags_data = data.get("flags", {})
 
+        # Handle case where budget/flags are already objects (not dicts)
+        # This can happen when LangGraph returns state with dataclass instances
+        if isinstance(budget_data, Budget):
+            budget = budget_data
+        elif isinstance(budget_data, dict):
+            budget = Budget(**budget_data) if budget_data else Budget()
+        else:
+            budget = Budget()
+
+        if isinstance(flags_data, ContextFlags):
+            flags = flags_data
+        elif isinstance(flags_data, dict):
+            flags = ContextFlags(**flags_data) if flags_data else ContextFlags()
+        else:
+            flags = ContextFlags()
+
         return cls(
             trace_id=data["trace_id"],
             user=data.get("user", "default"),
@@ -137,8 +153,8 @@ class AgentState:
             rag_snippets=data.get("rag_snippets", []),
             error=data.get("error"),
             retry_count=data.get("retry_count", 0),
-            budget=Budget(**budget_data) if budget_data else Budget(),
-            flags=ContextFlags(**flags_data) if flags_data else ContextFlags(),
+            budget=budget,
+            flags=flags,
             status=data.get("status", "pending"),
         )
 

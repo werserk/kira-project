@@ -6,7 +6,7 @@ Builds the execution graph: plan → reflect? → tool → verify → (done | pl
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any, Callable
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from ..adapters.llm import LLMAdapter
@@ -40,13 +40,13 @@ def build_agent_graph(
         Compiled agent graph ready for execution
     """
     try:
-        from langgraph.graph import END, StateGraph  # type: ignore[import-untyped]
+        from langgraph.graph import END, StateGraph
     except ImportError as e:
         raise ImportError(
             "LangGraph is not installed. Install with: pip install kira[agent] or poetry install --extras agent"
         ) from e
 
-    from .nodes import plan_node, reflect_node, respond_node, route_node, tool_node, verify_node
+    from .nodes import plan_node, reflect_node, respond_node, tool_node, verify_node
     from .state import AgentState as AgentStateClass
 
     # Create state graph
@@ -81,7 +81,7 @@ def build_agent_graph(
     def route_after_plan(state):  # type: ignore[no-untyped-def]
         """Route after planning."""
         if state.error or state.status == "error":
-            return "halt"
+            return "respond_step"  # Generate NL response even on planning error
         if state.flags.enable_reflection:
             return "reflect_step"
         return "tool_step"
@@ -89,37 +89,38 @@ def build_agent_graph(
     def route_after_reflect(state):  # type: ignore[no-untyped-def]
         """Route after reflection."""
         if state.error or state.status == "error":
-            return "halt"
+            return "respond_step"  # Generate NL response even on reflection error
         return "tool_step"
 
     def route_after_tool(state):  # type: ignore[no-untyped-def]
         """Route after tool execution."""
         if state.budget.is_exceeded():
-            return "halt"
+            return "respond_step"  # Generate NL response even on budget exceeded
         if state.error or state.status == "error":
             if state.retry_count < 2:
                 return "plan_step"
-            return "halt"
+            return "respond_step"  # Generate NL response even on error
         if state.flags.enable_verification:
             return "verify_step"
         # Check if more steps remain
         if state.current_step < len(state.plan):
             return "tool_step"
-        return "done"
+        return "respond_step"  # Always generate NL response before done
 
     def route_after_verify(state):  # type: ignore[no-untyped-def]
         """Route after verification."""
         if state.budget.is_exceeded():
-            return "halt"
+            return "respond_step"  # Generate NL response even on budget exceeded
         if state.error or state.status == "error":
-            return "halt"
+            return "respond_step"  # Generate NL response even on error
         # Check if more steps remain
         if state.current_step < len(state.plan):
             return "tool_step"
         return "respond_step"  # Generate NL response
 
-    def route_after_respond(state):  # type: ignore[no-untyped-def]
+    def route_after_respond(state):  # type: ignore[no-untyped-def,unused-ignore]
         """Route after response generation."""
+        _ = state  # State not used but required by interface
         return "done"
 
     # Add conditional edges
@@ -129,6 +130,7 @@ def build_agent_graph(
         {
             "reflect_step": "reflect_step",
             "tool_step": "tool_step",
+            "respond_step": "respond_step",
             "halt": END,
         },
     )
@@ -138,6 +140,7 @@ def build_agent_graph(
         route_after_reflect,
         {
             "tool_step": "tool_step",
+            "respond_step": "respond_step",
             "halt": END,
         },
     )
@@ -149,6 +152,7 @@ def build_agent_graph(
             "verify_step": "verify_step",
             "tool_step": "tool_step",
             "plan_step": "plan_step",
+            "respond_step": "respond_step",
             "done": END,
             "halt": END,
         },
@@ -208,11 +212,21 @@ class AgentGraph:
         logger.info(f"[{state.trace_id}] Starting graph execution")
 
         try:
-            # LangGraph returns dict (AddableValuesDict), not dataclass
-            result_dict = self.graph.invoke(state)  # type: ignore[no-untyped-call]
+            from .state import AgentState as StateClass
 
-            # Convert dict back to AgentState
-            final_state = AgentStateClass.from_dict(result_dict)
+            # LangGraph returns dict (AddableValuesDict), not dataclass
+            result = self.graph.invoke(state)
+
+            # Convert dict back to AgentState if needed
+            if isinstance(result, dict):
+                final_state = StateClass.from_dict(result)
+            elif isinstance(result, StateClass):
+                final_state = result
+            else:
+                # Unexpected type - try to convert
+                logger.warning(f"Unexpected result type from graph: {type(result)}")
+                final_state = StateClass.from_dict(dict(result))
+
             logger.info(f"[{state.trace_id}] Graph execution completed: status={final_state.status}")
             return final_state
         except Exception as e:
@@ -237,9 +251,9 @@ class AgentGraph:
         logger.info(f"[{state.trace_id}] Starting streaming graph execution")
 
         try:
-            for node_name, updated_state in self.graph.stream(state):
-                logger.debug(f"[{state.trace_id}] Node '{node_name}' completed")
-                yield node_name, updated_state
+            for node_name_val, updated_state in self.graph.stream(state):
+                logger.debug(f"[{state.trace_id}] Node '{node_name_val}' completed")
+                yield node_name_val, updated_state
         except Exception as e:
             logger.error(f"[{state.trace_id}] Streaming execution failed: {e}", exc_info=True)
             state.error = str(e)
@@ -256,9 +270,8 @@ class AgentGraph:
         """
         try:
             # LangGraph provides get_graph() method for visualization
-            result: str = self.graph.get_graph().draw_mermaid()  # type: ignore[no-untyped-call]
+            result: str = self.graph.get_graph().draw_mermaid()
             return result
         except Exception as e:
             logger.warning(f"Could not generate graph visualization: {e}")
             return "Graph visualization not available"
-
