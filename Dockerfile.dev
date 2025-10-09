@@ -1,0 +1,37 @@
+# Kira Development - Docker Image
+# Optimized for hot-reload and fast iteration
+
+FROM python:3.12-slim
+
+# Install Poetry
+RUN pip install poetry==1.7.1
+
+WORKDIR /app
+
+# Copy dependency files
+COPY pyproject.toml poetry.lock ./
+
+# Copy application code first (needed for poetry install)
+COPY src/ ./src/
+COPY config/ ./config/
+
+# Install dependencies with dev extras AND project itself
+# Need both "agent" and "telegram" extras for Telegram bot
+RUN poetry config virtualenvs.in-project true && \
+    poetry install --extras "agent telegram" --with dev
+
+# Create necessary directories
+RUN mkdir -p vault/{tasks,notes,events,inbox,processed,projects,contacts,meetings,journal,resources,archive} \
+    logs artifacts/audit .rag tmp/telegram
+
+# Set Python path and unbuffered output
+ENV PYTHONPATH=/app/src
+ENV PATH="/app/.venv/bin:$PATH"
+ENV PYTHONUNBUFFERED=1
+
+# Install watchdog for hot-reload (optional)
+RUN poetry run pip install watchdog
+
+# Default command (will be overridden by compose)
+CMD ["poetry", "run", "kira", "telegram", "start", "--verbose"]
+

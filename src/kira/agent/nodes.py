@@ -50,7 +50,7 @@ OUTPUT FORMAT (JSON only):
 {{
   "plan": ["step 1 description", "step 2 description", ...],
   "tool_calls": [
-    {{"tool": "exact_tool_name", "args": {{}}, "dry_run": true/false}},
+    {{"tool": "exact_tool_name", "args": {{}}, "dry_run": false}},
     ...
   ],
   "reasoning": "Brief explanation"
@@ -58,7 +58,8 @@ OUTPUT FORMAT (JSON only):
 
 RULES:
 - Use EXACT tool names from the list above
-- Start with dry_run=true for mutating operations
+- Set dry_run=false for actual execution (reflection_node will ensure safety)
+- Only use dry_run=true if user explicitly asks to simulate/preview
 - Keep plans concise (max {state.budget.max_steps - state.budget.steps_used} steps)
 - Return ONLY valid JSON, no markdown or extra text
 """
@@ -140,10 +141,10 @@ OUTPUT FORMAT (JSON only):
 }
 
 SAFETY CHECKS:
-- No destructive operations without dry_run=true first
-- No operations that could cause data loss
+- No operations that could cause unintended data loss
 - FSM state transitions are valid
 - Arguments are reasonable
+- User intent is clear (e.g., "delete all" requires explicit confirmation)
 """
 
     try:

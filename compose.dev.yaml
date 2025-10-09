@@ -1,0 +1,59 @@
+# Kira Development Environment - Docker Compose
+# Hot-reload enabled for fast development
+
+services:
+  kira-telegram-bot:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    image: kira-dev:latest
+    container_name: kira-telegram-dev
+    command: python -m kira.cli telegram start --verbose
+    environment:
+      - PYTHONUNBUFFERED=1
+      - PYTHONPATH=/app/src
+      - KIRA_VAULT_PATH=/app/vault
+      - KIRA_DEFAULT_TZ=UTC
+      - LLM_PROVIDER=${LLM_PROVIDER:-openrouter}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - ENABLE_OLLAMA_FALLBACK=true
+      - OLLAMA_BASE_URL=http://ollama:11434
+      - ENABLE_RAG=false
+      - ENABLE_CONVERSATION_MEMORY=true
+      - KIRA_LOG_LEVEL=DEBUG
+      - KIRA_EXECUTOR_TYPE=langgraph
+    volumes:
+      # Hot-reload: монтируем исходный код (будет работать с PYTHONPATH)
+      - ./src/kira:/app/src/kira:ro
+      - ./vault:/app/vault
+      - ./artifacts:/app/artifacts
+      - ./logs:/app/logs
+      - ./config:/app/config:ro
+      - ./.env:/app/.env:ro
+    depends_on:
+      - ollama
+    restart: unless-stopped
+    networks:
+      - kira-network
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: kira-ollama-dev
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_dev_data:/root/.ollama
+    restart: unless-stopped
+    networks:
+      - kira-network
+
+volumes:
+  ollama_dev_data:
+    driver: local
+
+networks:
+  kira-network:
+    driver: bridge
