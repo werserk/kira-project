@@ -179,6 +179,7 @@ def handle_telegram_start(
     from ..agent.message_handler import create_message_handler
     from ..agent.rag import RAGStore, build_rag_index
     from ..agent.tools import ToolRegistry
+    from ..agent.unified_executor import create_unified_executor
 
     click.echo("🤖 Запуск Telegram бота с AI агентом...")
 
@@ -256,17 +257,28 @@ def handle_telegram_start(
     # Initialize conversation memory
     memory = ConversationMemory(max_exchanges=agent_config.memory_max_exchanges)
 
-    # Create executor
-    executor = AgentExecutor(
-        cast(LLMAdapter, llm_adapter),
-        tool_registry,
-        agent_config,
+    # Create unified executor (supports both legacy and LangGraph)
+    executor_wrapper = create_unified_executor(
+        llm_adapter=cast(LLMAdapter, llm_adapter),
+        tool_registry=tool_registry,
+        config=agent_config,
+        host_api=host_api,
+        vault_path=vault_path,
+        executor_type=agent_config.executor_type,  # From config (default: "langgraph")
+        # Legacy executor options
         rag_store=rag_store,
         memory=memory,
+        # LangGraph executor options
+        enable_langgraph_reflection=agent_config.enable_langgraph_reflection,
+        enable_langgraph_verification=agent_config.enable_langgraph_verification,
+        max_steps=agent_config.langgraph_max_steps,
     )
+    
+    # Use wrapper for consistent interface
+    executor = executor_wrapper
 
     if verbose:
-        click.echo("   ✅ AI Agent инициализирован")
+        click.echo(f"   ✅ AI Agent инициализирован (executor: {agent_config.executor_type})")
 
     # === Setup Telegram Components ===
 
