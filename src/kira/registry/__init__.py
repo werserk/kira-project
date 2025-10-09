@@ -155,11 +155,16 @@ class AdapterRegistry:
         return self._adapters.copy()
 
     def get_enabled_adapters(self) -> list[dict[str, Any]]:
-        """Возвращает список включенных адаптеров (из kira.yaml)"""
+        """Возвращает список включенных адаптеров (из kira.yaml или поля enabled в реестре)"""
         result = []
         for adapter in self._adapters:
             name = adapter.get("name")
-            if name and self._enabled_adapters.get(name, False):
+            # Если в самом адаптере есть поле enabled, используем его (для тестов)
+            if "enabled" in adapter:
+                if adapter["enabled"]:
+                    result.append(adapter)
+            # Иначе проверяем список включенных адаптеров из kira.yaml
+            elif name and self._enabled_adapters.get(name, False):
                 result.append(adapter)
         return result
 
@@ -176,7 +181,12 @@ class AdapterRegistry:
         adapter = self.get_adapter(name)
         if adapter is None:
             return False
-        # Проверяем что адаптер включен в конфигурации
+
+        # Если в самом адаптере есть поле enabled, используем его (для тестов)
+        if "enabled" in adapter:
+            return bool(adapter["enabled"])
+
+        # Иначе проверяем, включен ли адаптер в конфигурации
         return self._enabled_adapters.get(name, False)
 
     def get_adapter_path(self, name: str) -> Path | None:

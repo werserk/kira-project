@@ -11,6 +11,8 @@
 .coverage.*
 .coverage.xml
 .coverage.json
+.mutmut-cache
+mutants/
 __pycache__
 *.pyc
 *.pyo

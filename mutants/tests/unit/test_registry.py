@@ -187,10 +187,10 @@ class TestAdapterRegistry:
 
     def test_is_adapter_enabled(self):
         """Тест проверки включенности адаптера"""
-        assert self.registry.is_adapter_enabled("kira-telegram")
-        assert self.registry.is_adapter_enabled("kira-gcal")
-        assert not self.registry.is_adapter_enabled("kira-filesystem")
-        assert not self.registry.is_adapter_enabled("nonexistent")
+        assert self.registry.is_adapter_enabled("kira-telegram") is True
+        assert self.registry.is_adapter_enabled("kira-gcal") is True
+        assert not self.registry.is_adapter_enabled("kira-filesystem") is True
+        assert not self.registry.is_adapter_enabled("nonexistent") is True
 
     def test_get_adapter_path(self):
         """Тест получения пути к адаптеру"""

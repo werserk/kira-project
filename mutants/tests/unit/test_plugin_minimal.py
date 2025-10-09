@@ -7,7 +7,17 @@ import sys
 from pathlib import Path
 
 # Add src to path
-sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
+src_path = Path(__file__).parent.parent.parent / "src"
+sys.path.insert(0, str(src_path))
+
+# Add plugin paths
+plugins_root = src_path / "kira" / "plugins"
+for plugin_dir in plugins_root.iterdir():
+    if plugin_dir.is_dir():
+        plugin_src_path = plugin_dir / "src"
+        if plugin_src_path.exists():
+            sys.path.insert(0, str(plugin_src_path.resolve()))
+
 
 from kira.plugin_sdk.context import PluginContext
 

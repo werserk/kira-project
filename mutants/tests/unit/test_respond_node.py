@@ -205,14 +205,12 @@ def test_respond_node_updates_state_status(
 
 def test_respond_node_system_prompt_is_conversational() -> None:
     """Test that system prompt emphasizes conversational, friendly tone."""
-    import inspect
+    from kira.agent.nodes import _get_respond_node_system_prompt
 
-    from kira.agent.nodes import respond_node
-
-    # Get source code of respond_node
-    source = inspect.getsource(respond_node)
+    # Get system prompt
+    system_prompt = _get_respond_node_system_prompt()
 
     # Check that system prompt has conversational markers (in Russian or English)
-    assert "дружелюбный" in source or "friendly" in source or "conversational" in source
-    assert "естественный" in source or "natural" in source
+    assert "дружелюбный" in system_prompt or "friendly" in system_prompt or "conversational" in system_prompt
+    assert "естественный" in system_prompt or "natural" in system_prompt
 
