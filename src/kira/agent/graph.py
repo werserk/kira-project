@@ -47,10 +47,10 @@ def build_agent_graph(
         ) from e
 
     from .nodes import plan_node, reflect_node, respond_node, tool_node, verify_node
-    from .state import AgentState as AgentStateClass
+    from .state import AgentState
 
     # Create state graph
-    graph = StateGraph(AgentStateClass)
+    graph = StateGraph(AgentState)
 
     # Add nodes with partial application of dependencies
     def _plan_node(state):  # type: ignore[no-untyped-def]

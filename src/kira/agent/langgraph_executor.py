@@ -32,8 +32,8 @@ class ExecutionResult:
         """
         # LangGraph returns dict, not dataclass
         if isinstance(state, dict):
-            from .state import AgentState as AgentStateClass
-            state = AgentStateClass.from_dict(state)
+            from .state import AgentState as StateClass
+            state = StateClass.from_dict(state)
 
         self.state = state
         self.trace_id = state.trace_id
