@@ -118,4 +118,9 @@ class AgentConfig:
             enable_telegram_webhook=settings.enable_telegram_webhook,
             # Vault
             vault_path=settings.vault_path,
+            # Executor (LangGraph by default)
+            executor_type=getattr(settings, "executor_type", "langgraph"),
+            enable_langgraph_reflection=getattr(settings, "enable_langgraph_reflection", True),
+            enable_langgraph_verification=getattr(settings, "enable_langgraph_verification", True),
+            langgraph_max_steps=getattr(settings, "langgraph_max_steps", 10),
         )
