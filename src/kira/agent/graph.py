@@ -210,7 +210,7 @@ class AgentGraph:
         try:
             # LangGraph returns dict (AddableValuesDict), not dataclass
             result_dict = self.graph.invoke(state)  # type: ignore[no-untyped-call]
-            
+
             # Convert dict back to AgentState
             final_state = AgentStateClass.from_dict(result_dict)
             logger.info(f"[{state.trace_id}] Graph execution completed: status={final_state.status}")

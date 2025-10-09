@@ -34,7 +34,7 @@ class ExecutionResult:
         if isinstance(state, dict):
             from .state import AgentState as AgentStateClass
             state = AgentStateClass.from_dict(state)
-        
+
         self.state = state
         self.trace_id = state.trace_id
         self.status = state.status
