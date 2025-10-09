@@ -156,7 +156,7 @@ def test_reflect_node_safe_plan():
 
     state = AgentState(
         trace_id="test-123",
-        plan=[{"tool": "task_list", "args": {}, "dry_run": false}],
+        plan=[{"tool": "task_list", "args": {}, "dry_run": False}],
     )
 
     result = reflect_node(state, llm_adapter)
@@ -180,7 +180,7 @@ def test_reflect_node_unsafe_plan_with_revision():
 
     state = AgentState(
         trace_id="test-123",
-        plan=[{"tool": "task_create", "args": {"title": "Test"}, "dry_run": false}],
+        plan=[{"tool": "task_create", "args": {"title": "Test"}, "dry_run": False}],
     )
 
     result = reflect_node(state, llm_adapter)
@@ -209,7 +209,7 @@ def test_tool_node_success():
 
     state = AgentState(
         trace_id="test-123",
-        plan=[{"tool": "task_create", "args": {"title": "Test"}, "dry_run": false}],
+        plan=[{"tool": "task_create", "args": {"title": "Test"}, "dry_run": False}],
         current_step=0,
     )
 
@@ -227,7 +227,7 @@ def test_tool_node_tool_not_found():
     registry = MockToolRegistry()
     state = AgentState(
         trace_id="test-123",
-        plan=[{"tool": "unknown_tool", "args": {}, "dry_run": false}],
+        plan=[{"tool": "unknown_tool", "args": {}, "dry_run": False}],
         current_step=0,
     )
 
@@ -245,7 +245,7 @@ def test_tool_node_respects_dry_run():
 
     state = AgentState(
         trace_id="test-123",
-        plan=[{"tool": "task_create", "args": {"title": "Test"}, "dry_run": true}],
+        plan=[{"tool": "task_create", "args": {"title": "Test"}, "dry_run": True}],
         current_step=0,
     )
 
@@ -263,7 +263,7 @@ def test_tool_node_global_dry_run():
 
     state = AgentState(
         trace_id="test-123",
-        plan=[{"tool": "task_create", "args": {"title": "Test"}, "dry_run": false}],
+        plan=[{"tool": "task_create", "args": {"title": "Test"}, "dry_run": False}],
         current_step=0,
         flags=ContextFlags(dry_run=True),
     )
@@ -281,7 +281,7 @@ def test_tool_node_updates_budget():
 
     state = AgentState(
         trace_id="test-123",
-        plan=[{"tool": "task_create", "args": {}, "dry_run": false}],
+        plan=[{"tool": "task_create", "args": {}, "dry_run": False}],
         current_step=0,
     )
 
@@ -463,7 +463,7 @@ def test_route_node_executed_more_steps():
 
 
 def test_route_node_verified_to_done():
-    """Test route node from verified to done."""
+    """Test route node from verified to respond (generates NL response)."""
     state = AgentState(
         trace_id="test-123",
         status="verified",
@@ -473,7 +473,7 @@ def test_route_node_verified_to_done():
 
     next_node = route_node(state)
 
-    assert next_node == "done"
+    assert next_node == "respond"  # Changed to respond for NL response generation
 
 
 def test_route_node_verified_more_steps():
@@ -491,10 +491,10 @@ def test_route_node_verified_more_steps():
 
 
 def test_route_node_completed():
-    """Test route node from completed to done."""
+    """Test route node from completed to respond (generates NL response)."""
     state = AgentState(trace_id="test-123", status="completed")
 
     next_node = route_node(state)
 
-    assert next_node == "done"
+    assert next_node == "respond"  # Changed to respond for NL response generation
 

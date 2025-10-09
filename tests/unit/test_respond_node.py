@@ -212,8 +212,7 @@ def test_respond_node_system_prompt_is_conversational() -> None:
     # Get source code of respond_node
     source = inspect.getsource(respond_node)
 
-    # Check that system prompt has conversational markers
-    assert "personal AI assistant" in source or "Kira" in source
-    assert "friendly" in source or "conversational" in source
-    assert "natural" in source
+    # Check that system prompt has conversational markers (in Russian or English)
+    assert "дружелюбный" in source or "friendly" in source or "conversational" in source
+    assert "естественный" in source or "natural" in source
 

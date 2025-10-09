@@ -133,7 +133,7 @@ class TestAuditLogging:
             entries = [json.loads(line) for line in f]
 
         # Verify update entry has args showing the change
-        update_entries = [e for e in entries if e["command"] == "task.update"]
+        update_entries = [e for e in entries if e["command"] == "task.update" and e["args"]["task_id"] == task_id]
         assert len(update_entries) > 0
 
         update_entry = update_entries[0]

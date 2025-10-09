@@ -260,7 +260,7 @@ def test_langgraph_executor_tool_error():
     plan_response = """{
         "plan": ["Create task"],
         "tool_calls": [
-            {"tool": "task_create", "args": {"title": "Test"}, "dry_run": false}
+            {"tool": "task_create", "args": {"title": "Test"}, "dry_run": False}
         ],
         "reasoning": "Create"
     }"""
@@ -282,7 +282,8 @@ def test_langgraph_executor_tool_error():
     result = executor.execute("Create a task")
 
     assert result.success is False
-    assert result.status == "error"
+    # Status should be "responded" since the executor generates a response even for errors
+    assert result.status == "responded"
 
 
 def test_langgraph_executor_streaming():

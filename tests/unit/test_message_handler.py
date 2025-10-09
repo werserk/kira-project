@@ -69,7 +69,7 @@ class TestMessageHandler:
 
         # Verify executor called
         executor.chat_and_execute.assert_called_once_with(
-            "Create a task for testing", trace_id="test-trace"
+            "Create a task for testing", trace_id="test-trace", session_id="telegram:123456"
         )
 
         # Verify callback called with formatted response

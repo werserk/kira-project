@@ -156,6 +156,9 @@ class TestTelegramAdapter:
             event_bus=self.event_bus,
             scheduler=self.scheduler,
         )
+        
+        # Mock _api_request to return dummy responses
+        self.adapter._api_request = MagicMock(return_value={"ok": True, "result": {"message_id": 123}})
 
     def test_adapter_initialization(self) -> None:
         """Test adapter initialization."""
@@ -167,9 +170,10 @@ class TestTelegramAdapter:
 
     def test_send_message(self) -> None:
         """Test sending a message."""
-        # send_message uses _api_request which is a placeholder
+        # send_message uses _api_request which is mocked
         response = self.adapter.send_message(123456, "Test message")
         assert response is not None
+        assert response["ok"] is True
 
     def test_send_message_with_keyboard(self) -> None:
         """Test sending message with inline keyboard."""
@@ -181,6 +185,7 @@ class TestTelegramAdapter:
             reply_markup=keyboard,
         )
         assert response is not None
+        assert response["ok"] is True
 
     def test_register_command_handler(self) -> None:
         """Test registering command handler."""
