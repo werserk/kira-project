@@ -3,6 +3,7 @@
 Provides NL → Plan → Dry-Run → Execute → Verify workflow with LLM integration.
 
 Phase 1: LangGraph integration available with LangGraphExecutor.
+Phase 2: Tool schemas, memory, RAG, and persistence.
 """
 
 from .config import AgentConfig
@@ -26,7 +27,20 @@ except ImportError:
     build_agent_graph = None  # type: ignore
     AgentGraph = None  # type: ignore
 
+# Phase 2: Tool schemas and execution
+from .context_memory import ContextMemory, EntityFact, create_context_memory
+from .persistence import (
+    FileStatePersistence,
+    SQLiteStatePersistence,
+    StatePersistence,
+    create_persistence,
+)
+from .rag_integration import RAGIntegration, create_rag_integration
+from .tool_executor import ToolExecutor, create_tool_executor
+from .tool_schemas import TOOL_SCHEMAS, validate_tool_args
+
 __all__ = [
+    # Core
     "AgentConfig",
     "AgentExecutor",
     "ExecutionPlan",
@@ -34,11 +48,28 @@ __all__ = [
     "AgentTool",
     "ToolRegistry",
     "create_agent_app",
-    # Phase 1 LangGraph
+    # Phase 1: LangGraph
     "LangGraphExecutor",
     "AgentState",
     "Budget",
     "ContextFlags",
     "build_agent_graph",
     "AgentGraph",
+    # Phase 2: Tools
+    "ToolExecutor",
+    "create_tool_executor",
+    "TOOL_SCHEMAS",
+    "validate_tool_args",
+    # Phase 2: Memory
+    "ContextMemory",
+    "EntityFact",
+    "create_context_memory",
+    # Phase 2: RAG
+    "RAGIntegration",
+    "create_rag_integration",
+    # Phase 2: Persistence
+    "StatePersistence",
+    "FileStatePersistence",
+    "SQLiteStatePersistence",
+    "create_persistence",
 ]
