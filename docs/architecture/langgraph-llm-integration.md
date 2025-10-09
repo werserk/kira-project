@@ -4,10 +4,10 @@
 
 LangGraph в Kira интегрирован с системой multi-provider LLM через `LangGraphLLMBridge`. Это обеспечивает:
 
-✅ **Работу с любым LLM провайдером** (OpenAI, Anthropic, OpenRouter, Ollama)  
-✅ **Автоматический fallback** на Ollama при сбоях  
-✅ **Provider routing** (разные модели для разных задач)  
-✅ **Retry логику** и обработку ошибок  
+✅ **Работу с любым LLM провайдером** (OpenAI, Anthropic, OpenRouter, Ollama)
+✅ **Автоматический fallback** на Ollama при сбоях
+✅ **Provider routing** (разные модели для разных задач)
+✅ **Retry логику** и обработку ошибок
 
 ## Архитектура
 
@@ -122,16 +122,16 @@ result = executor.execute("Create a task")
 # Пример: разные модели для разных задач
 llm = create_langgraph_llm_adapter(
     api_keys={"anthropic": "...", "openai": "..."},
-    
+
     # Planning nodes → Claude (лучше для reasoning)
     planning_provider="anthropic",
-    
+
     # JSON structuring → GPT-4 (лучше для structured output)
     structuring_provider="openai",
-    
+
     # Default для остального
     default_provider="openrouter",
-    
+
     # Всегда fallback на Ollama
     enable_ollama_fallback=True,
 )
@@ -143,10 +143,10 @@ llm = create_langgraph_llm_adapter(
 
 1. **Primary Provider** (anthropic/openai/openrouter)
    - Попытка с retry (3 раза с exponential backoff)
-   
+
 2. **Fallback Provider** (если настроен)
    - Попытка с альтернативным провайдером
-   
+
 3. **Ollama (local)**
    - Финальный fallback на локальную модель
    - Всегда доступен если `enable_ollama_fallback=True`
