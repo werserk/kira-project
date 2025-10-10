@@ -9,8 +9,8 @@ services:
     image: kira-dev:latest
     container_name: kira-telegram-dev
 
-    # Default: Telegram bot with hot-reload
-    command: python -m kira.cli telegram start --verbose
+    # Telegram bot with LangGraph + OpenRouter
+    command: poetry run kira telegram start --verbose
 
     environment:
       # Python settings
@@ -20,23 +20,31 @@ services:
       # Core Kira settings
       - KIRA_VAULT_PATH=/app/vault
       - KIRA_DEFAULT_TZ=${KIRA_DEFAULT_TZ:-UTC}
-      - KIRA_LOG_LEVEL=${KIRA_LOG_LEVEL:-DEBUG}
-      - KIRA_EXECUTOR_TYPE=${KIRA_EXECUTOR_TYPE:-langgraph}
+      - KIRA_LOG_LEVEL=${KIRA_LOG_LEVEL:-INFO}
 
-      # LLM Provider (choose one)
-      - LLM_PROVIDER=${LLM_PROVIDER:-ollama}
-      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
+      # Agent: LangGraph executor
+      - KIRA_EXECUTOR_TYPE=${KIRA_EXECUTOR_TYPE:-langgraph}
+      - KIRA_AGENT_MAX_TOOL_CALLS=${KIRA_AGENT_MAX_TOOL_CALLS:-10}
+      - KIRA_AGENT_MAX_TOKENS=${KIRA_AGENT_MAX_TOKENS:-4000}
+      - KIRA_AGENT_TEMPERATURE=${KIRA_AGENT_TEMPERATURE:-0.7}
+
+      # LLM: OpenRouter (default)
+      - LLM_PROVIDER=${LLM_PROVIDER:-openrouter}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      - OPENROUTER_DEFAULT_MODEL=${OPENROUTER_DEFAULT_MODEL:-anthropic/claude-3.5-sonnet}
+
+      # Optional: Other LLM providers
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
 
-      # Ollama (local AI)
-      - ENABLE_OLLAMA_FALLBACK=${ENABLE_OLLAMA_FALLBACK:-true}
+      # Ollama (local fallback - optional)
+      - ENABLE_OLLAMA_FALLBACK=${ENABLE_OLLAMA_FALLBACK:-false}
       - OLLAMA_BASE_URL=http://ollama:11434
 
       # Telegram
       - KIRA_TELEGRAM_ENABLED=${KIRA_TELEGRAM_ENABLED:-true}
-      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}
-      - TELEGRAM_ALLOWED_CHAT_IDS=${TELEGRAM_ALLOWED_CHAT_IDS:-}
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - TELEGRAM_ALLOWED_CHAT_IDS=${TELEGRAM_ALLOWED_CHAT_IDS}
 
       # Google Calendar (optional)
       - KIRA_GCAL_ENABLED=${KIRA_GCAL_ENABLED:-false}
@@ -45,6 +53,7 @@ services:
       # Features
       - ENABLE_RAG=${ENABLE_RAG:-false}
       - ENABLE_CONVERSATION_MEMORY=${ENABLE_CONVERSATION_MEMORY:-true}
+      - MEMORY_MAX_EXCHANGES=${MEMORY_MAX_EXCHANGES:-3}
       - KIRA_ENABLE_PLUGINS=${KIRA_ENABLE_PLUGINS:-false}
 
     volumes:
@@ -67,10 +76,7 @@ services:
       # Optional: Google Calendar credentials
       # - ./credentials.json:/app/credentials.json:ro
 
-    depends_on:
-      ollama:
-        condition: service_started
-
+    # Ollama is optional, start independently if needed
     restart: unless-stopped
 
     networks:
@@ -82,40 +88,26 @@ services:
         limits:
           memory: 4G
 
-  ollama:
-    image: ollama/ollama:latest
-    container_name: kira-ollama-dev
+  # Ollama - Optional local LLM fallback
+  # Uncomment if you want to use local LLM instead of OpenRouter
+  # ollama:
+  #   image: ollama/ollama:latest
+  #   container_name: kira-ollama-dev
+  #   ports:
+  #     - "11434:11434"
+  #   volumes:
+  #     - ollama_dev_data:/root/.ollama
+  #   restart: unless-stopped
+  #   networks:
+  #     - kira-network
+  #   deploy:
+  #     resources:
+  #       limits:
+  #         memory: 8G
 
-    ports:
-      - "11434:11434"
-
-    volumes:
-      - ollama_dev_data:/root/.ollama
-
-    restart: unless-stopped
-
-    networks:
-      - kira-network
-
-    deploy:
-      resources:
-        limits:
-          memory: 8G
-        reservations:
-          memory: 2G
-
-    # Auto-pull a lightweight model for development
-    # Uncomment to enable:
-    # command: >
-    #   sh -c "ollama serve &
-    #          sleep 10 &&
-    #          ollama pull llama2 &&
-    #          echo '✅ Ollama ready with llama2 model' &&
-    #          wait"
-
-volumes:
-  ollama_dev_data:
-    driver: local
+# volumes:
+#   ollama_dev_data:
+#     driver: local
 
 networks:
   kira-network:

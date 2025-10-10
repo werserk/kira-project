@@ -317,8 +317,12 @@ def handle_telegram_start(
             # Send without Markdown formatting to avoid parsing errors
             adapter.send_message(int(chat_id), text, parse_mode=None)
 
-    # Create message handler and subscribe to events
-    message_handler = create_message_handler(executor, response_callback=send_response)
+    # Create message handler with thinking indicator support and subscribe to events
+    message_handler = create_message_handler(
+        executor,
+        response_callback=send_response,
+        telegram_adapter=adapter,  # Pass adapter for thinking indicator
+    )
     event_bus.subscribe("message.received", message_handler.handle_message_received)
 
     if verbose:

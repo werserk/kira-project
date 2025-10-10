@@ -31,6 +31,7 @@ class MessageHandler:
         self,
         executor: Any,  # AgentExecutor or UnifiedExecutor
         response_callback: Callable[[str, str, str], None] | None = None,
+        telegram_adapter: Any | None = None,
     ) -> None:
         """Initialize message handler.
 
@@ -41,9 +42,12 @@ class MessageHandler:
         response_callback
             Callback to send responses back: callback(source, chat_id, response_text)
             Example: lambda source, chat_id, text: telegram_adapter.send_message(chat_id, text)
+        telegram_adapter
+            Optional Telegram adapter for thinking indicator support
         """
         self.executor = executor
         self.response_callback = response_callback
+        self.telegram_adapter = telegram_adapter
 
     def handle_message_received(self, event: Event) -> None:
         """Handle message.received event from any adapter.
@@ -73,6 +77,15 @@ class MessageHandler:
         logger.info(f"Processing message from {source}:{chat_id}, trace_id={trace_id}, session_id={session_id}")
         logger.debug(f"Message content: {message_text[:100]}...")
 
+        # Start thinking indicator for Telegram
+        thinking_indicator = None
+        if source == "telegram" and self.telegram_adapter:
+            try:
+                thinking_indicator = self.telegram_adapter.start_thinking_indicator(int(chat_id))
+                logger.debug(f"Started thinking indicator for {chat_id}")
+            except Exception as e:
+                logger.warning(f"Failed to start thinking indicator: {e}")
+
         try:
             # Execute request through agent
             logger.info(f"Executing agent request, trace_id={trace_id}")
@@ -95,6 +108,15 @@ class MessageHandler:
             error_response = f"❌ Ошибка обработки запроса: {str(e)}"
             if self.response_callback:
                 self.response_callback(source, chat_id, error_response)
+
+        finally:
+            # Stop thinking indicator
+            if thinking_indicator:
+                try:
+                    thinking_indicator.stop()
+                    logger.debug(f"Stopped thinking indicator for {chat_id}")
+                except Exception as e:
+                    logger.warning(f"Failed to stop thinking indicator: {e}")
 
     def _format_response(self, result: Any) -> str:
         """Format execution result for user.
@@ -263,6 +285,7 @@ class MessageHandler:
 def create_message_handler(
     executor: Any,  # AgentExecutor or UnifiedExecutor
     response_callback: Callable[[str, str, str], None] | None = None,
+    telegram_adapter: Any | None = None,
 ) -> MessageHandler:
     """Factory function to create message handler.
 
@@ -272,10 +295,12 @@ def create_message_handler(
         Agent executor (AgentExecutor or UnifiedExecutor)
     response_callback
         Optional callback for sending responses
+    telegram_adapter
+        Optional Telegram adapter for thinking indicator support
 
     Returns
     -------
     MessageHandler
         Configured message handler
     """
-    return MessageHandler(executor, response_callback)
+    return MessageHandler(executor, response_callback, telegram_adapter)

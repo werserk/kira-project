@@ -204,30 +204,30 @@ class InboxPipeline:
 
                 return True
 
-        except Exception as exc:
-            duration_ms = (time.time() - start_time) * 1000
+            except Exception as exc:
+                ctx["error"] = str(exc)
+                ctx["error_type"] = type(exc).__name__
 
-            # Log failure
-            self._log_event(
-                "item_failed",
-                {
-                    "trace_id": trace_id,
-                    "file_path": str(item_path),
-                    "attempt": attempt,
-                    "duration_ms": duration_ms,
-                    "outcome": "failure",
-                    "error": str(exc),
-                    "error_type": type(exc).__name__,
-                },
-            )
+                # Log failure
+                self._log_event(
+                    "item_failed",
+                    {
+                        "trace_id": trace_id,
+                        "file_path": str(item_path),
+                        "attempt": attempt,
+                        "outcome": "failure",
+                        "error": str(exc),
+                        "error_type": type(exc).__name__,
+                    },
+                )
 
-            # Retry with backoff
-            if attempt < self.config.max_retries:
-                delay = self.config.retry_delay * (self.config.retry_backoff ** (attempt - 1))
-                time.sleep(delay)
-                return self.process_item(item_path, trace_id, attempt + 1)
+                # Retry with backoff
+                if attempt < self.config.max_retries:
+                    delay = self.config.retry_delay * (self.config.retry_backoff ** (attempt - 1))
+                    time.sleep(delay)
+                    return self.process_item(item_path, trace_id, attempt + 1)
 
-            return False
+                return False
 
     def run(self) -> InboxPipelineResult:
         """Execute inbox pipeline.

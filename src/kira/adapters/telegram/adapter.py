@@ -10,6 +10,7 @@ import contextlib
 import hashlib
 import hmac
 import json
+import threading
 import time
 import uuid
 from dataclasses import dataclass, field
@@ -40,6 +41,7 @@ __all__ = [
     "TelegramAdapterConfig",
     "TelegramMessage",
     "TelegramUpdate",
+    "ThinkingIndicator",
     "create_telegram_adapter",
 ]
 
@@ -122,6 +124,113 @@ class TelegramAdapterConfig:
     daily_briefing_time: str = "09:00"  # HH:MM format
     weekly_briefing_day: int = 1  # Monday = 0
     weekly_briefing_time: str = "09:00"
+
+
+class ThinkingIndicator:
+    """Animated 'thinking' indicator for Telegram chat.
+
+    Displays "Думаю." message with animated dots (1-3 dots, cycling every second).
+    Automatically deleted when stopped.
+
+    Example
+    -------
+    >>> indicator = adapter.start_thinking_indicator(chat_id)
+    >>> # ... processing ...
+    >>> indicator.stop()  # Deletes indicator message
+    """
+
+    def __init__(self, adapter: TelegramAdapter, chat_id: int) -> None:
+        """Initialize thinking indicator.
+
+        Parameters
+        ----------
+        adapter
+            Telegram adapter instance
+        chat_id
+            Chat ID to show indicator in
+        """
+        self.adapter = adapter
+        self.chat_id = chat_id
+        self.message_id: int | None = None
+        self._stop_event = threading.Event()
+        self._thread: threading.Thread | None = None
+        self._start()
+
+    def _start(self) -> None:
+        """Start indicator animation."""
+        # Send initial message
+        result = self.adapter.send_message(self.chat_id, "Думаю.", parse_mode=None)
+
+        if result and result.get("ok"):
+            self.message_id = result.get("result", {}).get("message_id")
+
+            if self.message_id:
+                # Start animation thread
+                self._thread = threading.Thread(target=self._animate, daemon=True)
+                self._thread.start()
+
+                telegram_logger.debug(
+                    "Thinking indicator started",
+                    chat_id=self.chat_id,
+                    message_id=self.message_id,
+                )
+        else:
+            telegram_logger.warning(
+                "Failed to start thinking indicator",
+                chat_id=self.chat_id,
+            )
+
+    def _animate(self) -> None:
+        """Animate dots in background thread."""
+        dot_count = 1
+
+        while not self._stop_event.is_set():
+            # Wait 1 second (or until stop is called)
+            if self._stop_event.wait(1.0):
+                break
+
+            # Cycle dots: 1 -> 2 -> 3 -> 1
+            dot_count = (dot_count % 3) + 1
+            text = f"Думаю{'.' * dot_count}"
+
+            # Update message
+            if self.message_id:
+                self.adapter.edit_message(
+                    self.chat_id,
+                    self.message_id,
+                    text,
+                    parse_mode=None,
+                )
+
+    def stop(self) -> None:
+        """Stop indicator and delete message."""
+        # Signal thread to stop
+        self._stop_event.set()
+
+        # Wait for thread to finish (with timeout)
+        if self._thread and self._thread.is_alive():
+            self._thread.join(timeout=2.0)
+
+        # Delete message
+        if self.message_id:
+            deleted = self.adapter.delete_message(self.chat_id, self.message_id)
+
+            telegram_logger.debug(
+                "Thinking indicator stopped",
+                chat_id=self.chat_id,
+                message_id=self.message_id,
+                deleted=deleted,
+            )
+
+            self.message_id = None
+
+    def __enter__(self) -> ThinkingIndicator:
+        """Context manager entry."""
+        return self
+
+    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+        """Context manager exit - auto-stop indicator."""
+        self.stop()
 
 
 class TelegramAdapter:
@@ -301,6 +410,107 @@ class TelegramAdapter:
                 },
             )
             return None
+
+    def edit_message(
+        self,
+        chat_id: int,
+        message_id: int,
+        text: str,
+        *,
+        parse_mode: str | None = None,
+    ) -> dict[str, Any] | None:
+        """Edit existing message.
+
+        Parameters
+        ----------
+        chat_id
+            Chat ID
+        message_id
+            Message ID to edit
+        text
+            New text
+        parse_mode
+            Text formatting mode
+
+        Returns
+        -------
+        dict or None
+            API response or None on failure
+        """
+        params: dict[str, Any] = {
+            "chat_id": chat_id,
+            "message_id": message_id,
+            "text": text,
+        }
+
+        if parse_mode:
+            params["parse_mode"] = parse_mode
+
+        try:
+            return self._api_request("editMessageText", params)
+        except Exception as exc:
+            telegram_logger.warning(
+                "Failed to edit message",
+                chat_id=chat_id,
+                message_id=message_id,
+                error=str(exc),
+            )
+            return None
+
+    def delete_message(self, chat_id: int, message_id: int) -> bool:
+        """Delete message.
+
+        Parameters
+        ----------
+        chat_id
+            Chat ID
+        message_id
+            Message ID to delete
+
+        Returns
+        -------
+        bool
+            True if deleted successfully
+        """
+        params = {
+            "chat_id": chat_id,
+            "message_id": message_id,
+        }
+
+        try:
+            result = self._api_request("deleteMessage", params)
+            return bool(result and result.get("ok"))
+        except Exception as exc:
+            telegram_logger.warning(
+                "Failed to delete message",
+                chat_id=chat_id,
+                message_id=message_id,
+                error=str(exc),
+            )
+            return False
+
+    def start_thinking_indicator(self, chat_id: int) -> ThinkingIndicator:
+        """Start animated 'thinking' indicator.
+
+        Sends message "Думаю." and animates dots from 1 to 3.
+
+        Parameters
+        ----------
+        chat_id
+            Chat ID to show indicator in
+
+        Returns
+        -------
+        ThinkingIndicator
+            Indicator control object (use .stop() to remove)
+
+        Example
+        -------
+        >>> indicator = adapter.start_thinking_indicator(chat_id)
+        >>> # ... do LLM processing ...
+        >>> indicator.stop()  # Removes indicator message
+        """
+        return ThinkingIndicator(self, chat_id)
 
     def register_command_handler(self, command: str, handler: Callable[[dict[str, Any]], None]) -> None:
         """Register handler for plugin command triggered by confirmation.

@@ -11,7 +11,6 @@ from enum import Enum
 from typing import Any, Literal
 
 from ...observability.loguru_config import get_logger, timing_context
-
 from .adapter import LLMAdapter, LLMError, LLMRateLimitError, LLMResponse, LLMTimeoutError, Message, Tool
 from .anthropic_adapter import AnthropicAdapter
 from .ollama_adapter import OllamaAdapter
@@ -211,15 +210,15 @@ class LLMRouter:
         """
         provider = self._get_provider_for_task(task_type)
 
-        with timing_context(
-            "llm_generate",
-            component="langgraph",
-            provider=provider,
-            task_type=task_type.value,
-            prompt_length=len(prompt),
-            max_tokens=max_tokens,
-        ) as ctx:
-            try:
+        try:
+            with timing_context(
+                "llm_generate",
+                component="langgraph",
+                provider=provider,
+                task_type=task_type.value,
+                prompt_length=len(prompt),
+                max_tokens=max_tokens,
+            ) as ctx:
                 adapter = self._get_adapter(provider)
                 response = self._execute_with_retry(
                     adapter,
@@ -409,16 +408,16 @@ class LLMRouter:
         # Calculate total message length
         total_message_length = sum(len(msg.get('content', '')) for msg in messages if isinstance(msg, dict))
 
-        with timing_context(
-            "llm_chat",
-            component="langgraph",
-            provider=provider,
-            task_type=task_type.value,
-            num_messages=len(messages),
-            total_message_length=total_message_length,
-            max_tokens=max_tokens,
-        ) as ctx:
-            try:
+        try:
+            with timing_context(
+                "llm_chat",
+                component="langgraph",
+                provider=provider,
+                task_type=task_type.value,
+                num_messages=len(messages),
+                total_message_length=total_message_length,
+                max_tokens=max_tokens,
+            ) as ctx:
                 adapter = self._get_adapter(provider)
                 response = self._execute_with_retry(
                     adapter,
