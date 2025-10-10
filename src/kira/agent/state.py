@@ -83,6 +83,14 @@ class AgentState:
     tool_results: list[dict[str, Any]] = field(default_factory=list)
     response: str = ""  # Natural language response from respond_node
 
+    # Confirmation for destructive operations
+    pending_confirmation: bool = False
+    pending_plan: list[dict[str, Any]] = field(default_factory=list)
+    confirmation_question: str = ""
+
+    # Progress callback for UI updates
+    progress_callback: Any = None  # Optional callback(status: str) -> None
+
     # Memory and context
     memory: dict[str, Any] = field(default_factory=dict)
     rag_snippets: list[str] = field(default_factory=list)

@@ -131,10 +131,12 @@ class ThinkingIndicator:
 
     Displays "Думаю." message with animated dots (1-3 dots, cycling every second).
     Automatically deleted when stopped.
+    Can also show specific actions like "Получаю список задач..."
 
     Example
     -------
     >>> indicator = adapter.start_thinking_indicator(chat_id)
+    >>> indicator.update_status("Удаляю задачу...")
     >>> # ... processing ...
     >>> indicator.stop()  # Deletes indicator message
     """
@@ -154,6 +156,8 @@ class ThinkingIndicator:
         self.message_id: int | None = None
         self._stop_event = threading.Event()
         self._thread: threading.Thread | None = None
+        self._current_text = "Думаю."
+        self._custom_text: str | None = None
         self._start()
 
     def _start(self) -> None:
@@ -180,6 +184,30 @@ class ThinkingIndicator:
                 chat_id=self.chat_id,
             )
 
+    def update_status(self, text: str) -> None:
+        """Update indicator to show specific action.
+
+        Parameters
+        ----------
+        text
+            Action description (e.g., "Получаю список задач...")
+        """
+        self._custom_text = text
+
+        # Update immediately
+        if self.message_id:
+            self.adapter.edit_message(
+                self.chat_id,
+                self.message_id,
+                text,
+                parse_mode=None,
+            )
+            telegram_logger.debug(
+                "Status updated",
+                chat_id=self.chat_id,
+                status=text,
+            )
+
     def _animate(self) -> None:
         """Animate dots in background thread."""
         dot_count = 1
@@ -188,6 +216,10 @@ class ThinkingIndicator:
             # Wait 1 second (or until stop is called)
             if self._stop_event.wait(1.0):
                 break
+
+            # If custom text is set, don't animate, just keep it
+            if self._custom_text:
+                continue
 
             # Cycle dots: 1 -> 2 -> 3 -> 1
             dot_count = (dot_count % 3) + 1

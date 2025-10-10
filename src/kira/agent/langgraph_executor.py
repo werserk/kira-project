@@ -154,6 +154,7 @@ class LangGraphExecutor:
         session_id: str | None = None,
         user: str = "default",
         dry_run: bool = False,
+        progress_callback: Any = None,
     ) -> ExecutionResult:
         """Execute user request through LangGraph.
 
@@ -232,6 +233,7 @@ class LangGraphExecutor:
             session_id=session_id,
             user=user,
             messages=messages,  # Include conversation history!
+            progress_callback=progress_callback,  # For UI updates
             budget=Budget(
                 max_steps=self.max_steps,
                 max_tokens=self.max_tokens,

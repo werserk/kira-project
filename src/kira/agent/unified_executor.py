@@ -63,7 +63,14 @@ class UnifiedExecutor:
         self.executor_type = executor_type
         logger.info(f"Initialized unified executor with type: {executor_type}")
 
-    def chat_and_execute(self, user_request: str, *, trace_id: str | None = None, session_id: str | None = None) -> Any:
+    def chat_and_execute(
+        self,
+        user_request: str,
+        *,
+        trace_id: str | None = None,
+        session_id: str | None = None,
+        progress_callback: Any = None,
+    ) -> Any:
         """Execute user request through underlying executor.
 
         Parameters
@@ -74,6 +81,8 @@ class UnifiedExecutor:
             Optional trace ID for request correlation
         session_id
             Optional session ID for conversation memory (preferred)
+        progress_callback
+            Optional callback for progress updates: callback(status: str) -> None
 
         Returns
         -------
@@ -99,7 +108,12 @@ class UnifiedExecutor:
         if self.executor_type == ExecutorType.LANGGRAPH:
             logger.info(f"🔍 DEBUG: Delegating to LangGraphExecutor with session_id={session_id}")
             # LangGraphExecutor.execute() returns ExecutionResult with .response
-            result = self.executor.execute(user_request, trace_id=trace_id, session_id=session_id)  # type: ignore[attr-defined]
+            result = self.executor.execute(
+                user_request,
+                trace_id=trace_id,
+                session_id=session_id,
+                progress_callback=progress_callback,
+            )  # type: ignore[attr-defined]
             return result
         else:
             logger.info(f"🔍 DEBUG: Delegating to AgentExecutor (legacy) with session_id={session_id}")

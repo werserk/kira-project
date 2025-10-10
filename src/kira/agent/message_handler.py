@@ -83,17 +83,24 @@ class MessageHandler:
 
         # Start thinking indicator for Telegram
         thinking_indicator = None
+        progress_callback = None
         if source == "telegram" and self.telegram_adapter:
             try:
                 thinking_indicator = self.telegram_adapter.start_thinking_indicator(int(chat_id))
+                progress_callback = thinking_indicator.update_status  # Callback for progress updates
                 logger.debug(f"Started thinking indicator for {chat_id}")
             except Exception as e:
                 logger.warning(f"Failed to start thinking indicator: {e}")
 
         try:
-            # Execute request through agent
+            # Execute request through agent with progress updates
             logger.info(f"Executing agent request, trace_id={trace_id}")
-            result = self.executor.chat_and_execute(message_text, trace_id=trace_id, session_id=session_id)
+            result = self.executor.chat_and_execute(
+                message_text,
+                trace_id=trace_id,
+                session_id=session_id,
+                progress_callback=progress_callback,
+            )
             logger.info(f"Agent execution completed, status={getattr(result, 'status', 'unknown')}")
 
             # Format response

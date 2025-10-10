@@ -51,21 +51,86 @@ def plan_node(state: AgentState, llm_adapter: LLMAdapter, tool_registry: Any) ->
         logger.warning(f"[{state.trace_id}] No user message found")
         return {"error": "No user message to plan for", "status": "error"}
 
+    # Check if user is responding to a confirmation request
+    if state.pending_confirmation and state.pending_plan:
+        logger.info(f"[{state.trace_id}] Checking if user confirmed pending operation")
+        user_message_lower = user_message.lower()
+
+        # Positive confirmation patterns
+        positive_patterns = ["да", "yes", "уверен", "подтверждаю", "удали", "delete", "ok", "ок", "давай"]
+        # Negative confirmation patterns
+        negative_patterns = ["нет", "no", "отмена", "cancel", "стоп", "stop", "не уверен"]
+
+        is_confirmed = any(pattern in user_message_lower for pattern in positive_patterns)
+        is_rejected = any(pattern in user_message_lower for pattern in negative_patterns)
+
+        if is_confirmed and not is_rejected:
+            logger.info(f"[{state.trace_id}] User confirmed pending operation, restoring plan")
+            return {
+                "plan": state.pending_plan,
+                "pending_confirmation": False,
+                "pending_plan": [],
+                "confirmation_question": "",
+                "status": "planned",
+            }
+        elif is_rejected:
+            logger.info(f"[{state.trace_id}] User rejected pending operation")
+            return {
+                "pending_confirmation": False,
+                "pending_plan": [],
+                "confirmation_question": "",
+                "plan": [],
+                "status": "completed",  # Go to respond with cancellation message
+            }
+        # If ambiguous, treat as new request and continue to normal planning
+        else:
+            logger.warning(f"[{state.trace_id}] Ambiguous response to confirmation, treating as new request")
+            # Clear pending state and continue
+            state.pending_confirmation = False
+            state.pending_plan = []
+            state.confirmation_question = ""
+
     # Build concise system prompt (no JSON instructions needed!)
-    system_prompt = f"""You are Kira's AI planner. Your job is to call the right tools to accomplish the user's request.
+    system_prompt = f"""You are Kira's AI planner. Your job is to decide if tools are needed or if it's just conversation.
 
-🔄 DYNAMIC REPLANNING MODE:
-- You will be called AFTER each tool execution to decide next steps
-- You can see the results of previous tool executions
-- Use REAL data from previous results (uids, values, etc.)
-- Call one or more tools as needed
-- If the task is COMPLETE, don't call any tools
+💬 CHAT vs TOOLS - You decide:
+- If user just wants to TALK (greetings, questions, thanks) →
+  Don't call ANY tools, go straight to response
+- If user wants to DO something (create, delete, list, update) →
+  Call appropriate tools
 
-⚡ PARALLEL EXECUTION:
-- When you need to perform MULTIPLE INDEPENDENT operations, call ALL tools at once
-- For example: deleting 3 tasks → call task_delete 3 times in ONE response
-- For example: creating 2 tasks → call task_create 2 times in ONE response
-- Only use sequential calls when operations DEPEND on each other
+Examples:
+- "Привет!" → No tools, just friendly response
+- "Как дела?" → No tools, casual chat
+- "Что ты умеешь?" → No tools, explain capabilities
+- "Спасибо!" → No tools, acknowledge
+- "Покажи задачи" → Call task_list()
+- "Удали задачу X" → Call task_list() then task_delete()
+
+🎯 META-PLANNING - You choose the strategy:
+You have FULL CONTROL over how to execute tasks. You can mix and match approaches:
+
+1. **Single-step** (simple tasks):
+   - Call 1 tool → observe result → decide next
+   - Example: "Show tasks" → task_list() → done
+
+2. **Multi-step parallel** (independent operations):
+   - Call MULTIPLE tools at once
+   - Example: Delete 10 tasks → 10x task_delete() in ONE response
+
+3. **Sequential chain** (dependent operations):
+   - Call tool → observe → call next tool → observe → ...
+   - Example: "Delete task X" → task_list() [observe] → task_delete(real_uid)
+
+4. **Adaptive** (learn as you go):
+   - Start with exploration → adjust based on results
+   - Example: Try operation → if error, get more info → retry
+
+🔄 DYNAMIC REPLANNING:
+- After EACH tool execution, you decide: continue, replan, or complete
+- You can see results of previous executions
+- Use REAL data from results, never placeholders
+- If task is COMPLETE, don't call any tools
 
 IMPORTANT RULES:
 - Use EXACT tool names available to you
@@ -74,21 +139,54 @@ IMPORTANT RULES:
 - If user's request is fully satisfied, don't call any tools (task complete)
 - ALWAYS prefer parallel execution when operations are independent!
 
-EXAMPLES:
+🔑 CRITICAL RULE - Operations with tasks (delete/update/get):
+- If you DON'T have the exact UID → FIRST call task_list to get current UIDs
+- NEVER invent or guess UIDs based on descriptions/dates
+- User descriptions like "Task from 09.10" are NOT UIDs
+- ALWAYS get fresh data with task_list before delete/update operations
 
-Example 1 - Delete multiple tasks (PARALLEL):
+STRATEGY EXAMPLES - Mix and match as needed:
+
+Example 1 - Single-step (simple):
+User: "Show my tasks"
+→ Single call: task_list()
+→ Observe → Complete
+
+Example 2 - Sequential exploration (need info first):
+User: "Delete task X"
+Step 1: task_list() → Get all tasks
+[observe results]
+Step 2: task_delete(uid="real-uid-from-step1")
+→ Complete
+
+Example 3 - Parallel batch (independent ops):
 User: "Delete all tasks about project X"
-After task_list returns UIDs: [task-123, task-456, task-789]
-→ Call task_delete(uid="task-123"), task_delete(uid="task-456"), task_delete(uid="task-789") ALL AT ONCE
+Step 1: task_list() → Get tasks
+[observe results]
+Step 2: task_delete(uid="task-1"), task_delete(uid="task-2"), ..., task_delete(uid="task-10") ALL AT ONCE
+→ Complete
 
-Example 2 - Create multiple tasks (PARALLEL):
-User: "Create tasks: buy milk, walk dog, send email"
-→ Call task_create(title="buy milk"), task_create(title="walk dog"), task_create(title="send email") ALL AT ONCE
+Example 4 - Adaptive (handle errors):
+User: "Update task X"
+Step 1: task_list() → Check if exists
+[observe - found task]
+Step 2: task_update(uid="real-uid", ...)
+[observe - success]
+→ Complete
 
-Example 3 - Sequential (when dependent):
-User: "Create a task and mark it as done"
-Step 1: Call task_create(title="...")
-Step 2 (after creation): Call task_update(uid=<from_step1>, status="done")
+Example 5 - Hybrid (parallel + sequential):
+User: "Create 3 tasks and mark the first one as done"
+Step 1: task_create("Task 1"), task_create("Task 2"), task_create("Task 3") PARALLEL
+[observe - got UIDs]
+Step 2: task_update(uid="task-1-uid-from-step1", status="done")
+→ Complete
+
+Example 6 - Exploration first (uncertainty):
+User: "Do something with tasks about X"
+Step 1: task_list() → See what we have
+[observe - decide based on results]
+Step 2: Choose action based on what was found
+→ Continue or complete
 """
 
     # Call LLM with native function calling API
@@ -213,17 +311,26 @@ def reflect_node(state: AgentState, llm_adapter: LLMAdapter) -> dict[str, Any]:
 OUTPUT FORMAT (JSON only):
 {
   "safe": true/false,
+  "needs_confirmation": true/false,
   "concerns": ["concern 1", "concern 2", ...],
-  "revised_plan": [...],  // Only if unsafe and can be fixed
+  "entities_affected": ["entity1 uid/title", "entity2 uid/title", ...],
   "reasoning": "Brief explanation"
 }
 
 SAFETY CHECKS:
 - FSM state transitions are valid
 - Arguments are present and have correct types
-- ALLOW deletions if user explicitly requested (e.g., "удали задачу X", "delete task Y")
-- BLOCK only if user intent is ambiguous (e.g., "delete all" without explicit confirmation)
-- BLOCK if task_delete has no valid uid argument
+- DESTRUCTIVE operations (delete, mass updates) → needs_confirmation=true
+- If needs_confirmation=true, list ALL affected entities in entities_affected
+- Set safe=false ONLY if plan is fundamentally broken (missing args, wrong types)
+- Otherwise set safe=true (confirmation will be handled separately)
+
+EXAMPLES:
+- Single task deletion → needs_confirmation=true
+- Multiple task deletions → needs_confirmation=true
+- Mass updates → needs_confirmation=true
+- Read operations → safe=true, needs_confirmation=false
+- Invalid arguments → safe=false
 """
 
     try:
@@ -242,17 +349,42 @@ SAFETY CHECKS:
 
         reflection = json.loads(response.content)
         is_safe = reflection.get("safe", True)
+        needs_confirmation = reflection.get("needs_confirmation", False)
 
-        logger.info(f"[{state.trace_id}] Reflection complete: safe={is_safe}")
+        logger.info(f"[{state.trace_id}] Reflection complete: safe={is_safe}, needs_confirmation={needs_confirmation}")
 
-        if not is_safe and reflection.get("revised_plan"):
-            logger.warning(f"[{state.trace_id}] Plan revised due to safety concerns")
+        # If plan is fundamentally unsafe (broken), block it
+        if not is_safe:
+            logger.error(f"[{state.trace_id}] Plan is unsafe and blocked: {reflection.get('reasoning')}")
             return {
-                "plan": reflection["revised_plan"],
+                "error": f"Plan validation failed: {reflection.get('reasoning')}",
+                "status": "error",
                 "memory": {**state.memory, "reflection": reflection},
-                "status": "reflected",
             }
 
+        # If needs confirmation, store plan and ask user
+        if needs_confirmation:
+            logger.warning(f"[{state.trace_id}] Destructive operations detected, requesting confirmation")
+            entities_affected = reflection.get("entities_affected", [])
+
+            # Generate confirmation question
+            if len(entities_affected) > 3:
+                entities_str = f"{len(entities_affected)} объектов"
+            else:
+                entities_str = ", ".join(entities_affected[:5])
+
+            confirmation_question = f"Подтверди удаление: {entities_str}. Это действие необратимо. Уверен?"
+
+            return {
+                "pending_confirmation": True,
+                "pending_plan": state.plan,
+                "confirmation_question": confirmation_question,
+                "plan": [],  # Clear current plan, will restore after confirmation
+                "memory": {**state.memory, "reflection": reflection},
+                "status": "completed",  # Go to respond to ask question
+            }
+
+        # Plan is safe and doesn't need confirmation
         return {
             "memory": {**state.memory, "reflection": reflection},
             "status": "reflected",
@@ -262,6 +394,34 @@ SAFETY CHECKS:
         logger.error(f"[{state.trace_id}] Reflection failed: {e}", exc_info=True)
         # Continue without reflection on error
         return {"status": "reflected"}
+
+
+def _get_tool_status_text(tool_name: str, args: dict[str, Any]) -> str:  # noqa: ARG001
+    """Convert tool name to human-readable status.
+
+    Parameters
+    ----------
+    tool_name
+        Name of the tool being executed
+    args
+        Tool arguments (currently unused, reserved for future use)
+
+    Returns
+    -------
+    str
+        Human-readable status text
+    """
+    status_map = {
+        "task_list": "Получаю список задач...",
+        "task_get": "Получаю информацию о задаче...",
+        "task_create": "Создаю задачу...",
+        "task_update": "Обновляю задачу...",
+        "task_delete": "Удаляю задачу...",
+        "rollup_daily": "Генерирую дневной отчёт...",
+        "inbox_normalize": "Обрабатываю входящие...",
+    }
+
+    return status_map.get(tool_name, f"Выполняю {tool_name}...")
 
 
 def tool_node(state: AgentState, tool_registry: ToolRegistry) -> dict[str, Any]:
@@ -293,6 +453,14 @@ def tool_node(state: AgentState, tool_registry: ToolRegistry) -> dict[str, Any]:
 
     logger.info(f"[{state.trace_id}] Executing tool: {tool_name} (dry_run={dry_run}, args={args})")
 
+    # Send progress update to UI
+    if state.progress_callback:
+        status_text = _get_tool_status_text(tool_name, args)
+        try:
+            state.progress_callback(status_text)
+        except Exception as e:
+            logger.warning(f"[{state.trace_id}] Progress callback failed: {e}")
+
     start_time = time.time()
 
     try:
@@ -321,9 +489,19 @@ def tool_node(state: AgentState, tool_registry: ToolRegistry) -> dict[str, Any]:
             "elapsed_ms": int(elapsed * 1000),
         }
 
-        logger.info(
-            f"[{state.trace_id}] Tool {tool_name} completed: status={result.status}, elapsed={elapsed:.2f}s"
-        )
+        # Log result with details
+        if result.status == "ok":
+            logger.info(
+                f"[{state.trace_id}] ✅ Tool {tool_name} completed successfully: elapsed={elapsed:.2f}s"
+            )
+            if result.data:
+                logger.debug(f"[{state.trace_id}]   Result data: {result.data}")
+        else:
+            logger.error(
+                f"[{state.trace_id}] ❌ Tool {tool_name} FAILED: {result.error}"
+            )
+            logger.error(f"[{state.trace_id}]   Args: {args}")
+            logger.error(f"[{state.trace_id}]   Elapsed: {elapsed:.2f}s")
 
         return {
             "tool_results": state.tool_results + [tool_result],
@@ -445,17 +623,52 @@ def respond_node(state: AgentState, llm_adapter: LLMAdapter) -> dict[str, Any]:
         State updates with natural language response
     """
     logger.info(f"[{state.trace_id}] Response generation phase started")
+
+    # If there's a confirmation question pending, return it directly
+    if state.pending_confirmation and state.confirmation_question:
+        logger.info(f"[{state.trace_id}] Returning confirmation question to user")
+        return {
+            "response": state.confirmation_question,
+            "status": "responded",
+        }
+
+    # Check if user cancelled a pending operation
+    if not state.plan and not state.tool_results and not state.error:
+        logger.info(f"[{state.trace_id}] User cancelled operation or task is complete without actions")
+        # Check last user message to determine if it was cancellation
+        last_user_msg = ""
+        for msg in reversed(state.messages):
+            if msg.get("role") == "user":
+                last_user_msg = msg.get("content", "").lower()
+                break
+
+        if any(word in last_user_msg for word in ["нет", "no", "отмена", "cancel", "стоп", "stop"]):
+            return {
+                "response": "Хорошо, операция отменена. Могу помочь с чем-то другим?",
+                "status": "responded",
+            }
+
     state.status = "responding"
 
     # Build context for response generation (execution results)
     context_parts = []
 
     # CRITICAL: Check if we have ANY tool results
-    # If not, and there's no error - this means LLM is hallucinating!
+    # If not, and there's no error - check if it's chat mode or hallucination
     if not state.tool_results and not state.error:
-        # Вероятно, планирование провалилось
-        logger.warning(f"[{state.trace_id}] ⚠️ NO TOOL RESULTS and NO ERROR - possible hallucination!")
-        state.error = "Не удалось выполнить операцию (ошибка планирования)"
+        # Check if this is chat mode (LLM provided reasoning without tools)
+        reasoning = state.memory.get("reasoning", "")
+        if reasoning:
+            # This is chat mode - LLM answered directly without tools
+            logger.info(f"[{state.trace_id}] Chat mode detected - using LLM reasoning as response")
+            return {
+                "response": reasoning,
+                "status": "responded",
+            }
+        else:
+            # No results, no reasoning - this is hallucination/planning error
+            logger.warning(f"[{state.trace_id}] ⚠️ NO TOOL RESULTS and NO ERROR - possible hallucination!")
+            state.error = "Не удалось выполнить операцию (ошибка планирования)"
 
     # Add execution summary with clear success/failure indicators
     if state.tool_results:
