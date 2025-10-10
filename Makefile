@@ -1,6 +1,6 @@
 # Kira Makefile - Simple Docker workflow
 
-.PHONY: help up down rebuild clean clean-all logs init
+.PHONY: help up down restart rebuild clean clean-all logs init
 
 ENV ?= dev
 
@@ -9,10 +9,15 @@ help:  ## Show available commands
 	@echo ""
 	@echo "  make up         - Start Kira (Telegram + LangGraph + OpenRouter)"
 	@echo "  make down       - Stop Kira"
+	@echo "  make restart    - Quick restart (no rebuild, use for code changes)"
 	@echo "  make rebuild    - Rebuild and restart (no cache)"
 	@echo "  make clean      - Remove containers and volumes (fast)"
 	@echo "  make clean-all  - Deep clean including Docker cache (slow)"
 	@echo "  make logs       - View logs"
+	@echo ""
+	@echo "💡 Dev workflow:"
+	@echo "  1. Edit code in src/kira/"
+	@echo "  2. make restart  (changes applied instantly!)"
 	@echo ""
 	@echo "⚙️  Configuration:"
 	@echo "  Edit .env file to configure:"
@@ -65,6 +70,12 @@ else
 	@docker compose -f compose.yaml down
 endif
 	@echo "✅ Stopped"
+
+restart:  ## Quick restart (no rebuild - use for code changes)
+	@echo "🔄 Quick restart (code changes applied)..."
+	@make down
+	@make up
+	@echo "✅ Restarted with latest code changes"
 
 rebuild:  ## Rebuild and restart (no cache)
 	@echo "🔄 Rebuilding Kira (no cache)..."

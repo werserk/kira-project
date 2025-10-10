@@ -193,11 +193,16 @@ class LangGraphExecutor:
         logger.info(f"[{trace_id}] 🔍 DEBUG: Using memory type: {memory_type}")
 
         # Get conversation history from memory
+        # IMPORTANT: Limit to 3 exchanges (6 messages) to avoid overwhelming LLM
+        MAX_HISTORY_EXCHANGES = 3  # 3 user-assistant pairs = 6 messages
         try:
-            conversation_history = self.conversation_memory.get_context_messages(session_id)
+            conversation_history = self.conversation_memory.get_context_messages(
+                session_id,
+                limit=MAX_HISTORY_EXCHANGES
+            )
             logger.info(
                 f"[{trace_id}] 🔍 DEBUG: Loaded {len(conversation_history)} messages from memory "
-                f"for session={session_id}"
+                f"for session={session_id} (limited to {MAX_HISTORY_EXCHANGES} exchanges)"
             )
 
             # DEBUG: Log first few messages if any

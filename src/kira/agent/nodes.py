@@ -132,13 +132,27 @@ EXAMPLE WORKFLOW (Delete task):
         )
 
         response = llm_adapter.chat(messages, temperature=0.3, max_tokens=2000, timeout=30.0)
+        raw_content = response.content  # Store for error logging
 
         # Update token budget
         tokens_used = response.usage.get("total_tokens", 0)
         state.budget.tokens_used += tokens_used
 
+        # Log raw response for debugging
+        logger.debug(f"[{state.trace_id}] Raw LLM response: {raw_content[:500]}...")
+
+        # Clean response: remove markdown code blocks if present
+        content = raw_content.strip()
+        if content.startswith("```json"):
+            content = content[7:]  # Remove ```json
+        elif content.startswith("```"):
+            content = content[3:]  # Remove ```
+        if content.endswith("```"):
+            content = content[:-3]  # Remove closing ```
+        content = content.strip()
+
         # Parse plan
-        plan_data = json.loads(response.content)
+        plan_data = json.loads(content)
         tool_calls = plan_data.get("tool_calls", [])
         reasoning = plan_data.get("reasoning", "")
 
@@ -161,10 +175,26 @@ EXAMPLE WORKFLOW (Delete task):
 
     except json.JSONDecodeError as e:
         logger.error(f"[{state.trace_id}] Failed to parse plan JSON: {e}")
-        return {"error": f"Invalid plan JSON: {e}", "status": "error"}
+        try:
+            logger.error(f"[{state.trace_id}] Raw response that failed to parse: {raw_content[:500]}")
+            # Check if LLM returned plain text instead of JSON
+            if not raw_content.strip().startswith("{"):
+                logger.error(f"[{state.trace_id}] 🚨 LLM returned plain text instead of JSON! This is a critical prompt violation.")
+        except NameError:
+            logger.error(f"[{state.trace_id}] Response not available for logging")
+        # При ошибке парсинга - переходим к ответу с объяснением проблемы
+        return {
+            "error": f"Failed to generate valid plan (LLM returned invalid JSON - possibly plain text response)",
+            "status": "error",
+            "plan": [],  # Пустой план
+        }
     except Exception as e:
         logger.error(f"[{state.trace_id}] Planning failed: {e}", exc_info=True)
-        return {"error": f"Planning failed: {e}", "status": "error"}
+        return {
+            "error": f"Planning failed: {e}",
+            "status": "error",
+            "plan": [],  # Пустой план
+        }
 
 
 def reflect_node(state: AgentState, llm_adapter: LLMAdapter) -> dict[str, Any]:
@@ -374,16 +404,27 @@ def _get_respond_node_system_prompt() -> str:
 - Если задача выполнена - радуйся вместе с пользователем
 - Если ошибка - объясни понятно и предложи решение
 - Говори на языке пользователя (русский/английский)
-- Не упоминай технические детали (названия инструментов, ID)
+- Не упоминай технические детали пользователю, НО:
 - Будь как настоящий заботливый друг-помощник
+
+🚨 КРИТИЧЕСКИ ВАЖНО - ЧЕСТНОСТЬ И ТОЧНОСТЬ:
+- НИКОГДА не выдумывай результаты выполнения!
+- Если инструмент вернул ошибку - скажи об этом честно
+- Если операция НЕ выполнена - не говори, что выполнена
+- НЕ придумывай данные, которых нет в EXECUTION RESULTS
+- Если что-то пошло не так - признай это и предложи помощь
+- Лучше сказать "не получилось", чем солгать об успехе
 
 СТИЛЬ:
 ✅ "Отлично, я нашла 3 задачи! Хочешь, расскажу подробнее?"
 ✅ "С радостью помогу! У тебя есть несколько активных задач."
+✅ "Хм, что-то не получилось удалить задачу. Давай попробуем по-другому?"
+❌ "Задача удалена!" (если на самом деле была ошибка)
 ❌ "Найдено 3 записи. Вы можете запросить детали."
 ❌ "Вот твои задачи 😊" (без эмодзи!)
 
-Твоя цель - чтобы пользователь чувствовал теплоту и заботу через слова, а не смайлики."""
+Твоя цель - чтобы пользователь чувствовал теплоту и заботу через слова, а не смайлики.
+НО главное - быть ЧЕСТНОЙ и ТОЧНОЙ в описании результатов!"""
 
 
 def respond_node(state: AgentState, llm_adapter: LLMAdapter) -> dict[str, Any]:
@@ -413,21 +454,44 @@ def respond_node(state: AgentState, llm_adapter: LLMAdapter) -> dict[str, Any]:
     # Build context for response generation (execution results)
     context_parts = []
 
-    # Add execution summary
+    # CRITICAL: Check if we have ANY tool results
+    # If not, and there's no error - this means LLM is hallucinating!
+    if not state.tool_results and not state.error:
+        # Вероятно, планирование провалилось
+        logger.warning(f"[{state.trace_id}] ⚠️ NO TOOL RESULTS and NO ERROR - possible hallucination!")
+        state.error = "Не удалось выполнить операцию (ошибка планирования)"
+
+    # Add execution summary with clear success/failure indicators
     if state.tool_results:
-        context_parts.append("EXECUTION RESULTS:")
+        context_parts.append("Что было выполнено:")
         for i, result in enumerate(state.tool_results, 1):
             tool_name = result.get("tool", "unknown")
             status = result.get("status", "unknown")
             data = result.get("data", {})
-            context_parts.append(f"{i}. Tool: {tool_name}")
-            context_parts.append(f"   Status: {status}")
-            if data:
-                context_parts.append(f"   Data: {json.dumps(data, ensure_ascii=False)}")
+            error = result.get("error", "")
 
-    # Add error if present
+            # Clear status indicator
+            status_emoji = "✅" if status == "ok" else "❌"
+            context_parts.append(f"{i}. {status_emoji} Tool: {tool_name}")
+            context_parts.append(f"   Status: {status.upper()}")
+
+            # Show data OR error (never both)
+            if status == "ok" and data:
+                context_parts.append(f"   Result: {json.dumps(data, ensure_ascii=False)}")
+            elif status == "error" and error:
+                context_parts.append(f"   ⚠️ ERROR: {error}")
+                context_parts.append(f"   ⚠️ IMPORTANT: This operation FAILED - do NOT tell user it succeeded!")
+
+    # Add global error if present
     if state.error:
-        context_parts.append(f"\nERROR: {state.error}")
+        context_parts.append(f"\n🚨 GLOBAL ERROR: {state.error}")
+        context_parts.append("🚨 The request was NOT completed successfully!")
+
+        # If no tools were executed, make it VERY clear
+        if not state.tool_results:
+            context_parts.append("\n❌ NO TOOLS WERE EXECUTED!")
+            context_parts.append("❌ DO NOT use conversation history - you have NO REAL DATA!")
+            context_parts.append("❌ Tell user honestly that you couldn't get the information!")
 
     context = "\n".join(context_parts)
 
@@ -449,11 +513,17 @@ def respond_node(state: AgentState, llm_adapter: LLMAdapter) -> dict[str, Any]:
             messages.append(
                 Message(
                     role="system",
-                    content=f"""EXECUTION CONTEXT:
+                    content=f"""ВОТ РЕАЛЬНЫЕ РЕЗУЛЬТАТЫ ВЫПОЛНЕНИЯ ИНСТРУМЕНТОВ:
+
 {context}
 
-Сгенерируй дружелюбный и естественный ответ на основе результатов выше и истории разговора.
-Помни - общайся на "ты" и будь теплой!"""
+🚨 КРИТИЧЕСКИ ВАЖНО:
+- Используй ТОЛЬКО информацию из результатов выше
+- НЕ придумывай инструменты, которых нет в списке выше
+- НЕ копируй формат результатов в свой ответ
+- Если инструмент НЕ ВЫПОЛНЯЛСЯ - не говори, что он выполнился
+- Сгенерируй дружелюбный и естественный ответ БЕЗ технических деталей
+- Общайся на "ты" и будь теплой"""
                 )
             )
 
@@ -481,7 +551,16 @@ def respond_node(state: AgentState, llm_adapter: LLMAdapter) -> dict[str, Any]:
         logger.error(f"[{state.trace_id}] Response generation failed: {e}", exc_info=True)
 
         # Fallback to simple response
-        fallback = "Хорошо, выполнено!" if state.error is None else f"Произошла ошибка: {state.error}"
+        if state.error:
+            # Честно сообщаем об ошибке
+            fallback = f"Извини, что-то пошло не так при выполнении задачи. Техническая ошибка: {state.error}"
+        elif state.tool_results:
+            # Есть результаты, но LLM не смог их обработать
+            successful = sum(1 for r in state.tool_results if r.get("status") == "ok")
+            total = len(state.tool_results)
+            fallback = f"Я выполнила {successful} из {total} операций, но не могу сформулировать ответ. Попробуй спросить еще раз?"
+        else:
+            fallback = "Хм, не получилось выполнить задачу. Можешь попробовать переформулировать запрос?"
 
         return {
             "response": fallback,
@@ -511,12 +590,9 @@ def route_node(state: AgentState) -> str:
 
     # Check for errors
     if state.error or state.status == "error":
-        if state.retry_count < 2:
-            logger.info(f"[{state.trace_id}] Error detected, retrying (attempt {state.retry_count + 1})")
-            return "plan"  # Try to replan
-        else:
-            logger.error(f"[{state.trace_id}] Max retries reached")
-            return "halt"
+        logger.error(f"[{state.trace_id}] Error detected: {state.error}")
+        # При ошибке - генерируем честный ответ пользователю
+        return "respond"
 
     # Route based on status
     if state.status == "pending":
