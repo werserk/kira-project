@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Persistent Conversation Memory**: SQLite-based conversation history that survives restarts
+  - Conversations stored in `artifacts/conversations.db`
+  - Configurable via `ENABLE_PERSISTENT_MEMORY` and `MEMORY_DB_PATH` in `.env`
+  - Default: 10 exchanges per session with in-memory caching
+  - Full backward compatibility: can be disabled to use ephemeral memory
+  - See `docs/guides/persistent-memory.md` for details
+
+### Changed
+- Memory default increased from 3 to 10 exchanges
+- LangGraphExecutor now uses persistent memory by default
+
+### Fixed
+- **🔥 CRITICAL**: LangGraph nodes now properly use conversation history
+  - `plan_node` now receives full conversation context when planning
+  - `respond_node` now receives full conversation context when generating responses
+  - LLM can now see and reference previous messages in the conversation
+  - Fixes issue where bot said "I don't see your previous question" despite having history in memory
+
 ## [0.1.0-alpha] - 2025-10-08
 
 ### 🎉 First Public Alpha Release
@@ -21,7 +40,7 @@ This is the first public alpha release of Kira - a production-ready Personal Kno
 - **Host API Integration**: PluginContext properly wired with Host API for vault writes
 - **Test Coverage**: 48/48 tests passing
 
-#### Phase 1 — Core & Schemas Stabilization  
+#### Phase 1 — Core & Schemas Stabilization
 - **YAML Front-matter Schema (ADR-002)**: Single source of truth for Task/Note/Event entities
   - Required fields: `uid`, `title`, `created_ts(UTC)`, `updated_ts(UTC)`, `state`, `tags[]`
   - Optional fields: `due_ts`, `links[]`, `x-kira{source,version,remote_id,last_write_ts}`
@@ -38,7 +57,7 @@ This is the first public alpha release of Kira - a production-ready Personal Kno
 
 #### Phase 2 — CLI for Humans & Agents
 - **Machine-readable Output**: `--json` flag for all commands (`{status, data|error, meta}`)
-- **Stable Exit Codes**: 
+- **Stable Exit Codes**:
   - `0` success
   - `2` validation
   - `3` conflict/idempotent
@@ -69,7 +88,7 @@ This is the first public alpha release of Kira - a production-ready Personal Kno
 - **Test Coverage**: 64/64 tests passing
 
 #### Phase 6 — Packaging & Release (Current)
-- **Make Targets**: 
+- **Make Targets**:
   - `make init` - Full initialization (creates vault, installs dependencies)
   - `make smoke` - Quick smoke test (create/update/get task)
   - `make rollup:daily` - Daily rollup generation

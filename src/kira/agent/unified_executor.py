@@ -80,6 +80,10 @@ class UnifiedExecutor:
         ExecutionResult
             Execution result with .response field (both executors)
         """
+        logger.info(
+            f"🔍 DEBUG: UnifiedExecutor.chat_and_execute() called - "
+            f"executor_type={self.executor_type}, session_id={session_id}, trace_id={trace_id}"
+        )
         logger.debug(f"Executing via {self.executor_type}: {user_request[:100]}...")
 
         # Ensure session_id exists for conversation continuity
@@ -88,13 +92,17 @@ class UnifiedExecutor:
 
             # Generate default session_id if not provided
             session_id = f"default:{uuid.uuid4()}"
-            logger.debug(f"Generated default session_id: {session_id}")
+            logger.warning(f"⚠️ DEBUG: No session_id provided! Generated: {session_id}")
+        else:
+            logger.info(f"✅ DEBUG: Using provided session_id: {session_id}")
 
         if self.executor_type == ExecutorType.LANGGRAPH:
+            logger.info(f"🔍 DEBUG: Delegating to LangGraphExecutor with session_id={session_id}")
             # LangGraphExecutor.execute() returns ExecutionResult with .response
             result = self.executor.execute(user_request, trace_id=trace_id, session_id=session_id)  # type: ignore[attr-defined]
             return result
         else:
+            logger.info(f"🔍 DEBUG: Delegating to AgentExecutor (legacy) with session_id={session_id}")
             # AgentExecutor now also returns ExecutionResult with .response
             return self.executor.chat_and_execute(user_request, trace_id=trace_id, session_id=session_id)
 
@@ -178,15 +186,30 @@ def create_unified_executor(
 
             # Get memory config from kwargs or config
             memory_max_exchanges = kwargs.get('memory_max_exchanges', 10)
-            if config and hasattr(config, 'memory_max_exchanges'):
-                memory_max_exchanges = config.memory_max_exchanges
+            enable_persistent_memory = kwargs.get('enable_persistent_memory', True)
+            memory_db_path = kwargs.get('memory_db_path', None)
+
+            logger.info(f"🔍 DEBUG: Initial memory config from kwargs - max={memory_max_exchanges}, persistent={enable_persistent_memory}")
+
+            if config:
+                if hasattr(config, 'memory_max_exchanges'):
+                    memory_max_exchanges = config.memory_max_exchanges
+                    logger.info(f"🔍 DEBUG: Override memory_max_exchanges from config: {memory_max_exchanges}")
+                if hasattr(config, 'enable_persistent_memory'):
+                    enable_persistent_memory = config.enable_persistent_memory
+                    logger.info(f"🔍 DEBUG: Override enable_persistent_memory from config: {enable_persistent_memory}")
+                if hasattr(config, 'memory_db_path'):
+                    memory_db_path = config.memory_db_path
+                    logger.info(f"🔍 DEBUG: Override memory_db_path from config: {memory_db_path}")
 
             logger.info(
-                f"Creating LangGraph executor: "
+                f"🔍 DEBUG: Creating LangGraph executor with: "
                 f"reflection={enable_langgraph_reflection}, "
                 f"verification={enable_langgraph_verification}, "
                 f"max_steps={max_steps}, "
-                f"memory_max_exchanges={memory_max_exchanges}"
+                f"memory_max_exchanges={memory_max_exchanges}, "
+                f"persistent_memory={enable_persistent_memory}, "
+                f"db_path={memory_db_path}"
             )
 
             langgraph_executor = LangGraphExecutor(
@@ -196,6 +219,8 @@ def create_unified_executor(
                 enable_reflection=enable_langgraph_reflection,
                 enable_verification=enable_langgraph_verification,
                 memory_max_exchanges=memory_max_exchanges,
+                enable_persistent_memory=enable_persistent_memory,
+                memory_db_path=memory_db_path,
             )
 
             return UnifiedExecutor(
@@ -225,7 +250,7 @@ def create_unified_executor(
     )
 
     return UnifiedExecutor(
-        executor=legacy_executor,  # type: ignore[arg-type]
+        executor=legacy_executor,
         executor_type=ExecutorType.LEGACY,
     )
 

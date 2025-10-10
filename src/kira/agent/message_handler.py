@@ -74,6 +74,10 @@ class MessageHandler:
             logger.warning(f"Received empty message from {source}:{chat_id}")
             return
 
+        logger.info(
+            f"🔍 DEBUG: MessageHandler received message - "
+            f"source={source}, chat_id={chat_id}, session_id={session_id}, trace_id={trace_id}"
+        )
         logger.info(f"Processing message from {source}:{chat_id}, trace_id={trace_id}, session_id={session_id}")
         logger.debug(f"Message content: {message_text[:100]}...")
 
@@ -138,7 +142,7 @@ class MessageHandler:
             # Use NL response if it's not empty
             if result.response and result.response.strip():
                 logger.info(f"Using natural language response: {result.response[:100]}...")
-                return result.response
+                return str(result.response)
             else:
                 logger.warning("Empty response returned, falling back to formatter")
                 # Continue to fallback formatter below

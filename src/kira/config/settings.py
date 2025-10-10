@@ -123,7 +123,9 @@ class Settings:
     # RAG and Memory
     enable_rag: bool = False
     rag_index_path: str | None = None
-    memory_max_exchanges: int = 3
+    memory_max_exchanges: int = 10
+    enable_persistent_memory: bool = True
+    memory_db_path: Path | None = None
 
     # Agent Behavior
     agent_max_tool_calls: int = 10
@@ -263,7 +265,9 @@ class Settings:
                 # RAG and Memory
                 enable_rag=os.environ.get("ENABLE_RAG", "false").lower() == "true",
                 rag_index_path=os.environ.get("RAG_INDEX_PATH"),
-                memory_max_exchanges=int(os.environ.get("MEMORY_MAX_EXCHANGES", "3")),
+                memory_max_exchanges=int(os.environ.get("MEMORY_MAX_EXCHANGES", "10")),
+                enable_persistent_memory=os.environ.get("ENABLE_PERSISTENT_MEMORY", "true").lower() == "true",
+                memory_db_path=Path(os.environ["MEMORY_DB_PATH"]) if "MEMORY_DB_PATH" in os.environ else None,
                 # Agent Behavior
                 agent_max_tool_calls=int(os.environ.get("KIRA_AGENT_MAX_TOOL_CALLS", "10")),
                 agent_max_tokens=int(os.environ.get("KIRA_AGENT_MAX_TOKENS", "4000")),

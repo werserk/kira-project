@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 
 @dataclass
@@ -33,7 +34,9 @@ class AgentConfig:
     # RAG and Memory
     enable_rag: bool = False
     rag_index_path: str | None = None
-    memory_max_exchanges: int = 3
+    memory_max_exchanges: int = 10
+    enable_persistent_memory: bool = True
+    memory_db_path: Path | None = None
 
     # Agent behavior
     max_tool_calls: int = 10
@@ -105,6 +108,8 @@ class AgentConfig:
             enable_rag=settings.enable_rag,
             rag_index_path=settings.rag_index_path,
             memory_max_exchanges=settings.memory_max_exchanges,
+            enable_persistent_memory=getattr(settings, "enable_persistent_memory", True),
+            memory_db_path=getattr(settings, "memory_db_path", None),
             # Agent behavior
             max_tool_calls=settings.agent_max_tool_calls,
             max_tokens=settings.agent_max_tokens,

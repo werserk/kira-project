@@ -72,7 +72,7 @@ IMPORTANT FOR DELETIONS:
   ]
 """
 
-    # Get last user message
+    # Get last user message for validation
     user_message = ""
     for msg in reversed(state.messages):
         if msg.get("role") == "user":
@@ -83,14 +83,21 @@ IMPORTANT FOR DELETIONS:
         logger.warning(f"[{state.trace_id}] No user message found")
         return {"error": "No user message to plan for", "status": "error"}
 
-    # Call LLM
+    # Call LLM with FULL conversation history for context
     try:
         from ..adapters.llm import Message
 
-        messages = [
-            Message(role="system", content=system_prompt),
-            Message(role="user", content=user_message),
-        ]
+        # Build messages: system prompt + FULL conversation history
+        messages = [Message(role="system", content=system_prompt)]
+
+        # Add ALL conversation history from state.messages
+        for msg in state.messages:
+            messages.append(Message(role=msg.get("role", "user"), content=msg.get("content", "")))
+
+        logger.info(
+            f"[{state.trace_id}] 🔍 DEBUG: Calling LLM for planning with {len(messages)} messages "
+            f"(1 system + {len(state.messages)} conversation)"
+        )
 
         response = llm_adapter.chat(messages, temperature=0.3, max_tokens=2000, timeout=30.0)
 
@@ -359,19 +366,7 @@ def respond_node(state: AgentState, llm_adapter: LLMAdapter) -> dict[str, Any]:
     logger.info(f"[{state.trace_id}] Response generation phase started")
     state.status = "responding"
 
-    # Extract user request (get the LAST user message, not first!)
-    user_request = ""
-    if state.messages:
-        # Find the last user message in the conversation
-        for msg in reversed(state.messages):
-            if msg.get("role") == "user":
-                user_request = msg.get("content", "")
-                break
-        # Fallback to first message if no user role found
-        if not user_request:
-            user_request = state.messages[0].get("content", "")
-
-    # Build context for response generation
+    # Build context for response generation (execution results)
     context_parts = []
 
     # Add execution summary
@@ -395,19 +390,33 @@ def respond_node(state: AgentState, llm_adapter: LLMAdapter) -> dict[str, Any]:
     # Build prompt for natural response
     system_prompt = _get_respond_node_system_prompt()
 
-    user_prompt = f"""Пользователь спросил: "{user_request}"
-
-{context}
-
-Сгенерируй дружелюбный и естественный ответ на основе результатов выше. Помни - общайся на "ты" и будь теплой!"""
-
     try:
         from ..adapters.llm import Message
 
-        messages: list[Message] = [
-            Message(role="system", content=system_prompt),
-            Message(role="user", content=user_prompt),
-        ]
+        # Build messages with FULL conversation history
+        messages: list[Message] = [Message(role="system", content=system_prompt)]
+
+        # Add ALL conversation history from state.messages
+        for msg in state.messages:
+            messages.append(Message(role=msg.get("role", "user"), content=msg.get("content", "")))
+
+        # Add execution context as system message if we have results
+        if context:
+            messages.append(
+                Message(
+                    role="system",
+                    content=f"""EXECUTION CONTEXT:
+{context}
+
+Сгенерируй дружелюбный и естественный ответ на основе результатов выше и истории разговора.
+Помни - общайся на "ты" и будь теплой!"""
+                )
+            )
+
+        logger.info(
+            f"[{state.trace_id}] 🔍 DEBUG: Calling LLM for response with {len(messages)} messages "
+            f"(system + {len(state.messages)} conversation + context)"
+        )
 
         response = llm_adapter.chat(
             messages,

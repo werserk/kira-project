@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import logging
 import uuid
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
@@ -79,6 +80,8 @@ class LangGraphExecutor:
         enable_reflection: bool = True,
         enable_verification: bool = True,
         memory_max_exchanges: int = 10,
+        enable_persistent_memory: bool = True,
+        memory_db_path: Path | None = None,
     ) -> None:
         """Initialize LangGraph executor.
 
@@ -100,6 +103,10 @@ class LangGraphExecutor:
             Enable verification node
         memory_max_exchanges
             Maximum number of conversation exchanges to keep in memory
+        enable_persistent_memory
+            Use persistent SQLite memory (survives restarts)
+        memory_db_path
+            Path to SQLite database for persistent memory
         """
         self.llm_adapter = llm_adapter
         self.tool_registry = tool_registry
@@ -110,15 +117,35 @@ class LangGraphExecutor:
         self.enable_verification = enable_verification
 
         # Conversation memory for multi-turn context
-        from .memory import ConversationMemory
-        self.conversation_memory = ConversationMemory(max_exchanges=memory_max_exchanges)
+        # Can be either PersistentConversationMemory or ConversationMemory
+        if enable_persistent_memory:
+            from .persistent_memory import PersistentConversationMemory
+
+            if memory_db_path is None:
+                memory_db_path = Path("artifacts/conversations.db")
+
+            self.conversation_memory: Any = PersistentConversationMemory(
+                db_path=memory_db_path,
+                max_exchanges=memory_max_exchanges,
+            )
+            logger.info(
+                f"LangGraph executor initialized with PERSISTENT memory "
+                f"(max_exchanges={memory_max_exchanges}, db={memory_db_path})"
+            )
+        else:
+            from .memory import ConversationMemory
+
+            self.conversation_memory = ConversationMemory(max_exchanges=memory_max_exchanges)
+            logger.info(
+                f"LangGraph executor initialized with EPHEMERAL memory "
+                f"(max_exchanges={memory_max_exchanges})"
+            )
 
         # Build graph on initialization
         tools_desc = tool_registry.get_tools_description()
         from .graph import build_agent_graph
 
         self.graph = build_agent_graph(llm_adapter, tool_registry, tools_desc)
-        logger.info(f"LangGraph executor initialized with conversation memory (max_exchanges={memory_max_exchanges})")
 
     def execute(
         self,
@@ -161,14 +188,37 @@ class LangGraphExecutor:
 
         logger.info(f"[{trace_id}] Executing request: {user_request[:100]}... (session={session_id})")
 
+        # DEBUG: Log memory type
+        memory_type = type(self.conversation_memory).__name__
+        logger.info(f"[{trace_id}] 🔍 DEBUG: Using memory type: {memory_type}")
+
         # Get conversation history from memory
-        conversation_history = self.conversation_memory.get_context_messages(session_id)
+        try:
+            conversation_history = self.conversation_memory.get_context_messages(session_id)
+            logger.info(
+                f"[{trace_id}] 🔍 DEBUG: Loaded {len(conversation_history)} messages from memory "
+                f"for session={session_id}"
+            )
+
+            # DEBUG: Log first few messages if any
+            if conversation_history:
+                for i, msg in enumerate(conversation_history[:4]):
+                    logger.debug(f"[{trace_id}]   History[{i}]: {msg.role} - {msg.content[:50]}...")
+            else:
+                logger.info(f"[{trace_id}] 🔍 DEBUG: NO HISTORY FOUND for session={session_id}")
+
+        except Exception as e:
+            logger.error(f"[{trace_id}] ❌ ERROR loading conversation history: {e}", exc_info=True)
+            conversation_history = []
 
         # Build messages list: [old context] + [new user message]
         messages = [{"role": msg.role, "content": msg.content} for msg in conversation_history]
         messages.append({"role": "user", "content": user_request})
 
-        logger.debug(f"[{trace_id}] Building state with {len(messages)} messages (history: {len(conversation_history)})")
+        logger.info(
+            f"[{trace_id}] 🔍 DEBUG: Building state with {len(messages)} total messages "
+            f"({len(conversation_history)} from history + 1 new)"
+        )
 
         # Create initial state
         from .state import AgentState, Budget, ContextFlags
@@ -199,12 +249,27 @@ class LangGraphExecutor:
 
         # Save this exchange to conversation memory
         assistant_response = final_state.response or "Ошибка выполнения"
-        self.conversation_memory.add_turn(
-            session_id,
-            user_message=user_request,
-            assistant_message=assistant_response
+
+        logger.info(
+            f"[{trace_id}] 🔍 DEBUG: Saving turn to memory - "
+            f"session={session_id}, user_msg_len={len(user_request)}, "
+            f"assistant_msg_len={len(assistant_response)}"
         )
-        logger.debug(f"[{trace_id}] Saved conversation turn to memory (session={session_id})")
+
+        try:
+            self.conversation_memory.add_turn(
+                session_id,
+                user_message=user_request,
+                assistant_message=assistant_response
+            )
+            logger.info(f"[{trace_id}] ✅ Successfully saved conversation turn to memory (session={session_id})")
+
+            # DEBUG: Verify it was saved
+            verification = self.conversation_memory.get_context_messages(session_id)
+            logger.info(f"[{trace_id}] 🔍 DEBUG: Verification - memory now has {len(verification)} messages")
+
+        except Exception as e:
+            logger.error(f"[{trace_id}] ❌ ERROR saving conversation turn: {e}", exc_info=True)
 
         return result
 
