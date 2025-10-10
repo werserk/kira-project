@@ -10,11 +10,16 @@ import time
 from enum import Enum
 from typing import Any, Literal
 
+from ...observability.loguru_config import get_logger, timing_context
+
 from .adapter import LLMAdapter, LLMError, LLMRateLimitError, LLMResponse, LLMTimeoutError, Message, Tool
 from .anthropic_adapter import AnthropicAdapter
 from .ollama_adapter import OllamaAdapter
 from .openai_adapter import OpenAIAdapter
 from .openrouter_adapter import OpenRouterAdapter
+
+# Loguru logger for LLM operations
+llm_logger = get_logger("langgraph")
 
 __all__ = ["LLMRouter", "TaskType", "RouterConfig", "LLMErrorEnhanced"]
 
@@ -173,6 +178,7 @@ class LLMRouter:
         temperature: float = 0.7,
         max_tokens: int = 1000,
         timeout: float = 30.0,
+        task_type: TaskType = TaskType.DEFAULT,
     ) -> LLMResponse:
         """Generate text completion from prompt.
 
@@ -190,6 +196,8 @@ class LLMRouter:
             Maximum tokens
         timeout
             Request timeout
+        task_type
+            Task type for routing
 
         Returns
         -------
@@ -201,20 +209,44 @@ class LLMRouter:
         LLMErrorEnhanced
             If request fails
         """
-        provider = self.config.default_provider
+        provider = self._get_provider_for_task(task_type)
 
-        try:
-            adapter = self._get_adapter(provider)
-            return self._execute_with_retry(
-                adapter,
-                "generate",
-                provider,
-                prompt,
-                model=model,
-                temperature=temperature,
-                max_tokens=max_tokens,
-                timeout=timeout,
-            )
+        with timing_context(
+            "llm_generate",
+            component="langgraph",
+            provider=provider,
+            task_type=task_type.value,
+            prompt_length=len(prompt),
+            max_tokens=max_tokens,
+        ) as ctx:
+            try:
+                adapter = self._get_adapter(provider)
+                response = self._execute_with_retry(
+                    adapter,
+                    "generate",
+                    provider,
+                    prompt,
+                    model=model,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                    timeout=timeout,
+                )
+
+                # Add response metrics to context
+                if hasattr(response, 'usage'):
+                    ctx['completion_tokens'] = getattr(response.usage, 'completion_tokens', 0)
+                    ctx['prompt_tokens'] = getattr(response.usage, 'prompt_tokens', 0)
+                    ctx['total_tokens'] = getattr(response.usage, 'total_tokens', 0)
+
+                llm_logger.info(
+                    "LLM generation completed",
+                    provider=provider,
+                    task_type=task_type.value,
+                    prompt_length=len(prompt),
+                    response_length=len(response.content),
+                )
+
+                return response
 
         except LLMErrorEnhanced as e:
             # Try Ollama fallback if enabled and error is retryable
@@ -374,18 +406,46 @@ class LLMRouter:
         """
         provider = self._get_provider_for_task(task_type)
 
-        try:
-            adapter = self._get_adapter(provider)
-            return self._execute_with_retry(
-                adapter,
-                "chat",
-                provider,
-                messages,
-                model=model,
-                temperature=temperature,
-                max_tokens=max_tokens,
-                timeout=timeout,
-            )
+        # Calculate total message length
+        total_message_length = sum(len(msg.get('content', '')) for msg in messages if isinstance(msg, dict))
+
+        with timing_context(
+            "llm_chat",
+            component="langgraph",
+            provider=provider,
+            task_type=task_type.value,
+            num_messages=len(messages),
+            total_message_length=total_message_length,
+            max_tokens=max_tokens,
+        ) as ctx:
+            try:
+                adapter = self._get_adapter(provider)
+                response = self._execute_with_retry(
+                    adapter,
+                    "chat",
+                    provider,
+                    messages,
+                    model=model,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                    timeout=timeout,
+                )
+
+                # Add response metrics to context
+                if hasattr(response, 'usage'):
+                    ctx['completion_tokens'] = getattr(response.usage, 'completion_tokens', 0)
+                    ctx['prompt_tokens'] = getattr(response.usage, 'prompt_tokens', 0)
+                    ctx['total_tokens'] = getattr(response.usage, 'total_tokens', 0)
+
+                llm_logger.info(
+                    "LLM chat completed",
+                    provider=provider,
+                    task_type=task_type.value,
+                    num_messages=len(messages),
+                    response_length=len(response.content),
+                )
+
+                return response
 
         except LLMErrorEnhanced as e:
             # Try Ollama fallback if enabled and error is retryable

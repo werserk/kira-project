@@ -22,11 +22,16 @@ try:
 except ImportError:
     httpx = None  # type: ignore
 
+from ...observability.loguru_config import get_logger, log_process_end, log_process_start, timing_context
+
 if TYPE_CHECKING:
     from collections.abc import Callable
 
     from ...core.events import EventBus
     from ...core.scheduler import Scheduler
+
+# Loguru logger for Telegram component
+telegram_logger = get_logger("telegram")
 
 __all__ = [
     "BriefingScheduler",
@@ -616,14 +621,20 @@ class TelegramAdapter:
         """
         trace_id = str(uuid.uuid4())
 
-        # Handle callback query (inline button clicks)
-        if update.callback_query:
-            self._handle_callback_query(update.callback_query, trace_id)
-            return
+        with timing_context(
+            "telegram_update_processing",
+            component="telegram",
+            trace_id=trace_id,
+            update_id=update.update_id,
+        ):
+            # Handle callback query (inline button clicks)
+            if update.callback_query:
+                self._handle_callback_query(update.callback_query, trace_id)
+                return
 
-        # Handle message
-        if update.message:
-            self._handle_message(update.message, trace_id)
+            # Handle message
+            if update.message:
+                self._handle_message(update.message, trace_id)
 
     def _handle_message(self, message: TelegramMessage, trace_id: str) -> None:
         """Handle incoming message.
@@ -635,55 +646,87 @@ class TelegramAdapter:
         trace_id
             Trace ID for correlation
         """
-        # Check idempotency - avoid processing duplicates
-        idempotency_key = message.get_idempotency_key()
-        if idempotency_key in self._processed_updates:
-            self._log_event(
-                "message_duplicate",
-                {
-                    "trace_id": trace_id,
-                    "chat_id": message.chat_id,
-                    "message_id": message.message_id,
-                },
+        start_ns = log_process_start(
+            "telegram_message_ingestion",
+            component="telegram",
+            trace_id=trace_id,
+            chat_id=message.chat_id,
+            message_id=message.message_id,
+            message_length=len(message.text) if message.text else 0,
+        )
+
+        try:
+            # Check idempotency - avoid processing duplicates
+            idempotency_key = message.get_idempotency_key()
+            if idempotency_key in self._processed_updates:
+                self._log_event(
+                    "message_duplicate",
+                    {
+                        "trace_id": trace_id,
+                        "chat_id": message.chat_id,
+                        "message_id": message.message_id,
+                    },
+                )
+                telegram_logger.info(
+                    "Duplicate message detected",
+                    trace_id=trace_id,
+                    chat_id=message.chat_id,
+                    message_id=message.message_id,
+                )
+                return
+
+            # Check whitelist
+            if not self._is_allowed(message.chat_id, message.user_id):
+                self._log_event(
+                    "message_rejected",
+                    {
+                        "trace_id": trace_id,
+                        "chat_id": message.chat_id,
+                        "user_id": message.user_id,
+                        "reason": "not_whitelisted",
+                    },
+                )
+                telegram_logger.warning(
+                    "Message rejected: not whitelisted",
+                    trace_id=trace_id,
+                    chat_id=message.chat_id,
+                    user_id=message.user_id,
+                )
+                return
+
+            # Mark as processed
+            self._processed_updates.add(idempotency_key)
+
+            # Cleanup old entries (keep last 10000)
+            if len(self._processed_updates) > 10000:
+                # Remove oldest half
+                to_remove = list(self._processed_updates)[:5000]
+                for key in to_remove:
+                    self._processed_updates.discard(key)
+
+            # Process text message
+            if message.text:
+                # Check if it's a bot command
+                if message.text.startswith("/"):
+                    command_handled = self._handle_bot_command(message, trace_id)
+                    if command_handled:
+                        return  # Command handled, don't publish to event bus
+
+                self._publish_message_received(message, trace_id)
+
+            # Process file/photo
+            if message.document or message.photo:
+                self._publish_file_dropped(message, trace_id)
+
+        finally:
+            log_process_end(
+                "telegram_message_ingestion",
+                start_ns,
+                component="telegram",
+                trace_id=trace_id,
+                chat_id=message.chat_id,
+                message_id=message.message_id,
             )
-            return
-
-        # Check whitelist
-        if not self._is_allowed(message.chat_id, message.user_id):
-            self._log_event(
-                "message_rejected",
-                {
-                    "trace_id": trace_id,
-                    "chat_id": message.chat_id,
-                    "user_id": message.user_id,
-                    "reason": "not_whitelisted",
-                },
-            )
-            return
-
-        # Mark as processed
-        self._processed_updates.add(idempotency_key)
-
-        # Cleanup old entries (keep last 10000)
-        if len(self._processed_updates) > 10000:
-            # Remove oldest half
-            to_remove = list(self._processed_updates)[:5000]
-            for key in to_remove:
-                self._processed_updates.discard(key)
-
-        # Process text message
-        if message.text:
-            # Check if it's a bot command
-            if message.text.startswith("/"):
-                command_handled = self._handle_bot_command(message, trace_id)
-                if command_handled:
-                    return  # Command handled, don't publish to event bus
-
-            self._publish_message_received(message, trace_id)
-
-        # Process file/photo
-        if message.document or message.photo:
-            self._publish_file_dropped(message, trace_id)
 
     def _handle_bot_command(self, message: TelegramMessage, trace_id: str) -> bool:
         """Handle bot commands like /start and /help.
@@ -846,6 +889,14 @@ _Отправьте /help для подробной справки_
         if not self.event_bus:
             return
 
+        start_ns = log_process_start(
+            "telegram_event_publish",
+            component="telegram",
+            trace_id=trace_id,
+            event="message.received",
+            chat_id=message.chat_id,
+        )
+
         payload = {
             "message": message.text,
             "source": "telegram",
@@ -857,6 +908,22 @@ _Отправьте /help для подробной справки_
         }
 
         self.event_bus.publish("message.received", payload)
+
+        telegram_logger.info(
+            "Message published to event bus",
+            trace_id=trace_id,
+            event="message.received",
+            chat_id=message.chat_id,
+            message_preview=message.text[:50] if message.text else "",
+        )
+
+        log_process_end(
+            "telegram_event_publish",
+            start_ns,
+            component="telegram",
+            trace_id=trace_id,
+            event="message.received",
+        )
 
         self._log_event(
             "message_published",

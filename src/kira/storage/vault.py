@@ -33,6 +33,10 @@ from pathlib import Path
 from typing import Any
 
 from ..core.host import Entity, VaultError, create_host_api
+from ..observability.loguru_config import get_logger, log_process_end, log_process_start, timing_context
+
+# Loguru logger for Vault operations
+vault_logger = get_logger("vault")
 
 __all__ = [
     "Vault",
@@ -138,15 +142,41 @@ class Vault:
         """
         # Extract or generate entity ID
         entity_id = data.get("id")
-        if not entity_id:
-            # Let HostAPI generate ID
-            pass
+        trace_id = data.get("trace_id")
 
-        # Acquire file lock for this entity
-        with self._acquire_entity_lock(entity_id) if entity_id else self._no_lock():
-            # Delegate to HostAPI for validation and event emission
-            # HostAPI will handle atomic writes via md_io.write_markdown(atomic=True)
-            return self.host_api.upsert_entity(entity_type, data, content=content)
+        start_ns = log_process_start(
+            "vault_upsert",
+            component="vault",
+            trace_id=trace_id,
+            entity_type=entity_type,
+            entity_id=entity_id,
+            content_length=len(content),
+        )
+
+        try:
+            # Acquire file lock for this entity
+            with self._acquire_entity_lock(entity_id) if entity_id else self._no_lock():
+                # Delegate to HostAPI for validation and event emission
+                # HostAPI will handle atomic writes via md_io.write_markdown(atomic=True)
+                entity = self.host_api.upsert_entity(entity_type, data, content=content)
+
+                vault_logger.info(
+                    "Entity upserted to vault",
+                    trace_id=trace_id,
+                    entity_type=entity_type,
+                    entity_id=entity.id,
+                    operation="create" if not entity_id else "update",
+                )
+
+                return entity
+        finally:
+            log_process_end(
+                "vault_upsert",
+                start_ns,
+                component="vault",
+                trace_id=trace_id,
+                entity_type=entity_type,
+            )
 
     def delete(self, uid: str) -> None:
         """Delete entity by UID.
@@ -163,8 +193,27 @@ class Vault:
         VaultError
             If deletion fails
         """
-        with self._acquire_entity_lock(uid):
-            self.host_api.delete_entity(uid)
+        start_ns = log_process_start(
+            "vault_delete",
+            component="vault",
+            entity_id=uid,
+        )
+
+        try:
+            with self._acquire_entity_lock(uid):
+                self.host_api.delete_entity(uid)
+
+                vault_logger.info(
+                    "Entity deleted from vault",
+                    entity_id=uid,
+                )
+        finally:
+            log_process_end(
+                "vault_delete",
+                start_ns,
+                component="vault",
+                entity_id=uid,
+            )
 
     def list_entities(
         self,
@@ -213,37 +262,54 @@ class Vault:
         VaultError
             If write fails
         """
-        try:
-            # Create parent directories
-            if create_dirs and not file_path.parent.exists():
-                file_path.parent.mkdir(parents=True, exist_ok=True)
-
-            # Write to temporary file on same filesystem
-            with tempfile.NamedTemporaryFile(
-                mode="w",
-                encoding="utf-8",
-                dir=file_path.parent,
-                prefix=f".{file_path.name}.tmp",
-                delete=False,
-            ) as tmp_file:
-                tmp_file.write(content)
-                tmp_file.flush()
-                # Fsync to ensure data reaches disk
-                os.fsync(tmp_file.fileno())
-                tmp_path = Path(tmp_file.name)
-
-            # Atomic rename
-            tmp_path.rename(file_path)
-
-            # Fsync directory to ensure rename is persisted
-            dir_fd = os.open(file_path.parent, os.O_RDONLY)
+        with timing_context(
+            "vault_atomic_write",
+            component="vault",
+            file_path=str(file_path),
+            content_size=len(content),
+        ):
             try:
-                os.fsync(dir_fd)
-            finally:
-                os.close(dir_fd)
+                # Create parent directories
+                if create_dirs and not file_path.parent.exists():
+                    file_path.parent.mkdir(parents=True, exist_ok=True)
 
-        except Exception as exc:
-            raise VaultError(f"Atomic write failed for {file_path}: {exc}") from exc
+                # Write to temporary file on same filesystem
+                with tempfile.NamedTemporaryFile(
+                    mode="w",
+                    encoding="utf-8",
+                    dir=file_path.parent,
+                    prefix=f".{file_path.name}.tmp",
+                    delete=False,
+                ) as tmp_file:
+                    tmp_file.write(content)
+                    tmp_file.flush()
+                    # Fsync to ensure data reaches disk
+                    os.fsync(tmp_file.fileno())
+                    tmp_path = Path(tmp_file.name)
+
+                # Atomic rename
+                tmp_path.rename(file_path)
+
+                # Fsync directory to ensure rename is persisted
+                dir_fd = os.open(file_path.parent, os.O_RDONLY)
+                try:
+                    os.fsync(dir_fd)
+                finally:
+                    os.close(dir_fd)
+
+                vault_logger.debug(
+                    "Atomic write completed",
+                    file_path=str(file_path),
+                    content_size=len(content),
+                )
+
+            except Exception as exc:
+                vault_logger.error(
+                    "Atomic write failed",
+                    file_path=str(file_path),
+                    error=str(exc),
+                )
+                raise VaultError(f"Atomic write failed for {file_path}: {exc}") from exc
 
     def _acquire_entity_lock(self, entity_id: str) -> EntityLock | NoOpLock:
         """Acquire file lock for entity.

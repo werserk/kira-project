@@ -578,6 +578,279 @@ def read_entity(entity_id):
 
 ---
 
+## Logging Standards
+
+### Loguru Integration
+
+Kira uses **loguru** for structured logging with precise timing instrumentation. This enables performance optimization by tracking time between processes.
+
+**Key logging flow:** NL (Telegram) → LLM (OpenRouter, LangGraph) → DB (Markdown, Vault)
+
+### Configuration
+
+**Initialize loguru at application startup:**
+
+```python
+from kira.observability.loguru_config import configure_loguru
+from pathlib import Path
+
+# Configure once at startup
+configure_loguru(
+    log_dir=Path("logs"),
+    level="INFO",
+    enable_timing_logs=True  # Separate timing.jsonl file
+)
+```
+
+### Component-Specific Loggers
+
+**Always use component-bound loggers:**
+
+```python
+# ✅ CORRECT - Component-specific logger
+from kira.observability.loguru_config import get_logger
+
+telegram_logger = get_logger("telegram")
+llm_logger = get_logger("langgraph")
+vault_logger = get_logger("vault")
+agent_logger = get_logger("agent")
+pipeline_logger = get_logger("pipeline")
+
+# Log with automatic component filtering
+telegram_logger.info("Message received", trace_id=trace_id, chat_id=123)
+
+# ❌ INCORRECT - Direct loguru import
+from loguru import logger
+logger.info("Message received")  # No component filtering!
+```
+
+**Available components:**
+- `telegram` - Telegram adapter operations
+- `langgraph` - LLM/AI processing (OpenRouter, Anthropic, etc.)
+- `vault` - Storage operations (markdown files)
+- `agent` - Agent executor and orchestration
+- `pipeline` - Pipeline operations (inbox, sync, rollup)
+
+### Timing Instrumentation
+
+**Use timing context for performance-critical operations:**
+
+```python
+# ✅ CORRECT - Timing context
+from kira.observability.loguru_config import timing_context
+
+def process_message(message: str, trace_id: str):
+    with timing_context(
+        "telegram_to_llm",
+        component="agent",
+        trace_id=trace_id,
+        message_length=len(message),
+    ) as ctx:
+        # Do work here
+        result = llm.generate(message)
+
+        # Add runtime metrics to context
+        ctx["tokens_used"] = result.tokens
+        ctx["model"] = result.model
+
+        return result
+```
+
+**Manual timing for fine-grained control:**
+
+```python
+from kira.observability.loguru_config import log_process_start, log_process_end
+
+def complex_operation(trace_id: str):
+    start_ns = log_process_start(
+        "vault_write",
+        component="vault",
+        trace_id=trace_id,
+        file_size=1024,
+    )
+
+    # Do work
+    write_to_disk(data)
+
+    duration_ms = log_process_end(
+        "vault_write",
+        start_ns,
+        component="vault",
+        trace_id=trace_id,
+        success=True,
+    )
+```
+
+**End-to-end timing with TimingLogger:**
+
+```python
+from kira.observability.loguru_config import get_timing_logger
+
+def handle_request(trace_id: str):
+    timing = get_timing_logger(trace_id=trace_id, component="agent")
+
+    timing.start("telegram_ingestion")
+    ingest_message()
+    timing.end("telegram_ingestion", message_size=512)
+
+    timing.start("llm_processing")
+    response = call_llm()
+    timing.end("llm_processing", tokens=150, model="gpt-4")
+
+    timing.start("vault_write")
+    save_to_vault()
+    timing.end("vault_write", entity_type="task")
+
+    # Log summary with all timings
+    timing.log_summary()
+```
+
+### Logging Best Practices
+
+**1. Always include trace_id for correlation:**
+
+```python
+# ✅ CORRECT
+logger.info("Processing request", trace_id=trace_id, user_id=123)
+
+# ❌ INCORRECT
+logger.info("Processing request")  # Can't correlate across services!
+```
+
+**2. Use structured logging (key-value pairs):**
+
+```python
+# ✅ CORRECT - Structured
+logger.info(
+    "LLM generation completed",
+    trace_id=trace_id,
+    provider="openrouter",
+    model="gpt-4",
+    tokens=150,
+    duration_ms=1250,
+)
+
+# ❌ INCORRECT - String interpolation
+logger.info(f"LLM generation completed: {provider}, {tokens} tokens")
+```
+
+**3. Choose appropriate log levels:**
+
+```python
+# DEBUG - Detailed diagnostic information
+logger.debug("Cache hit", key="task-123", ttl=300)
+
+# INFO - General informational messages
+logger.info("Task created", task_id="task-123", title="My Task")
+
+# WARNING - Something unexpected but recoverable
+logger.warning("Rate limit approached", remaining=5, limit=100)
+
+# ERROR - Error occurred but system continues
+logger.error("LLM request failed", error=str(e), provider="openrouter")
+
+# CRITICAL - System failure, immediate attention needed
+logger.critical("Vault corruption detected", path=str(vault_path))
+```
+
+**4. Log at key integration points:**
+
+Required logging points in the business logic flow:
+
+```python
+# Telegram adapter - message ingestion
+telegram_logger.info("Message received from Telegram", trace_id=trace_id, chat_id=123)
+
+# LLM router - before/after API call
+llm_logger.info("LLM request started", provider="openrouter", trace_id=trace_id)
+llm_logger.info("LLM request completed", tokens=150, duration_ms=1200)
+
+# Vault storage - entity operations
+vault_logger.info("Entity upserted", entity_type="task", entity_id="task-123")
+
+# Agent executor - end-to-end result
+agent_logger.info("Request completed", trace_id=trace_id, success=True)
+```
+
+**5. Never log sensitive data:**
+
+```python
+# ✅ CORRECT
+logger.info("User authenticated", user_id=hash(username))
+
+# ❌ INCORRECT
+logger.info("User authenticated", password=password, api_key=key)
+```
+
+### Log File Organization
+
+Loguru automatically creates component-specific log files:
+
+```
+logs/
+├── kira.jsonl          # Main application log (all components)
+├── timing.jsonl        # Performance timing data
+├── telegram.jsonl      # Telegram adapter only
+├── langgraph.jsonl     # LLM operations only
+├── vault.jsonl         # Storage operations only
+├── agent.jsonl         # Agent executor only
+└── pipeline.jsonl      # Pipeline operations only
+```
+
+**Benefits:**
+- **Filtering**: Easy to grep specific component
+- **Performance**: Analyze timing.jsonl for bottlenecks
+- **Debugging**: Focus on one layer of the stack
+- **Monitoring**: Alert on component-specific patterns
+
+### Analyzing Timing Logs
+
+**Find slowest operations:**
+
+```bash
+# Top 10 slowest operations
+jq -r 'select(.extra.timing == true) | "\(.extra.duration_ms)ms - \(.extra.operation)"' logs/timing.jsonl | sort -rn | head -10
+
+# Average duration by operation
+jq -r 'select(.extra.timing == true) | "\(.extra.operation) \(.extra.duration_ms)"' logs/timing.jsonl | awk '{sum[$1]+=$2; count[$1]++} END {for (op in sum) print sum[op]/count[op] "ms -", op}' | sort -rn
+```
+
+**Trace specific request:**
+
+```bash
+# Follow trace_id through entire stack
+grep "trace_id.*abc-123" logs/kira.jsonl | jq .
+
+# Timing breakdown for trace
+grep "trace_id.*abc-123" logs/timing.jsonl | jq -r '"\(.extra.operation): \(.extra.duration_ms)ms"'
+```
+
+### Migration from Legacy Logging
+
+**Old pattern (deprecated):**
+
+```python
+# ❌ OLD - Don't use
+from kira.observability.logging import StructuredLogger
+
+logger = StructuredLogger("kira", log_file=Path("logs/app.jsonl"))
+logger.log("INFO", "event_type", "message", correlation_id=uid)
+```
+
+**New pattern:**
+
+```python
+# ✅ NEW - Use this
+from kira.observability.loguru_config import get_logger
+
+logger = get_logger("agent")
+logger.info("message", trace_id=trace_id, entity_id=uid)
+```
+
+**Legacy StructuredLogger is still available for backward compatibility but should not be used in new code.**
+
+---
+
 ## Git Workflow
 
 ### Branch Naming

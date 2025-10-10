@@ -28,7 +28,11 @@ except ImportError:
         "FastAPI dependencies not installed. Install with: poetry install --extras agent"
     ) from None
 
+from ..observability.loguru_config import get_logger, get_timing_logger
 from .executor import AgentExecutor
+
+# Loguru logger for agent operations
+agent_logger = get_logger("agent")
 
 __all__ = ["create_telegram_router", "TelegramUpdate"]
 
@@ -80,14 +84,42 @@ class TelegramGateway:
         session_id = f"telegram:{chat_id}"
         trace_id = f"telegram-{chat_id}-{uuid.uuid4()}"
 
+        # Initialize timing logger for end-to-end tracking
+        timing = get_timing_logger(trace_id=trace_id, component="agent")
+        timing.start("e2e_telegram_to_vault", chat_id=chat_id, message_length=len(text))
+
         try:
+            agent_logger.info(
+                "Processing Telegram message",
+                trace_id=trace_id,
+                chat_id=chat_id,
+                session_id=session_id,
+                message_length=len(text),
+            )
+
+            timing.start("agent_execution", chat_id=chat_id)
+
             # Execute request with session_id for memory continuity
             result = self.executor.chat_and_execute(text, trace_id=trace_id, session_id=session_id)
+
+            timing.end("agent_execution", status=result.status)
 
             # Check if result has natural language response (LangGraph)
             if hasattr(result, "response") and result.response:
                 # LangGraph ExecutionResult with NL response - use it directly!
-                return result.response
+                response = result.response
+
+                timing.end("e2e_telegram_to_vault", success=True, response_length=len(response))
+                timing.log_summary()
+
+                agent_logger.info(
+                    "Message processing completed successfully",
+                    trace_id=trace_id,
+                    chat_id=chat_id,
+                    response_length=len(response),
+                )
+
+                return response
 
             # Legacy ExecutionResult - format manually
             if result.status == "ok":
@@ -106,13 +138,38 @@ class TelegramGateway:
                             error = step_result.get("error", "Unknown error")
                             response_parts.append(f"❌ Step {i}: {error}")
 
-                    return "\n".join(response_parts)
+                    response = "\n".join(response_parts)
                 else:
-                    return "✅ Request completed successfully"
+                    response = "✅ Request completed successfully"
+
+                timing.end("e2e_telegram_to_vault", success=True, response_length=len(response))
+                timing.log_summary()
+
+                return response
             else:
+                timing.end("e2e_telegram_to_vault", success=False, error=result.error)
+                timing.log_summary()
+
+                agent_logger.error(
+                    "Message processing failed",
+                    trace_id=trace_id,
+                    chat_id=chat_id,
+                    error=result.error,
+                )
+
                 return f"❌ Error: {result.error}"
 
         except Exception as e:
+            timing.end("e2e_telegram_to_vault", success=False, error=str(e))
+            timing.log_summary()
+
+            agent_logger.error(
+                "Exception during message processing",
+                trace_id=trace_id,
+                chat_id=chat_id,
+                error=str(e),
+            )
+
             return f"❌ Error processing request: {str(e)}"
 
 

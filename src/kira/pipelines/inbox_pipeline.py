@@ -14,8 +14,13 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from ..observability.loguru_config import get_logger, timing_context
+
 if TYPE_CHECKING:
     from ..core.events import EventBus
+
+# Loguru logger for pipeline operations
+pipeline_logger = get_logger("pipeline")
 
 __all__ = [
     "InboxPipeline",
@@ -137,54 +142,67 @@ class InboxPipeline:
         bool
             True if successful
         """
-        start_time = time.time()
+        with timing_context(
+            "pipeline_inbox_item",
+            component="pipeline",
+            trace_id=trace_id,
+            item_path=str(item_path),
+            attempt=attempt,
+        ) as ctx:
+            try:
+                # Read item content
+                content = item_path.read_text(encoding="utf-8")
+                ctx["content_size"] = len(content)
 
-        try:
-            # Read item content
-            content = item_path.read_text(encoding="utf-8")
+                # Determine event type based on file extension
+                if item_path.suffix == ".md":
+                    event_name = "file.dropped"
+                    payload = {
+                        "file_path": str(item_path),
+                        "content": content,
+                        "mime_type": "text/markdown",
+                        "source": "inbox_scan",
+                    }
+                else:
+                    event_name = "message.received"
+                    payload = {
+                        "message": content,
+                        "source": "inbox_file",
+                        "file_path": str(item_path),
+                    }
 
-            # Determine event type based on file extension
-            if item_path.suffix == ".md":
-                event_name = "file.dropped"
-                payload = {
-                    "file_path": str(item_path),
-                    "content": content,
-                    "mime_type": "text/markdown",
-                    "source": "inbox_scan",
-                }
-            else:
-                event_name = "message.received"
-                payload = {
-                    "message": content,
-                    "source": "inbox_file",
-                    "file_path": str(item_path),
-                }
+                # Add trace context
+                payload["trace_id"] = trace_id
+                payload["attempt"] = str(attempt)
+                payload["timestamp"] = datetime.now(UTC).isoformat()
 
-            # Add trace context
-            payload["trace_id"] = trace_id
-            payload["attempt"] = str(attempt)
-            payload["timestamp"] = datetime.now(UTC).isoformat()
+                # Publish event to plugins (thin orchestration - no business logic)
+                if self.event_bus:
+                    self.event_bus.publish(event_name, payload)
 
-            # Publish event to plugins (thin orchestration - no business logic)
-            if self.event_bus:
-                self.event_bus.publish(event_name, payload)
+                ctx["event_name"] = event_name
 
-            duration_ms = (time.time() - start_time) * 1000
+                pipeline_logger.info(
+                    "Inbox item processed",
+                    trace_id=trace_id,
+                    item_path=str(item_path),
+                    event_name=event_name,
+                    content_size=len(content),
+                )
 
-            # Log success
-            self._log_event(
-                "item_processed",
-                {
-                    "trace_id": trace_id,
-                    "file_path": str(item_path),
-                    "event_name": event_name,
-                    "attempt": attempt,
-                    "duration_ms": duration_ms,
-                    "outcome": "success",
-                },
-            )
+                # Log success
+                self._log_event(
+                    "item_processed",
+                    {
+                        "trace_id": trace_id,
+                        "file_path": str(item_path),
+                        "event_name": event_name,
+                        "attempt": attempt,
+                        "outcome": "success",
+                    },
+                )
 
-            return True
+                return True
 
         except Exception as exc:
             duration_ms = (time.time() - start_time) * 1000
