@@ -40,15 +40,21 @@ def plan_node(state: AgentState, llm_adapter: LLMAdapter, tools_description: str
     logger.info(f"[{state.trace_id}] Planning phase started")
     state.status = "planning"
 
-    # Build prompt for planning
-    system_prompt = f"""You are Kira's AI planner. Generate a JSON execution plan for the user's request.
+    # Build prompt for planning with dynamic replanning support
+    system_prompt = f"""You are Kira's AI planner. Generate a JSON execution plan for the next step(s) of the user's request.
+
+🔄 DYNAMIC REPLANNING MODE:
+- You will be called AFTER each tool execution to plan the next step(s)
+- You can see the results of previous tool executions
+- Use REAL data from previous results, NOT placeholders
+- Plan one or more steps, based on what's needed
+- If the task is COMPLETE, return an empty tool_calls array []
 
 AVAILABLE TOOLS:
 {tools_description}
 
 OUTPUT FORMAT (JSON only):
 {{
-  "plan": ["step 1 description", "step 2 description", ...],
   "tool_calls": [
     {{"tool": "exact_tool_name", "args": {{}}, "dry_run": false}},
     ...
@@ -58,18 +64,25 @@ OUTPUT FORMAT (JSON only):
 
 RULES:
 - Use EXACT tool names from the list above
-- Set dry_run=false for actual execution (reflection_node will ensure safety)
-- Only use dry_run=true if user explicitly asks to simulate/preview
-- Keep plans concise (max {state.budget.max_steps - state.budget.steps_used} steps)
+- Use REAL data from previous results (uids, values, etc.)
+- DO NOT use placeholders like '<uid_from_previous_step>' - use actual UIDs!
+- Set dry_run=false for actual execution
+- Keep plans concise (max {state.budget.max_steps - state.budget.steps_used} steps remaining)
 - Return ONLY valid JSON, no markdown or extra text
 
-IMPORTANT FOR DELETIONS:
-- To delete a task, you MUST first get its 'uid' from task_list
-- Use task_list to find the task, then task_delete with the uid
-- Example: [
-    {{"tool": "task_list", "args": {{}}, "dry_run": false}},
-    {{"tool": "task_delete", "args": {{"uid": "<uid_from_previous_step>"}}, "dry_run": false}}
-  ]
+COMPLETION:
+- If the user's request is fully satisfied, return: {{"tool_calls": [], "reasoning": "Task completed"}}
+- This will trigger the natural language response generation
+
+EXAMPLE WORKFLOW (Delete task):
+1st call (no previous results):
+  {{"tool_calls": [{{"tool": "task_list", "args": {{}}, "dry_run": false}}], "reasoning": "Get task list to find UIDs"}}
+
+2nd call (after task_list returned tasks with UIDs):
+  {{"tool_calls": [{{"tool": "task_delete", "args": {{"uid": "task-20251010-123456"}}, "dry_run": false}}], "reasoning": "Delete specific task using real UID from results"}}
+
+3rd call (after successful deletion):
+  {{"tool_calls": [], "reasoning": "Task deleted successfully, work complete"}}
 """
 
     # Get last user message for validation
@@ -87,16 +100,35 @@ IMPORTANT FOR DELETIONS:
     try:
         from ..adapters.llm import Message
 
-        # Build messages: system prompt + FULL conversation history
+        # Build messages: system prompt + FULL conversation history + previous results
         messages = [Message(role="system", content=system_prompt)]
 
         # Add ALL conversation history from state.messages
         for msg in state.messages:
             messages.append(Message(role=msg.get("role", "user"), content=msg.get("content", "")))
 
+        # Add tool results as assistant messages so LLM can see what was executed
+        if state.tool_results:
+            results_summary = "PREVIOUS TOOL EXECUTIONS:\n"
+            for i, result in enumerate(state.tool_results, 1):
+                tool_name = result.get("tool", "unknown")
+                status = result.get("status", "unknown")
+                data = result.get("data", {})
+                error = result.get("error", "")
+
+                results_summary += f"\n{i}. {tool_name}: {status}"
+                if status == "ok" and data:
+                    # Format data nicely for LLM
+                    results_summary += f"\n   Result: {json.dumps(data, ensure_ascii=False, indent=2)}"
+                elif status == "error" and error:
+                    results_summary += f"\n   Error: {error}"
+
+            messages.append(Message(role="assistant", content=results_summary))
+            logger.info(f"[{state.trace_id}] 🔍 DEBUG: Added {len(state.tool_results)} previous tool results to context")
+
         logger.info(
             f"[{state.trace_id}] 🔍 DEBUG: Calling LLM for planning with {len(messages)} messages "
-            f"(1 system + {len(state.messages)} conversation)"
+            f"(1 system + {len(state.messages)} conversation + {1 if state.tool_results else 0} results)"
         )
 
         response = llm_adapter.chat(messages, temperature=0.3, max_tokens=2000, timeout=30.0)
@@ -107,11 +139,23 @@ IMPORTANT FOR DELETIONS:
 
         # Parse plan
         plan_data = json.loads(response.content)
-        logger.info(f"[{state.trace_id}] Generated plan with {len(plan_data.get('tool_calls', []))} steps")
+        tool_calls = plan_data.get("tool_calls", [])
+        reasoning = plan_data.get("reasoning", "")
+
+        logger.info(f"[{state.trace_id}] Generated plan with {len(tool_calls)} steps")
+
+        # Check if plan is empty (task completed)
+        if not tool_calls:
+            logger.info(f"[{state.trace_id}] Empty plan returned - task completed. Reasoning: {reasoning}")
+            return {
+                "plan": [],
+                "memory": {**state.memory, "reasoning": reasoning},
+                "status": "completed",  # This will route to respond_step
+            }
 
         return {
-            "plan": plan_data.get("tool_calls", []),
-            "memory": {**state.memory, "reasoning": plan_data.get("reasoning", "")},
+            "plan": tool_calls,
+            "memory": {**state.memory, "reasoning": reasoning},
             "status": "planned",
         }
 

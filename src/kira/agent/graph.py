@@ -46,7 +46,8 @@ def build_agent_graph(
             "LangGraph is not installed. Install with: pip install kira[agent] or poetry install --extras agent"
         ) from e
 
-    from .nodes import plan_node, reflect_node, respond_node, tool_node, verify_node
+    from .nodes import (plan_node, reflect_node, respond_node, tool_node,
+                        verify_node)
     from .state import AgentState
 
     # Create state graph
@@ -82,6 +83,8 @@ def build_agent_graph(
         """Route after planning."""
         if state.error or state.status == "error":
             return "respond_step"  # Generate NL response even on planning error
+        if state.status == "completed":
+            return "respond_step"  # Task completed, generate final response
         if state.flags.enable_reflection:
             return "reflect_step"
         return "tool_step"
@@ -93,30 +96,35 @@ def build_agent_graph(
         return "tool_step"
 
     def route_after_tool(state):  # type: ignore[no-untyped-def]
-        """Route after tool execution."""
+        """Route after tool execution.
+
+        New behavior: After successful tool execution, return to plan_step
+        so LLM can see the results and plan next steps dynamically.
+        """
         if state.budget.is_exceeded():
             return "respond_step"  # Generate NL response even on budget exceeded
         if state.error or state.status == "error":
             if state.retry_count < 2:
-                return "plan_step"
+                return "plan_step"  # Replan on error
             return "respond_step"  # Generate NL response even on error
         if state.flags.enable_verification:
             return "verify_step"
-        # Check if more steps remain
-        if state.current_step < len(state.plan):
-            return "tool_step"
-        return "respond_step"  # Always generate NL response before done
+        # Always return to planning after successful tool execution
+        # This allows LLM to see results and decide next steps dynamically
+        return "plan_step"
 
     def route_after_verify(state):  # type: ignore[no-untyped-def]
-        """Route after verification."""
+        """Route after verification.
+
+        New behavior: After verification, return to planning to allow
+        dynamic replanning based on results.
+        """
         if state.budget.is_exceeded():
             return "respond_step"  # Generate NL response even on budget exceeded
         if state.error or state.status == "error":
             return "respond_step"  # Generate NL response even on error
-        # Check if more steps remain
-        if state.current_step < len(state.plan):
-            return "tool_step"
-        return "respond_step"  # Generate NL response
+        # Return to planning after verification
+        return "plan_step"
 
     def route_after_respond(state):  # type: ignore[no-untyped-def,unused-ignore]
         """Route after response generation."""
@@ -163,6 +171,7 @@ def build_agent_graph(
         route_after_verify,
         {
             "tool_step": "tool_step",
+            "plan_step": "plan_step",
             "respond_step": "respond_step",
             "halt": END,
         },
@@ -235,7 +244,7 @@ class AgentGraph:
             state.status = "error"
             return state
 
-    def stream(self, state: AgentState) -> Any:  # type: ignore[misc]
+    def stream(self, state: AgentState) -> Any:
         """Stream graph execution step by step.
 
         Parameters
