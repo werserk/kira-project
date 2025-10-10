@@ -20,8 +20,8 @@ logger = logging.getLogger(__name__)
 __all__ = ["plan_node", "reflect_node", "tool_node", "verify_node", "respond_node", "route_node"]
 
 
-def plan_node(state: AgentState, llm_adapter: LLMAdapter, tools_description: str) -> dict[str, Any]:
-    """Planning node - generates execution plan from user request.
+def plan_node(state: AgentState, llm_adapter: LLMAdapter, tool_registry: Any) -> dict[str, Any]:
+    """Planning node - generates execution plan from user request using native function calling.
 
     Parameters
     ----------
@@ -29,61 +29,16 @@ def plan_node(state: AgentState, llm_adapter: LLMAdapter, tools_description: str
         Current agent state
     llm_adapter
         LLM adapter for generating plan
-    tools_description
-        Description of available tools
+    tool_registry
+        Tool registry for converting tools to API format
 
     Returns
     -------
     dict
         State updates with plan
     """
-    logger.info(f"[{state.trace_id}] Planning phase started")
+    logger.info(f"[{state.trace_id}] Planning phase started (using native function calling)")
     state.status = "planning"
-
-    # Build prompt for planning with dynamic replanning support
-    system_prompt = f"""You are Kira's AI planner. Generate a JSON execution plan for the next step(s) of the user's request.
-
-🔄 DYNAMIC REPLANNING MODE:
-- You will be called AFTER each tool execution to plan the next step(s)
-- You can see the results of previous tool executions
-- Use REAL data from previous results, NOT placeholders
-- Plan one or more steps, based on what's needed
-- If the task is COMPLETE, return an empty tool_calls array []
-
-AVAILABLE TOOLS:
-{tools_description}
-
-OUTPUT FORMAT (JSON only):
-{{
-  "tool_calls": [
-    {{"tool": "exact_tool_name", "args": {{}}, "dry_run": false}},
-    ...
-  ],
-  "reasoning": "Brief explanation"
-}}
-
-RULES:
-- Use EXACT tool names from the list above
-- Use REAL data from previous results (uids, values, etc.)
-- DO NOT use placeholders like '<uid_from_previous_step>' - use actual UIDs!
-- Set dry_run=false for actual execution
-- Keep plans concise (max {state.budget.max_steps - state.budget.steps_used} steps remaining)
-- Return ONLY valid JSON, no markdown or extra text
-
-COMPLETION:
-- If the user's request is fully satisfied, return: {{"tool_calls": [], "reasoning": "Task completed"}}
-- This will trigger the natural language response generation
-
-EXAMPLE WORKFLOW (Delete task):
-1st call (no previous results):
-  {{"tool_calls": [{{"tool": "task_list", "args": {{}}, "dry_run": false}}], "reasoning": "Get task list to find UIDs"}}
-
-2nd call (after task_list returned tasks with UIDs):
-  {{"tool_calls": [{{"tool": "task_delete", "args": {{"uid": "task-20251010-123456"}}, "dry_run": false}}], "reasoning": "Delete specific task using real UID from results"}}
-
-3rd call (after successful deletion):
-  {{"tool_calls": [], "reasoning": "Task deleted successfully, work complete"}}
-"""
 
     # Get last user message for validation
     user_message = ""
@@ -96,7 +51,47 @@ EXAMPLE WORKFLOW (Delete task):
         logger.warning(f"[{state.trace_id}] No user message found")
         return {"error": "No user message to plan for", "status": "error"}
 
-    # Call LLM with FULL conversation history for context
+    # Build concise system prompt (no JSON instructions needed!)
+    system_prompt = f"""You are Kira's AI planner. Your job is to call the right tools to accomplish the user's request.
+
+🔄 DYNAMIC REPLANNING MODE:
+- You will be called AFTER each tool execution to decide next steps
+- You can see the results of previous tool executions
+- Use REAL data from previous results (uids, values, etc.)
+- Call one or more tools as needed
+- If the task is COMPLETE, don't call any tools
+
+⚡ PARALLEL EXECUTION:
+- When you need to perform MULTIPLE INDEPENDENT operations, call ALL tools at once
+- For example: deleting 3 tasks → call task_delete 3 times in ONE response
+- For example: creating 2 tasks → call task_create 2 times in ONE response
+- Only use sequential calls when operations DEPEND on each other
+
+IMPORTANT RULES:
+- Use EXACT tool names available to you
+- Use REAL data from previous results (actual UIDs, not placeholders!)
+- Keep plans concise (max {state.budget.max_steps - state.budget.steps_used} steps remaining)
+- If user's request is fully satisfied, don't call any tools (task complete)
+- ALWAYS prefer parallel execution when operations are independent!
+
+EXAMPLES:
+
+Example 1 - Delete multiple tasks (PARALLEL):
+User: "Delete all tasks about project X"
+After task_list returns UIDs: [task-123, task-456, task-789]
+→ Call task_delete(uid="task-123"), task_delete(uid="task-456"), task_delete(uid="task-789") ALL AT ONCE
+
+Example 2 - Create multiple tasks (PARALLEL):
+User: "Create tasks: buy milk, walk dog, send email"
+→ Call task_create(title="buy milk"), task_create(title="walk dog"), task_create(title="send email") ALL AT ONCE
+
+Example 3 - Sequential (when dependent):
+User: "Create a task and mark it as done"
+Step 1: Call task_create(title="...")
+Step 2 (after creation): Call task_update(uid=<from_step1>, status="done")
+"""
+
+    # Call LLM with native function calling API
     try:
         from ..adapters.llm import Message
 
@@ -107,7 +102,7 @@ EXAMPLE WORKFLOW (Delete task):
         for msg in state.messages:
             messages.append(Message(role=msg.get("role", "user"), content=msg.get("content", "")))
 
-        # Add tool results as assistant messages so LLM can see what was executed
+        # Add tool results as user message so LLM can see what was executed
         if state.tool_results:
             results_summary = "PREVIOUS TOOL EXECUTIONS:\n"
             for i, result in enumerate(state.tool_results, 1):
@@ -123,38 +118,47 @@ EXAMPLE WORKFLOW (Delete task):
                 elif status == "error" and error:
                     results_summary += f"\n   Error: {error}"
 
-            messages.append(Message(role="assistant", content=results_summary))
+            messages.append(Message(role="user", content=results_summary))
             logger.info(f"[{state.trace_id}] 🔍 DEBUG: Added {len(state.tool_results)} previous tool results to context")
 
+        # Get tools in API format from registry
+        api_tools = tool_registry.to_api_format()
+
         logger.info(
-            f"[{state.trace_id}] 🔍 DEBUG: Calling LLM for planning with {len(messages)} messages "
-            f"(1 system + {len(state.messages)} conversation + {1 if state.tool_results else 0} results)"
+            f"[{state.trace_id}] 🔍 DEBUG: Calling LLM with {len(api_tools)} tools available, "
+            f"{len(messages)} messages (1 system + {len(state.messages)} conversation + "
+            f"{1 if state.tool_results else 0} results)"
         )
 
-        response = llm_adapter.chat(messages, temperature=0.3, max_tokens=2000, timeout=30.0)
-        raw_content = response.content  # Store for error logging
+        # Call LLM with native function calling API
+        response = llm_adapter.tool_call(
+            messages=messages,
+            tools=api_tools,
+            temperature=0.3,
+            max_tokens=2000,
+            timeout=30.0
+        )
 
         # Update token budget
         tokens_used = response.usage.get("total_tokens", 0)
         state.budget.tokens_used += tokens_used
 
-        # Log raw response for debugging
-        logger.debug(f"[{state.trace_id}] Raw LLM response: {raw_content[:500]}...")
+        # Process tool calls from response
+        tool_calls = []
+        if response.tool_calls:
+            logger.info(f"[{state.trace_id}] LLM requested {len(response.tool_calls)} tool call(s)")
+            for call in response.tool_calls:
+                tool_calls.append({
+                    "tool": call.name,
+                    "args": call.arguments,
+                    "dry_run": state.flags.dry_run  # Use global dry_run flag
+                })
+                logger.debug(f"[{state.trace_id}]  - {call.name}({call.arguments})")
+        else:
+            logger.info(f"[{state.trace_id}] LLM didn't request any tools - task may be complete")
 
-        # Clean response: remove markdown code blocks if present
-        content = raw_content.strip()
-        if content.startswith("```json"):
-            content = content[7:]  # Remove ```json
-        elif content.startswith("```"):
-            content = content[3:]  # Remove ```
-        if content.endswith("```"):
-            content = content[:-3]  # Remove closing ```
-        content = content.strip()
-
-        # Parse plan
-        plan_data = json.loads(content)
-        tool_calls = plan_data.get("tool_calls", [])
-        reasoning = plan_data.get("reasoning", "")
+        # Extract reasoning from response content (if provided)
+        reasoning = response.content if response.content else "Tool execution planned"
 
         logger.info(f"[{state.trace_id}] Generated plan with {len(tool_calls)} steps")
 
@@ -173,27 +177,12 @@ EXAMPLE WORKFLOW (Delete task):
             "status": "planned",
         }
 
-    except json.JSONDecodeError as e:
-        logger.error(f"[{state.trace_id}] Failed to parse plan JSON: {e}")
-        try:
-            logger.error(f"[{state.trace_id}] Raw response that failed to parse: {raw_content[:500]}")
-            # Check if LLM returned plain text instead of JSON
-            if not raw_content.strip().startswith("{"):
-                logger.error(f"[{state.trace_id}] 🚨 LLM returned plain text instead of JSON! This is a critical prompt violation.")
-        except NameError:
-            logger.error(f"[{state.trace_id}] Response not available for logging")
-        # При ошибке парсинга - переходим к ответу с объяснением проблемы
-        return {
-            "error": f"Failed to generate valid plan (LLM returned invalid JSON - possibly plain text response)",
-            "status": "error",
-            "plan": [],  # Пустой план
-        }
     except Exception as e:
         logger.error(f"[{state.trace_id}] Planning failed: {e}", exc_info=True)
         return {
             "error": f"Planning failed: {e}",
             "status": "error",
-            "plan": [],  # Пустой план
+            "plan": [],
         }
 
 
@@ -404,7 +393,6 @@ def _get_respond_node_system_prompt() -> str:
 - Если задача выполнена - радуйся вместе с пользователем
 - Если ошибка - объясни понятно и предложи решение
 - Говори на языке пользователя (русский/английский)
-- Не упоминай технические детали пользователю, НО:
 - Будь как настоящий заботливый друг-помощник
 
 🚨 КРИТИЧЕСКИ ВАЖНО - ЧЕСТНОСТЬ И ТОЧНОСТЬ:
@@ -415,16 +403,24 @@ def _get_respond_node_system_prompt() -> str:
 - Если что-то пошло не так - признай это и предложи помощь
 - Лучше сказать "не получилось", чем солгать об успехе
 
+🔍 ПРИ ОШИБКАХ - ДОБАВЛЯЙ ПОДРОБНОСТИ:
+- Если ты видишь DEBUG INFO - ОБЯЗАТЕЛЬНО включи его в ответ
+- Пользователь разработчик и ему нужна техническая информация
+- Формат: "Извини, возникла ошибка. Вот подробности для дебага: [DEBUG INFO]"
+- Не скрывай Trace ID, тип ошибки и другую техническую информацию
+- Это поможет пользователю быстро найти проблему в логах
+
 СТИЛЬ:
 ✅ "Отлично, я нашла 3 задачи! Хочешь, расскажу подробнее?"
 ✅ "С радостью помогу! У тебя есть несколько активных задач."
-✅ "Хм, что-то не получилось удалить задачу. Давай попробуем по-другому?"
+✅ "Хм, что-то не получилось. Вот подробности: Trace ID: xxx, Error: yyy"
+✅ "Извини, возникла техническая ошибка при планировании. Trace ID: abc-123, планирование вернуло plain text вместо JSON."
 ❌ "Задача удалена!" (если на самом деле была ошибка)
 ❌ "Найдено 3 записи. Вы можете запросить детали."
 ❌ "Вот твои задачи 😊" (без эмодзи!)
 
 Твоя цель - чтобы пользователь чувствовал теплоту и заботу через слова, а не смайлики.
-НО главное - быть ЧЕСТНОЙ и ТОЧНОЙ в описании результатов!"""
+НО главное - быть ЧЕСТНОЙ и ТОЧНОЙ в описании результатов и ПРЕДОСТАВЛЯТЬ ТЕХНИЧЕСКУЮ ИНФОРМАЦИЮ ПРИ ОШИБКАХ!"""
 
 
 def respond_node(state: AgentState, llm_adapter: LLMAdapter) -> dict[str, Any]:
@@ -487,11 +483,26 @@ def respond_node(state: AgentState, llm_adapter: LLMAdapter) -> dict[str, Any]:
         context_parts.append(f"\n🚨 GLOBAL ERROR: {state.error}")
         context_parts.append("🚨 The request was NOT completed successfully!")
 
+        # Add detailed error information for debugging
+        context_parts.append(f"\n📋 DEBUG INFO (include in response for user):")
+        context_parts.append(f"   Trace ID: {state.trace_id}")
+        context_parts.append(f"   Error Type: {state.error}")
+        context_parts.append(f"   Steps Completed: {state.budget.steps_used}/{state.budget.max_steps}")
+
+        if state.tool_results:
+            context_parts.append(f"   Tools Executed: {len(state.tool_results)}")
+            failed_tools = [r for r in state.tool_results if r.get("status") == "error"]
+            if failed_tools:
+                context_parts.append(f"   Failed Tools: {len(failed_tools)}")
+        else:
+            context_parts.append(f"   Tools Executed: 0 (planning failed)")
+
         # If no tools were executed, make it VERY clear
         if not state.tool_results:
             context_parts.append("\n❌ NO TOOLS WERE EXECUTED!")
             context_parts.append("❌ DO NOT use conversation history - you have NO REAL DATA!")
             context_parts.append("❌ Tell user honestly that you couldn't get the information!")
+            context_parts.append("❌ PROVIDE THE DEBUG INFO ABOVE TO THE USER!")
 
     context = "\n".join(context_parts)
 

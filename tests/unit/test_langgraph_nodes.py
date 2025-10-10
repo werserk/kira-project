@@ -6,7 +6,7 @@ from unittest.mock import Mock
 
 import pytest
 
-from kira.adapters.llm import LLMResponse, Message
+from kira.adapters.llm import LLMResponse, Message, Tool, ToolCall
 from kira.agent.nodes import plan_node, reflect_node, route_node, tool_node, verify_node
 from kira.agent.state import AgentState, Budget, ContextFlags
 from kira.agent.tools import ToolResult
@@ -15,13 +15,15 @@ from kira.agent.tools import ToolResult
 class MockLLMAdapter:
     """Mock LLM adapter for testing."""
 
-    def __init__(self, response_content: str = ""):
+    def __init__(self, response_content: str = "", tool_calls: list[ToolCall] | None = None):
         self.response_content = response_content
+        self.tool_calls_to_return = tool_calls or []
         self.calls = []
 
     def chat(self, messages, temperature=0.7, max_tokens=1000, timeout=30.0):
         """Mock chat method."""
         self.calls.append({
+            "method": "chat",
             "messages": messages,
             "temperature": temperature,
             "max_tokens": max_tokens,
@@ -30,6 +32,24 @@ class MockLLMAdapter:
         return LLMResponse(
             content=self.response_content,
             finish_reason="stop",
+            usage={"total_tokens": 100, "prompt_tokens": 50, "completion_tokens": 50},
+            model="mock-model",
+        )
+
+    def tool_call(self, messages, tools, temperature=0.7, max_tokens=2000, timeout=60.0):
+        """Mock tool_call method for native function calling."""
+        self.calls.append({
+            "method": "tool_call",
+            "messages": messages,
+            "tools": tools,
+            "temperature": temperature,
+            "max_tokens": max_tokens,
+            "timeout": timeout,
+        })
+        return LLMResponse(
+            content=self.response_content,
+            finish_reason="tool_calls" if self.tool_calls_to_return else "stop",
+            tool_calls=self.tool_calls_to_return,
             usage={"total_tokens": 100, "prompt_tokens": 50, "completion_tokens": 50},
             model="mock-model",
         )
@@ -76,28 +96,50 @@ class MockToolRegistry:
         """Get tools description."""
         return "\n".join(f"- {t.name}: {t.description}" for t in self.tools.values())
 
+    def to_api_format(self):
+        """Convert tools to API format."""
+        from kira.adapters.llm import Tool
+        return [
+            Tool(
+                name=tool.name,
+                description=tool.description,
+                parameters=tool.get_parameters()
+            )
+            for tool in self.tools.values()
+        ]
+
 
 def test_plan_node_success():
-    """Test plan node with successful planning."""
+    """Test plan node with successful planning using native function calling."""
+    # Create mock tool calls that LLM would return
+    mock_tool_calls = [
+        ToolCall(
+            id="call_1",
+            name="task_create",
+            arguments={"title": "Test"}
+        )
+    ]
+
     llm_adapter = MockLLMAdapter(
-        response_content="""{
-            "plan": ["Create a task"],
-            "tool_calls": [
-                {"tool": "task_create", "args": {"title": "Test"}, "dry_run": true}
-            ],
-            "reasoning": "User wants to create a task"
-        }"""
+        response_content="I will create a task",
+        tool_calls=mock_tool_calls
     )
+
+    # Create mock registry
+    registry = MockToolRegistry()
+    registry.register(MockTool("task_create", ToolResult.ok({})))
 
     state = AgentState(
         trace_id="test-123",
         messages=[{"role": "user", "content": "Create a task named Test"}],
     )
 
-    result = plan_node(state, llm_adapter, "- task_create: Create a task")
+    result = plan_node(state, llm_adapter, registry)
 
     assert result["status"] == "planned"
     assert len(result["plan"]) == 1
+    assert result["plan"][0]["tool"] == "task_create"
+    assert result["plan"][0]["args"] == {"title": "Test"}
     assert result["plan"][0]["tool"] == "task_create"
     assert "reasoning" in result["memory"]
 
@@ -105,40 +147,47 @@ def test_plan_node_success():
 def test_plan_node_no_user_message():
     """Test plan node with no user message."""
     llm_adapter = MockLLMAdapter()
+    registry = MockToolRegistry()
     state = AgentState(trace_id="test-123", messages=[])
 
-    result = plan_node(state, llm_adapter, "")
+    result = plan_node(state, llm_adapter, registry)
 
     assert result["status"] == "error"
     assert "No user message" in result["error"]
 
 
-def test_plan_node_invalid_json():
-    """Test plan node with invalid JSON response."""
-    llm_adapter = MockLLMAdapter(response_content="Not valid JSON")
+def test_plan_node_empty_tool_calls():
+    """Test plan node when LLM doesn't call any tools (task complete)."""
+    llm_adapter = MockLLMAdapter(
+        response_content="Task is complete",
+        tool_calls=[]  # No tools to call
+    )
+    registry = MockToolRegistry()
     state = AgentState(
         trace_id="test-123",
         messages=[{"role": "user", "content": "Do something"}],
     )
 
-    result = plan_node(state, llm_adapter, "")
+    result = plan_node(state, llm_adapter, registry)
 
-    assert result["status"] == "error"
-    assert "Invalid plan JSON" in result["error"]
+    assert result["status"] == "completed"
+    assert result["plan"] == []
 
 
 def test_plan_node_updates_token_budget():
     """Test that plan node updates token budget."""
     llm_adapter = MockLLMAdapter(
-        response_content='{"plan": [], "tool_calls": [], "reasoning": "test"}'
+        response_content="Task complete",
+        tool_calls=[]
     )
+    registry = MockToolRegistry()
     state = AgentState(
         trace_id="test-123",
         messages=[{"role": "user", "content": "Test"}],
     )
 
     initial_tokens = state.budget.tokens_used
-    result = plan_node(state, llm_adapter, "")
+    result = plan_node(state, llm_adapter, registry)
 
     # The mock returns 100 total tokens
     assert state.budget.tokens_used == initial_tokens + 100

@@ -142,10 +142,9 @@ class LangGraphExecutor:
             )
 
         # Build graph on initialization
-        tools_desc = tool_registry.get_tools_description()
         from .graph import build_agent_graph
 
-        self.graph = build_agent_graph(llm_adapter, tool_registry, tools_desc)
+        self.graph = build_agent_graph(llm_adapter, tool_registry)
 
     def execute(
         self,

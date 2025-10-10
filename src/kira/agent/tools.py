@@ -45,9 +45,9 @@ class ToolResult:
         return cls(status="ok", data=data, meta=meta or {})
 
     @classmethod
-    def error(cls, error: str, meta: dict[str, Any] | None = None) -> ToolResult:
+    def error(cls, error_msg: str, meta: dict[str, Any] | None = None) -> ToolResult:
         """Create error result."""
-        return cls(status="error", error=error, meta=meta or {})
+        return cls(status="error", error=error_msg, meta=meta or {})
 
 
 class AgentTool(Protocol):
@@ -140,3 +140,27 @@ class ToolRegistry:
             descriptions.append(f"- {tool.name}: {tool.description}")
             descriptions.append(f"  Parameters: {params}")
         return "\n".join(descriptions)
+
+    def to_api_format(self) -> list[Any]:
+        """Convert tools to LLM API format (Tool objects).
+
+        This method converts our internal tool representation to the format
+        expected by LLM adapters' tool_call() API.
+
+        Returns
+        -------
+        list[Tool]
+            List of Tool objects for LLM API
+        """
+        from ..adapters.llm import Tool
+
+        api_tools = []
+        for tool in self._tools.values():
+            api_tools.append(
+                Tool(
+                    name=tool.name,
+                    description=tool.description,
+                    parameters=tool.get_parameters()
+                )
+            )
+        return api_tools
