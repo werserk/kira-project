@@ -18,8 +18,6 @@ __pycache__
 *.pyo
 *.pyd
 
-vault/
-
 # Configuration and secrets
 .env
 .env.local
@@ -37,4 +35,5 @@ is_everything_ok.sh
 
 
 logs/
-artifacts
+artifacts/
+vault/
