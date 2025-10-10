@@ -204,11 +204,9 @@ def timing_context(
     }
 
     # Log operation start
-    logger.bind(component=component, timing=True).info(
+    logger.bind(component=component, timing=True, operation=operation, trace_id=trace_id).info(
         f"START: {operation}",
-        operation=operation,
         phase="start",
-        trace_id=trace_id,
         timestamp_ns=start_time_ns,
         **metadata,
     )
@@ -223,17 +221,15 @@ def timing_context(
         duration_ns = end_time_ns - start_time_ns
 
         # Log operation end with timing
-        logger.bind(component=component, timing=True).info(
+        logger.bind(component=component, timing=True, operation=operation, trace_id=trace_id).info(
             f"END: {operation}",
-            operation=operation,
             phase="end",
-            trace_id=trace_id,
             duration_s=duration_s,
             duration_ms=duration_ms,
             duration_ns=duration_ns,
             start_ns=start_time_ns,
             end_ns=end_time_ns,
-            **context,
+            **{k: v for k, v in context.items() if k not in ['operation', 'component', 'trace_id']},
         )
 
 

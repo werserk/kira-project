@@ -176,11 +176,17 @@ def create_unified_executor(
                 else:
                     raise ValueError("tool_registry or (host_api + vault_path) required for LangGraph")
 
+            # Get memory config from kwargs or config
+            memory_max_exchanges = kwargs.get('memory_max_exchanges', 10)
+            if config and hasattr(config, 'memory_max_exchanges'):
+                memory_max_exchanges = config.memory_max_exchanges
+
             logger.info(
                 f"Creating LangGraph executor: "
                 f"reflection={enable_langgraph_reflection}, "
                 f"verification={enable_langgraph_verification}, "
-                f"max_steps={max_steps}"
+                f"max_steps={max_steps}, "
+                f"memory_max_exchanges={memory_max_exchanges}"
             )
 
             langgraph_executor = LangGraphExecutor(
@@ -189,6 +195,7 @@ def create_unified_executor(
                 max_steps=max_steps,
                 enable_reflection=enable_langgraph_reflection,
                 enable_verification=enable_langgraph_verification,
+                memory_max_exchanges=memory_max_exchanges,
             )
 
             return UnifiedExecutor(

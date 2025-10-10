@@ -78,6 +78,7 @@ class LangGraphExecutor:
         max_wall_time: float = 300.0,
         enable_reflection: bool = True,
         enable_verification: bool = True,
+        memory_max_exchanges: int = 10,
     ) -> None:
         """Initialize LangGraph executor.
 
@@ -97,6 +98,8 @@ class LangGraphExecutor:
             Enable reflection node
         enable_verification
             Enable verification node
+        memory_max_exchanges
+            Maximum number of conversation exchanges to keep in memory
         """
         self.llm_adapter = llm_adapter
         self.tool_registry = tool_registry
@@ -108,14 +111,14 @@ class LangGraphExecutor:
 
         # Conversation memory for multi-turn context
         from .memory import ConversationMemory
-        self.conversation_memory = ConversationMemory(max_exchanges=5)  # Keep last 5 exchanges
+        self.conversation_memory = ConversationMemory(max_exchanges=memory_max_exchanges)
 
         # Build graph on initialization
         tools_desc = tool_registry.get_tools_description()
         from .graph import build_agent_graph
 
         self.graph = build_agent_graph(llm_adapter, tool_registry, tools_desc)
-        logger.info("LangGraph executor initialized with conversation memory")
+        logger.info(f"LangGraph executor initialized with conversation memory (max_exchanges={memory_max_exchanges})")
 
     def execute(
         self,
