@@ -24,11 +24,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - LangGraphExecutor now uses persistent memory by default
 
 ### Fixed
-- **🔥 CRITICAL**: Infinite loop in confirmation flow causing recursion limit errors
+- **🔥 CRITICAL (Report 023)**: Confirmation state lost in respond_node - bot never saves pending confirmation
+  - `respond_node` now properly returns `pending_confirmation`, `pending_plan`, `confirmation_question` fields
+  - Previously these fields were NOT included in return dict, causing LangGraph to lose the state
+  - This was the ROOT CAUSE of confirmation loop bug despite Reports 021/022 fixes
+  - Fixes issue where session_state was always cleared instead of saved
+  - See `docs/reports/023-respond-node-state-loss.md` for detailed analysis
+- **🔥 CRITICAL (Report 020)**: Infinite loop in confirmation flow causing recursion limit errors
   - `route_after_reflect` now correctly checks for `status == "completed"`
   - When reflection detects destructive operations and requests user confirmation, graph now properly routes to `respond_step` instead of entering infinite loop
   - Fixes: `GraphRecursionError: Recursion limit of 25 reached without hitting a stop condition`
   - See `docs/reports/020-recursion-limit-bug-fix.md` for detailed analysis
+- **🔥 CRITICAL (Report 021)**: Confirmation loop - bot asks same question repeatedly, ignores "Да" response
+  - Added `session_state` table to persist confirmation state between requests
+  - `LangGraphExecutor` now loads/saves `pending_confirmation`, `pending_plan`, `confirmation_question` from/to database
+  - Confirmation flow now works correctly across multiple requests
+  - Fixes issue where bot kept asking "Подтверди удаление?" despite user responding "Да"
+  - See `docs/reports/021-confirmation-loop-bug-fix.md` for detailed analysis
+- **🔥 HIGH (Report 022)**: Pending confirmation not cleared on new request
+  - `plan_node` now properly returns cleared state when user sends different request
+  - Fixed direct state mutation that was being lost (mutations must be returned in LangGraph)
+  - User can now freely change their mind and send new requests without being stuck with old confirmation
+  - Fixes issue where bot showed old "Подтверди удаление?" when user asked "Скинь список задач"
+  - See `docs/reports/022-pending-state-not-cleared.md` for detailed analysis
 - **🔥 CRITICAL**: LangGraph nodes now properly use conversation history
   - `plan_node` now receives full conversation context when planning
   - `respond_node` now receives full conversation context when generating responses

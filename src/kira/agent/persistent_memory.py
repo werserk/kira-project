@@ -132,6 +132,19 @@ class PersistentConversationMemory:
                 """
             )
 
+            # Session state table for confirmation flow
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS session_state (
+                    session_id TEXT PRIMARY KEY,
+                    pending_confirmation INTEGER NOT NULL DEFAULT 0,
+                    pending_plan TEXT,
+                    confirmation_question TEXT,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+                """
+            )
+
             conn.commit()
 
     def add_turn(
@@ -468,4 +481,125 @@ class PersistentConversationMemory:
             "turn_count": len(turns),
             "turns": [turn.to_dict() for turn in turns],
         }
+
+    def save_session_state(
+        self,
+        session_id: str,
+        pending_confirmation: bool,
+        pending_plan: list[dict[str, Any]] | None = None,
+        confirmation_question: str = "",
+    ) -> None:
+        """Save session confirmation state.
+
+        Parameters
+        ----------
+        session_id
+            Session identifier
+        pending_confirmation
+            Whether confirmation is pending
+        pending_plan
+            Plan waiting for confirmation
+        confirmation_question
+            Question to ask user
+        """
+        import logging
+        logger = logging.getLogger(__name__)
+
+        logger.info(
+            f"🔍 DEBUG: save_session_state() - session={session_id}, "
+            f"pending={pending_confirmation}, plan_len={len(pending_plan) if pending_plan else 0}"
+        )
+
+        pending_plan_json = json.dumps(pending_plan or [])
+
+        with sqlite3.connect(self.db_path) as conn:
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO session_state
+                (session_id, pending_confirmation, pending_plan, confirmation_question, updated_at)
+                VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+                """,
+                (
+                    session_id,
+                    1 if pending_confirmation else 0,
+                    pending_plan_json,
+                    confirmation_question,
+                ),
+            )
+            conn.commit()
+
+        logger.info(f"✅ DEBUG: Saved session state for {session_id}")
+
+    def get_session_state(self, session_id: str) -> dict[str, Any]:
+        """Get session confirmation state.
+
+        Parameters
+        ----------
+        session_id
+            Session identifier
+
+        Returns
+        -------
+        dict
+            Session state with pending_confirmation, pending_plan, confirmation_question
+        """
+        import logging
+        logger = logging.getLogger(__name__)
+
+        logger.info(f"🔍 DEBUG: get_session_state() - session={session_id}")
+
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.execute(
+                """
+                SELECT pending_confirmation, pending_plan, confirmation_question
+                FROM session_state
+                WHERE session_id = ?
+                """,
+                (session_id,),
+            )
+            row = cursor.fetchone()
+
+            if row:
+                pending_confirmation, pending_plan_json, confirmation_question = row
+                pending_plan = json.loads(pending_plan_json) if pending_plan_json else []
+
+                logger.info(
+                    f"✅ DEBUG: Found session state - pending={bool(pending_confirmation)}, "
+                    f"plan_len={len(pending_plan)}"
+                )
+
+                return {
+                    "pending_confirmation": bool(pending_confirmation),
+                    "pending_plan": pending_plan,
+                    "confirmation_question": confirmation_question or "",
+                }
+
+        logger.info(f"✅ DEBUG: No session state found for {session_id}, using defaults")
+        return {
+            "pending_confirmation": False,
+            "pending_plan": [],
+            "confirmation_question": "",
+        }
+
+    def clear_session_state(self, session_id: str) -> None:
+        """Clear session confirmation state.
+
+        Parameters
+        ----------
+        session_id
+            Session identifier
+        """
+        import logging
+        logger = logging.getLogger(__name__)
+
+        logger.info(f"🔍 DEBUG: clear_session_state() - session={session_id}")
+
+        with sqlite3.connect(self.db_path) as conn:
+            conn.execute(
+                "DELETE FROM session_state WHERE session_id = ?",
+                (session_id,),
+            )
+            conn.commit()
+
+        logger.info(f"✅ DEBUG: Cleared session state for {session_id}")
 

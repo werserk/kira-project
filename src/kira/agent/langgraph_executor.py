@@ -225,6 +225,14 @@ class LangGraphExecutor:
             f"({len(conversation_history)} from history + 1 new)"
         )
 
+        # Load session state (for confirmation flow)
+        session_state = self.conversation_memory.get_session_state(session_id)
+        logger.info(
+            f"[{trace_id}] 🔍 DEBUG: Loaded session state - "
+            f"pending_confirmation={session_state['pending_confirmation']}, "
+            f"pending_plan_len={len(session_state['pending_plan'])}"
+        )
+
         # Create initial state
         from .state import AgentState, Budget, ContextFlags
 
@@ -234,6 +242,10 @@ class LangGraphExecutor:
             user=user,
             messages=messages,  # Include conversation history!
             progress_callback=progress_callback,  # For UI updates
+            # Restore confirmation state from session
+            pending_confirmation=session_state["pending_confirmation"],
+            pending_plan=session_state["pending_plan"],
+            confirmation_question=session_state["confirmation_question"],
             budget=Budget(
                 max_steps=self.max_steps,
                 max_tokens=self.max_tokens,
@@ -276,6 +288,28 @@ class LangGraphExecutor:
 
         except Exception as e:
             logger.error(f"[{trace_id}] ❌ ERROR saving conversation turn: {e}", exc_info=True)
+
+        # Save or clear session state (for confirmation flow)
+        try:
+            if final_state.pending_confirmation:
+                # Save pending confirmation state
+                logger.info(
+                    f"[{trace_id}] 💾 Saving pending confirmation state - "
+                    f"plan_len={len(final_state.pending_plan)}"
+                )
+                self.conversation_memory.save_session_state(
+                    session_id,
+                    pending_confirmation=True,
+                    pending_plan=final_state.pending_plan,
+                    confirmation_question=final_state.confirmation_question,
+                )
+            else:
+                # Clear any pending confirmation state (user confirmed or rejected)
+                logger.info(f"[{trace_id}] 🧹 Clearing session state (no pending confirmation)")
+                self.conversation_memory.clear_session_state(session_id)
+
+        except Exception as e:
+            logger.error(f"[{trace_id}] ❌ ERROR managing session state: {e}", exc_info=True)
 
         return result
 

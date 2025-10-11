@@ -51,6 +51,9 @@ def plan_node(state: AgentState, llm_adapter: LLMAdapter, tool_registry: Any) ->
         logger.warning(f"[{state.trace_id}] No user message found")
         return {"error": "No user message to plan for", "status": "error"}
 
+    # Track if we need to clear pending state
+    clear_pending_state = False
+
     # Check if user is responding to a confirmation request
     if state.pending_confirmation and state.pending_plan:
         logger.info(f"[{state.trace_id}] Checking if user confirmed pending operation")
@@ -82,13 +85,10 @@ def plan_node(state: AgentState, llm_adapter: LLMAdapter, tool_registry: Any) ->
                 "plan": [],
                 "status": "completed",  # Go to respond with cancellation message
             }
-        # If ambiguous, treat as new request and continue to normal planning
+        # If ambiguous/different request, clear pending state and continue to normal planning
         else:
-            logger.warning(f"[{state.trace_id}] Ambiguous response to confirmation, treating as new request")
-            # Clear pending state and continue
-            state.pending_confirmation = False
-            state.pending_plan = []
-            state.confirmation_question = ""
+            logger.warning(f"[{state.trace_id}] User sent different request, clearing pending confirmation")
+            clear_pending_state = True
 
     # Build concise system prompt (no JSON instructions needed!)
     system_prompt = f"""You are Kira's AI planner. Your job is to decide if tools are needed or if it's just conversation.
@@ -263,17 +263,33 @@ Step 2: Choose action based on what was found
         # Check if plan is empty (task completed)
         if not tool_calls:
             logger.info(f"[{state.trace_id}] Empty plan returned - task completed. Reasoning: {reasoning}")
-            return {
+            result = {
                 "plan": [],
                 "memory": {**state.memory, "reasoning": reasoning},
                 "status": "completed",  # This will route to respond_step
             }
+            # Clear pending state if needed
+            if clear_pending_state:
+                result.update({
+                    "pending_confirmation": False,
+                    "pending_plan": [],
+                    "confirmation_question": "",
+                })
+            return result
 
-        return {
+        result = {
             "plan": tool_calls,
             "memory": {**state.memory, "reasoning": reasoning},
             "status": "planned",
         }
+        # Clear pending state if needed
+        if clear_pending_state:
+            result.update({
+                "pending_confirmation": False,
+                "pending_plan": [],
+                "confirmation_question": "",
+            })
+        return result
 
     except Exception as e:
         logger.error(f"[{state.trace_id}] Planning failed: {e}", exc_info=True)
@@ -627,9 +643,13 @@ def respond_node(state: AgentState, llm_adapter: LLMAdapter) -> dict[str, Any]:
     # If there's a confirmation question pending, return it directly
     if state.pending_confirmation and state.confirmation_question:
         logger.info(f"[{state.trace_id}] Returning confirmation question to user")
+        # CRITICAL: Must return pending_* fields to preserve confirmation state!
         return {
             "response": state.confirmation_question,
             "status": "responded",
+            "pending_confirmation": True,  # Preserve confirmation state
+            "pending_plan": state.pending_plan,  # Preserve pending plan
+            "confirmation_question": state.confirmation_question,  # Preserve question
         }
 
     # Check if user cancelled a pending operation

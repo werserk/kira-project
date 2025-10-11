@@ -105,7 +105,7 @@ def test_execution_result_to_dict():
     assert "budget" in data
 
 
-def test_langgraph_executor_initialization():
+def test_langgraph_executor_initialization(tmp_path):
     """Test LangGraph executor initialization."""
     llm_adapter = MockLLMAdapter("{}")
     tool_registry = MockToolRegistry()
@@ -115,6 +115,7 @@ def test_langgraph_executor_initialization():
         tool_registry,
         max_steps=5,
         max_tokens=5000,
+        memory_db_path=tmp_path / "test.db",
     )
 
     assert executor.max_steps == 5
@@ -122,7 +123,7 @@ def test_langgraph_executor_initialization():
     assert executor.graph is not None
 
 
-def test_langgraph_executor_execute_simple():
+def test_langgraph_executor_execute_simple(tmp_path):
     """Test executor with simple plan."""
     plan_response = """{
         "plan": ["List tasks"],
@@ -143,6 +144,7 @@ def test_langgraph_executor_execute_simple():
         tool_registry,
         enable_reflection=False,
         enable_verification=False,
+        memory_db_path=tmp_path / "test.db",
     )
 
     result = executor.execute("List all tasks")
@@ -152,7 +154,7 @@ def test_langgraph_executor_execute_simple():
     assert len(result.tool_results) == 1
 
 
-def test_langgraph_executor_dry_run():
+def test_langgraph_executor_dry_run(tmp_path):
     """Test executor with dry_run mode."""
     plan_response = """{
         "plan": ["Create task"],
@@ -173,6 +175,7 @@ def test_langgraph_executor_dry_run():
         tool_registry,
         enable_reflection=False,
         enable_verification=False,
+        memory_db_path=tmp_path / "test.db",
     )
 
     result = executor.execute("Create a task", dry_run=True)
@@ -181,7 +184,7 @@ def test_langgraph_executor_dry_run():
     assert result.success is True
 
 
-def test_langgraph_executor_with_trace_id():
+def test_langgraph_executor_with_trace_id(tmp_path):
     """Test executor with custom trace ID."""
     plan_response = """{
         "plan": ["List tasks"],
@@ -200,6 +203,7 @@ def test_langgraph_executor_with_trace_id():
         tool_registry,
         enable_reflection=False,
         enable_verification=False,
+        memory_db_path=tmp_path / "test.db",
     )
 
     result = executor.execute("List tasks", trace_id="custom-trace-123")
@@ -207,7 +211,7 @@ def test_langgraph_executor_with_trace_id():
     assert result.trace_id == "custom-trace-123"
 
 
-def test_langgraph_executor_budget_limits():
+def test_langgraph_executor_budget_limits(tmp_path):
     """Test executor respects budget limits."""
     plan_response = """{
         "plan": ["Create many tasks"],
@@ -233,6 +237,7 @@ def test_langgraph_executor_budget_limits():
         max_steps=3,  # Limit to 3 steps
         enable_reflection=False,
         enable_verification=False,
+        memory_db_path=tmp_path / "test.db",
     )
 
     result = executor.execute("Create tasks")
@@ -241,12 +246,12 @@ def test_langgraph_executor_budget_limits():
     assert task_create_tool.execution_count <= 3
 
 
-def test_langgraph_executor_get_graph_diagram():
+def test_langgraph_executor_get_graph_diagram(tmp_path):
     """Test getting graph visualization."""
     llm_adapter = MockLLMAdapter("{}")
     tool_registry = MockToolRegistry()
 
-    executor = LangGraphExecutor(llm_adapter, tool_registry)
+    executor = LangGraphExecutor(llm_adapter, tool_registry, memory_db_path=tmp_path / "test.db")
 
     diagram = executor.get_graph_diagram()
 
@@ -255,7 +260,7 @@ def test_langgraph_executor_get_graph_diagram():
     assert len(diagram) > 0
 
 
-def test_langgraph_executor_tool_error():
+def test_langgraph_executor_tool_error(tmp_path):
     """Test executor handles tool errors gracefully."""
     plan_response = """{
         "plan": ["Create task"],
@@ -277,6 +282,7 @@ def test_langgraph_executor_tool_error():
         tool_registry,
         enable_reflection=False,
         enable_verification=False,
+        memory_db_path=tmp_path / "test.db",
     )
 
     result = executor.execute("Create a task")
@@ -286,7 +292,7 @@ def test_langgraph_executor_tool_error():
     assert result.status == "responded"
 
 
-def test_langgraph_executor_streaming():
+def test_langgraph_executor_streaming(tmp_path):
     """Test executor streaming mode."""
     plan_response = """{
         "plan": ["List tasks"],
@@ -305,6 +311,7 @@ def test_langgraph_executor_streaming():
         tool_registry,
         enable_reflection=False,
         enable_verification=False,
+        memory_db_path=tmp_path / "test.db",
     )
 
     steps = list(executor.stream("List tasks"))
@@ -318,7 +325,7 @@ def test_langgraph_executor_streaming():
         assert isinstance(result, ExecutionResult)
 
 
-def test_langgraph_executor_multi_step():
+def test_langgraph_executor_multi_step(tmp_path):
     """Test executor with multi-step plan."""
     plan_response = """{
         "plan": ["List tasks", "Create task"],
@@ -343,6 +350,7 @@ def test_langgraph_executor_multi_step():
         tool_registry,
         enable_reflection=False,
         enable_verification=False,
+        memory_db_path=tmp_path / "test.db",
     )
 
     result = executor.execute("List and create")
