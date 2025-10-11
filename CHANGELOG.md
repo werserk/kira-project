@@ -14,12 +14,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Default: 10 exchanges per session with in-memory caching
   - Full backward compatibility: can be disabled to use ephemeral memory
   - See `docs/guides/persistent-memory.md` for details
+- **Unit Tests for Graph Routing**: Comprehensive tests for routing logic in LangGraph
+  - Tests for all routing functions: `route_after_plan`, `route_after_reflect`, `route_after_tool`, `route_after_verify`
+  - Regression test for recursion limit bug in confirmation flow
+  - See `tests/unit/test_agent_graph_routing.py`
 
 ### Changed
 - Memory default increased from 3 to 10 exchanges
 - LangGraphExecutor now uses persistent memory by default
 
 ### Fixed
+- **🔥 CRITICAL**: Infinite loop in confirmation flow causing recursion limit errors
+  - `route_after_reflect` now correctly checks for `status == "completed"`
+  - When reflection detects destructive operations and requests user confirmation, graph now properly routes to `respond_step` instead of entering infinite loop
+  - Fixes: `GraphRecursionError: Recursion limit of 25 reached without hitting a stop condition`
+  - See `docs/reports/020-recursion-limit-bug-fix.md` for detailed analysis
 - **🔥 CRITICAL**: LangGraph nodes now properly use conversation history
   - `plan_node` now receives full conversation context when planning
   - `respond_node` now receives full conversation context when generating responses

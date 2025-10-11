@@ -207,6 +207,8 @@ def build_agent_graph(
         """Route after reflection."""
         if state.error or state.status == "error":
             return "respond_step"  # Generate NL response even on reflection error
+        if state.status == "completed":
+            return "respond_step"  # Confirmation needed, ask user before proceeding
         return "tool_step"
 
     def route_after_tool(state):  # type: ignore[no-untyped-def]
